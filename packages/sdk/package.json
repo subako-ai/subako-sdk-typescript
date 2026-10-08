@@ -1,0 +1,48 @@
+{
+	"name": "@subako-ai/sdk",
+	"version": "0.1.14",
+	"description": "TypeScript client for the Subako API",
+	"homepage": "https://subako.ai",
+	"license": "Apache-2.0",
+	"author": "Kikuvi, Inc.",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/subako-ai/subako-sdk-typescript.git",
+		"directory": "packages/sdk"
+	},
+	"files": [
+		"dist",
+		"src"
+	],
+	"type": "module",
+	"sideEffects": false,
+	"exports": {
+		".": "./src/index.ts",
+		"./package.json": "./package.json"
+	},
+	"publishConfig": {
+		"exports": {
+			".": {
+				"types": "./dist/index.d.ts",
+				"default": "./dist/index.js"
+			},
+			"./package.json": "./package.json"
+		},
+		"access": "public"
+	},
+	"scripts": {
+		"gen": "openapi-ts && node ../../scripts/gen-idempotency.mjs",
+		"prepack": "node ../../scripts/prepack.mjs"
+	},
+	"dependencies": {
+		"@standard-schema/spec": "^1.1.0"
+	},
+	"devDependencies": {
+		"@hey-api/openapi-ts": "0.0.0-next-20260824173136",
+		"oxc-parser": "^0.127.0",
+		"typescript": "^7"
+	},
+	"engines": {
+		"node": ">=22"
+	}
+}

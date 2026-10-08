@@ -1,0 +1,176 @@
+---
+title: Navigation
+description: Let an agent move the person between your app's pages.
+sidebar:
+  order: 3
+---
+
+An agent that can fill in a form still has to get to the page the form is on. `navigateTool` is where your app lists the pages a model may send someone to. Anything not on that list is unreachable.
+
+```sh
+pnpm add @subako-ai/tools @subako-ai/sdk
+```
+
+## `navigateTool`
+
+```ts
+navigateTool({
+	routes: [
+		{ to: "/", description: "The dashboard" },
+		{ to: "/contact", description: "The contact form" },
+		{ to: "/users/$userId", params: { userId: "string" } },
+	],
+	navigate: (to, params) => router.navigate({ to, params }),
+	read: () => ({ location: window.location.pathname }),
+});
+```
+
+Three things go in, and the first is the one that matters.
+
+<TypeTable
+  type={{
+    routes: {
+      type: "Route[]",
+      required: true,
+      description:
+        "The allowlist. `to` becomes an `enum`, so the model can only name a destination the app declared — and an external URL is not a destination at all.",
+    },
+    navigate: {
+      type: "(to, params) => void | Promise<void>",
+      required: true,
+      description: "The move. Await it if the router's transition is asynchronous.",
+    },
+    read: {
+      type: "() => unknown",
+      description:
+        "Where the app ended up, read when the model asks. Without it the answer is `{ location: to }`.",
+    },
+  }}
+/>
+
+### The allowlist is the point
+
+`to` becomes an enum in the schema the model reads, so there is no call that names a page you did not list. An external URL cannot be expressed at all — the tool has no field for one.
+
+That also makes the descriptions load-bearing: they are how the model tells `/users/$userId` from `/settings/billing` without guessing from the path.
+
+### Path parameters
+
+The path parameters of every route are described as **one** `params` object, and the chosen route's own parameters are checked when the call arrives — so naming the wrong ones is answered as an error rather than navigating somewhere unintended.
+
+A strict schema makes the model fill that object whole, so a parameter the chosen route does not take is ignored when it is blank and refused only when it carries a value.
+
+### Reading back
+
+The answer is `read()`, or `{ location: to }` when there is none. Reporting where the app actually ended up is worth the small extra: a guard that redirected, a route that fell through to a 404, a transition that has not finished — the model sees the place rather than the intent.
+
+## TanStack Router
+
+The route tree is the allowlist, so nothing has to be written by hand.
+
+```sh
+pnpm add @subako-ai/tanstack-router @subako-ai/tools
+```
+
+```tsx
+import { useTool } from "@subako-ai/react";
+import { fromTanStackRouter } from "@subako-ai/tanstack-router";
+import { navigateTool } from "@subako-ai/tools";
+
+useTool(client, "navigate", navigateTool(fromTanStackRouter(router)));
+```
+
+`fromTanStackRouter(router)` answers with `routes`, `navigate` and `read` — everything `navigateTool` takes. Spread it and add a `description` when the default one is not enough.
+
+It walks `routesById`, skipping the root and any pathless layout route, and carries every `$param` as a string parameter. Its `navigate` **awaits** `router.navigate(...)`, so the tool answers once the route has actually changed — the adapter owns the wait for the transition, so nothing in the app has to. `read` reports `router.state.location.pathname`.
+
+Requires `@tanstack/react-router` 1.100 or newer.
+
+## React Router
+
+```sh
+pnpm add @subako-ai/react-router @subako-ai/tools
+```
+
+```tsx
+import { useTool } from "@subako-ai/react";
+import { fromReactRouter } from "@subako-ai/react-router";
+import { navigateTool } from "@subako-ai/tools";
+import { useRef } from "react";
+import { useLocation, useNavigate } from "react-router";
+
+function Agent({ client }: { client: ToolClient }) {
+	const navigate = useNavigate();
+	const { pathname } = useLocation();
+
+	// Where the app is now, read when the model asks rather than when the tool was built.
+	const here = useRef(pathname);
+	here.current = pathname;
+
+	useTool(
+		client,
+		"navigate",
+		navigateTool(
+			fromReactRouter({
+				navigate,
+				location: () => here.current,
+				routes: [
+					{ to: "/documents", description: "Every document" },
+					{ to: "/documents/:id", description: "One document" },
+				],
+			}),
+		),
+	);
+
+	return null;
+}
+```
+
+**The app names its own routes.** Neither the `<Routes>` style nor the file-based one keeps a registry to read at runtime, so there is nothing to enumerate — and naming them is worth doing anyway, because it is the allowlist.
+
+A route's path parameters come from its path, so `/documents/:id` needs no `params` of its own; declare them only to say one is a number. The binding builds the path it navigates to — React Router's `navigate()` takes `/documents/7`, not the pattern and a params object — and values are escaped on the way in.
+
+A splat is not a destination a model can name, and neither is an optional segment (`:id?`): the binding does not elide it, so both are refused when the binding is built. List the concrete variants as separate routes instead.
+
+### Read `location` live
+
+`location` is called when the model asks, which can be many renders after the tool was built, and `useLocation()` answers with a **new object every render**. Close over one and the binding reports the page the app was on when the tool was declared — the model navigates, is told it is still where it started, and navigates again.
+
+The ref above always holds the current render's path, so the read is live whether or not the tool is memoized. `window.location.pathname` works too, minus the router's `basename` if it has one.
+
+`location` is optional; without it the answer is the path the binding just built, which is still a place — unlike the pattern `navigateTool` would otherwise report.
+
+### `routesOf`
+
+For a data router, where the route objects do exist:
+
+```ts
+import { createBrowserRouter } from "react-router";
+import { fromReactRouter, routesOf } from "@subako-ai/react-router";
+
+const router = createBrowserRouter(routeObjects);
+fromReactRouter({
+	navigate: (to) => router.navigate(to),
+	routes: routesOf(routeObjects),
+});
+```
+
+It flattens the tree, joining a child's path onto its parent's unless the child opens with a slash. A pathless layout route is not a destination, and neither is a splat or an optional segment: all three are dropped, and what sits under them is kept. An `index: true` route has no path of its own either, and needs none — the parent's path already reaches it.
+
+Descriptions are yours to add afterwards; the route objects carry none.
+
+Requires React Router 6.4 or newer.
+
+## Any other router
+
+`navigateTool` takes `navigate` and `read` as plain functions and `routes` as data, so a router with no adapter needs only those:
+
+```ts
+navigateTool({
+	routes: [{ to: "/inbox", description: "The inbox" }],
+	navigate: (to) => myRouter.go(to),
+	read: () => ({ location: myRouter.current() }),
+});
+```
+
+The two things worth getting right are the ones the adapters handle for you: **await the transition** in `navigate` if it is asynchronous, and make `read` a live reading rather than a value closed over at build time.

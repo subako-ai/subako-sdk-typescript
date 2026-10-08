@@ -1,0 +1,79 @@
+---
+title: Errors
+description: What the SDK throws, and how to tell the kinds apart.
+sidebar:
+  order: 2
+---
+
+Every failure is a `SubakoError`: `status`, `code`, `body`, and a message. The seven codes the API declares have a class each, and a code this version has not heard of still arrives with its code and message intact.
+
+```ts
+import { ConflictError, NotFoundError, SubakoError } from "@subako-ai/sdk";
+
+try {
+	await subako.sessions.postEvent(sessionId, { type: "input", text });
+} catch (error) {
+	if (error instanceof NotFoundError) {
+		// ...
+	} else if (error instanceof ConflictError) {
+		// ...
+	} else if (error instanceof SubakoError) {
+		console.error(error.status, error.code, error.message);
+	}
+}
+```
+
+## The classes
+
+| Class | When |
+| ----- | ---- |
+| `UnauthorizedError` | The credential was missing, malformed, or refused — and a refresh did not settle it. |
+| `ForbiddenError` | The credential is valid and lacks the permission, or names another workspace. |
+| `NotFoundError` | No such thing, or the caller cannot see it. |
+| `InvalidRequestError` | The request itself needs changing. |
+| `ConflictError` | The state will not take it — a duplicate idempotency key, a sandbox still settling. |
+| `ClientOutdatedError` | This SDK is behind what the server now requires. |
+| `InternalError` | The server failed. |
+
+Two more are the SDK's own rather than the API's:
+
+- **`SubakoConnectionError`** — no response arrived at all.
+- **`SubakoTimeoutError`** — the attempt outlived its `timeout`.
+
+All of them extend `SubakoError`, so one `instanceof` catches the lot.
+
+## Aborts are not errors
+
+An `AbortSignal` you abort yourself is **rethrown untouched**, never wrapped. What comes out is the abort reason — whatever you passed to `abort(reason)`, or the `AbortError` `DOMException` the platform supplies when you passed nothing.
+
+```ts
+const controller = new AbortController();
+const reason = new Error("the person navigated away");
+
+try {
+	await subako.agents.get(agentId, { signal: controller.signal });
+} catch (error) {
+	if (error === reason) {
+		// our own cancellation, not a failure
+	}
+}
+
+controller.abort(reason);
+```
+
+So a caller that cancels deliberately can tell its own cancellation from a failure without inspecting a message.
+
+## A code this version has not heard of
+
+The class list is closed; the code list is not. A code the server added after this SDK shipped arrives as a plain `SubakoError` with `error.code` set to whatever the server sent, so a `switch` on `error.code` keeps working and only the `instanceof` narrowing misses out.
+
+```ts
+if (error instanceof SubakoError) {
+	switch (error.code) {
+		case "precondition_failed":
+		case "too_many_requests":
+			// codes the API grew later; no class, and no reason to wait for one
+			break;
+	}
+}
+```

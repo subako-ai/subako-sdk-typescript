@@ -1,0 +1,131 @@
+---
+title: The session connection
+description: connect() opens a session, keeps its log, and reconnects when the stream drops.
+sidebar:
+  order: 1
+---
+
+`connect` gives you a live view of one session. It reads the log, opens the stream, and holds on to both. Whether you are rendering a chat or waiting for a job to finish, everything comes off this object — you do not keep a copy of the messages yourself.
+
+```ts
+const session = subako.sessions.connect(sessionId, { history: true }); // subako.connect on a session client
+
+await session.ready; // the history is read and the stream is open
+```
+
+## What it holds
+
+```ts
+session.state.status; // "connecting" | "open" | "reconnecting" | "closed" | "failed"
+session.state.error; // the failure, set when the status is "failed"
+session.state.lastSeq; // number | undefined
+session.state.events; // every event seen, in seq order
+session.state.transcript; // the messages of the log, each call joined to its result and approval
+session.state.approvals; // the approvals no decision has settled
+session.state.isRunning; // a run queued or under way
+session.state.hasEarlier; // the log holds events before the first in `events`
+```
+
+`state` is immutable. You get a new object on every event and every status change, and the same object for as long as nothing changes. `events` follows the same rule: a new array when an event arrives, the same one otherwise, and the events inside are never copied. That is what makes it safe to hand straight to a renderer:
+
+```ts
+const state = useSyncExternalStore(session.subscribe, () => session.state);
+state.transcript; // what this render draws
+```
+
+`state.events` is this client's copy of the log: raw wire bodies in seq order. The connection does not interpret them. It joins no messages and builds no strings, so what an event means stays your decision. [Reading the log](/sessions/reading-the-log) covers the three helpers that do the interpreting.
+
+## Driving the session
+
+The same object is how you drive the session, so nothing else has to hold state:
+
+```ts
+await session.send("book me a room"); // posts a user turn
+await session.cancel(); // stops the active run at its next checkpoint
+await session.resolveApproval(callId, "deny", "not this one"); // "allow" | "deny"
+
+session.transcript; // the same three readings, taken off the connection
+session.approvals;
+session.isRunning;
+```
+
+Those three appear in two places, and it is one value either way: derived from `state.events` on first read, and recomputed only when that array changes. Read them off `state` when you hold a snapshot — inside a render, or in a `subscribe` listener. Read them off the connection anywhere else, where you want the latest rather than the one that render was woken for.
+
+## Iterating and subscribing
+
+```ts
+const stop = session.subscribe((state) => render(state)); // returns an unsubscribe
+
+for await (const event of session) {
+	// The events so far, then live ones. `break` stops iterating, not the connection.
+}
+
+session.close(); // ends the stream; the clients on it are deleted
+session.reconnect(); // only after a failure: opens the stream again on this same connection
+```
+
+Subscribers are called synchronously after every change, in seq order, with the states that follow their subscription. A listener that throws is reported with `console.error` and delivery carries on.
+
+## Options
+
+<TypeTable
+  type={{
+    history: {
+      type: "boolean | { latest: number }",
+      description:
+        "Reads the log to its end first, oldest first; the stream then starts at the last seq. This is what a chat that draws the conversation so far wants. `{ latest }` reads only the newest part: at least that many events, and back to the start of the latest run.",
+    },
+    afterSeq: {
+      type: "number",
+      description:
+        "Otherwise: where the stream starts. Omit for the live head, or pass `0` to replay the log.",
+    },
+    signal: {
+      type: "AbortSignal",
+      description: "Aborting closes the connection, as `close()` does.",
+    },
+    maxRetries: {
+      type: "number",
+      description: "Retries of the request that opens the stream, as for any call.",
+    },
+    maxReconnects: {
+      type: "number",
+      description: "Consecutive failed reconnects tolerated. Defaults to 5.",
+    },
+  }}
+/>
+
+A connection with neither `history` nor `afterSeq` starts at the live head: it carries what happens from now on, and nothing that happened before.
+
+## Long sessions
+
+A session that has run for a while holds more events than a page needs at first. `history: { latest: 50 }` reads the newest fifty, newest first, and keeps reading back until it reaches the `run_queued` that started the latest run, so `isRunning` and the pending approvals read the run under way as the whole log would. Then it streams on as `history: true` does.
+
+`loadEarlier(count)` reads up to `count` events (100 when omitted) from before the first one the connection holds, and puts them in front. `state.hasEarlier` says whether there is anything left to read; a call while one is under way joins it.
+
+```ts
+const session = subako.sessions.connect(sessionId, { history: { latest: 50 } });
+await session.ready;
+
+if (session.state.hasEarlier) {
+	await session.loadEarlier(); // the transcript now starts further back
+}
+```
+
+A tool result or an approval whose call sits before the first event held joins nothing until `loadEarlier` reaches its call.
+
+## What happens when it drops
+
+The server tails the log forever, so the connection ends only when you end it.
+
+- **Opening the stream is a request like any other.** It is retried under `maxRetries` on the same terms, and a refusal such as a `404` fails the connection right away, with `ready` rejecting and `state.error` set.
+
+- **Once open, every close is followed by a wait and a fresh connection** carrying `Last-Event-ID`, whether the server closed cleanly or the connection dropped. The server opens every stream with a cursor frame naming where it starts, so a reconnect resumes from there even when the connection carried no event at all. The wait is the server's own `retry:` value when it sends one, else 3 seconds, doubling up to 30 seconds while reconnects keep failing and resetting as soon as an event arrives. After `maxReconnects` consecutive failed reconnects the status is `failed` and `state.error` holds the last failure. A reconnect the server refuses outright fails at once: a `404`, or a `401` that a freshly resolved token did not settle.
+
+- **A connection that failed can be opened again.** `reconnect()` starts the stream over from `lastSeq` on the same connection object — the same subscribers, the same log, the same clients — with the reconnect budget reset and `ready` a fresh promise that resolves when the stream is open. The tool clients the failure sent away register again once it is, as they would on a connection opened from scratch. In any other status, a closed connection included, it does nothing. Nothing calls it for you: it is what a "reconnect" button in a chat is wired to.
+
+## Browser support
+
+The SDK calls `AbortSignal.any` to join your signal to its own timeout, which puts the browser floor at **Safari 17.4**, Chrome 116, and Firefox 124.
+
+Aborting with your own `AbortSignal` rethrows the abort **reason**, untouched and never wrapped in a `SubakoError` — whatever you passed to `abort(reason)`, or the `AbortError` `DOMException` the platform supplies when you passed nothing. A caller that aborts deliberately can therefore tell its own cancellation from a failure without inspecting a message.

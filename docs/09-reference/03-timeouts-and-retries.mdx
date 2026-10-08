@@ -1,0 +1,81 @@
+---
+title: Timeouts, retries and idempotency
+description: How long a call waits, when it is retried, and what an idempotency key buys you.
+sidebar:
+  order: 3
+---
+
+One attempt may take `timeout` milliseconds (default 60000). A failed attempt is retried up to `maxRetries` times (default 2, so three attempts), on the same terms for every call.
+
+Every operation that creates or consumes something carries an `Idempotency-Key` the SDK generates for it, so a repeated attempt is deduped by the server rather than acting twice; the rest are idempotent already.
+
+## What is retried
+
+**Retried:**
+
+- A connection failure, or a timeout, including while reading a response body.
+- A `5xx`, a `429`, or a `408`.
+
+**Not retried:**
+
+- Any `4xx`, a `409` among them: the request itself needs changing. A repeat the server is still executing under the same key waits on its own lock rather than answering, so there is nothing here for a retry to pick up.
+- A request whose body is a `ReadableStream`, which cannot be read twice.
+
+A `401` is the one refusal handled outside this budget: with a function credential the token is resolved again and the request goes once more, spending no retry. See [Clients and authentication](/clients-and-auth#refresh-and-when-it-is-spent).
+
+The wait honours `Retry-After` when the server sends one, and is otherwise exponential with jitter.
+
+## Setting them
+
+Both settings can be set on the client and overridden per call.
+
+```ts
+const subako = new SubakoClient({
+	baseUrl,
+	apiKey,
+	timeout: 10_000,
+	maxRetries: 4,
+});
+
+await subako.agents.list(undefined, { maxRetries: 0 });
+```
+
+## Idempotency keys
+
+The generated key covers the SDK's own retries. Pass `idempotencyKey` to dedupe across **your** retries too, or across processes: the same key with the same request returns the first attempt's receipt instead of acting again, for at least seven days after it completed.
+
+```ts
+await subako.sessions.create({ agent_id: agentId }, { idempotencyKey: `nightly-${date}` });
+```
+
+A key is sent only where the operation takes one, and is ignored elsewhere. Reusing one key for a **different** request is a `409`, so a `ConflictError` no retry will settle.
+
+## Receipts
+
+Five operations answer with a secret shown once. A replay never carries that secret again, so each of them answers with either the fresh body or a receipt, and the type says so:
+
+| Operation | Fresh (`201`) | Replayed (`200`) |
+| --------- | ------------- | ---------------- |
+| `sessions.create` | `CreatedSessionBody` | `CreatedSessionReceiptBody` |
+| `sessions.mintToken` | `SessionTokenBody` | `SessionTokenReceiptBody` |
+| `apiKeys.mint` | `MintedApiKeyBody` | `ApiKeyReceiptBody` |
+| `vaults.startOAuth` | `OAuthStarted` | `OAuthStartReceiptBody` |
+| `vaults.reconnectOAuth` | `OAuthStarted` | `OAuthStartReceiptBody` |
+
+The receipt confirms what the first attempt committed — the session and its id, the key and its prefix, the OAuth connection's expiry — and drops the field carrying the secret, which is what narrows the union:
+
+```ts
+const created = await subako.sessions.create({ agent_id: agentId });
+if ("session_token" in created) {
+	use(created.session_token);
+} else {
+	// The first attempt committed and its answer was lost: the session is there
+	// under `created.id`, and a fresh mint gives it a token.
+	const minted = await subako.sessions.mintToken(created.id);
+	if ("session_token" in minted) {
+		use(minted.session_token);
+	}
+}
+```
+
+A receipt reaches you only where a key was spent twice: the SDK's own retry of a lost response, or an `idempotencyKey` you repeated yourself. **A first attempt under a fresh key always answers with the secret.**

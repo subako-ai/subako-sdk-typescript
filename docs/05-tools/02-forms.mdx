@@ -1,0 +1,182 @@
+---
+title: Forms
+description: Let an agent fill in a form and submit it.
+sidebar:
+  order: 2
+---
+
+Most of what people ask an agent to do turns out to be a form. "Book me a room for Tuesday" is a form, filled in. `@subako-ai/tools` has a tool for writing to one and a separate tool for sending it, plus a reader for a form that is already in the DOM.
+
+```sh
+pnpm add @subako-ai/tools @subako-ai/sdk
+```
+
+Each one is a function that returns a `ToolDefinition`, so you declare it wherever you declare tools: `useTool` in `@subako-ai/react`, or `client.addTool` on the SDK's client.
+
+## `formTool`
+
+```ts
+formTool({
+	description: "The contact form.",
+	fields: {
+		email: { type: "string", label: "Email address", required: true },
+		plan: { type: "string", options: ["basic", "pro"] },
+		newsletter: { type: "boolean" },
+	},
+	apply: (values) => form.reset({ ...form.getValues(), ...values }),
+	read: () => ({ values: form.getValues() }),
+});
+```
+
+`execute` validates the arguments against the description, calls `apply`, and answers with `read()` as JSON text — or with the applied values when there is no `read`. **The model sees what it actually wrote**, which is what lets it correct itself rather than assume the fill landed.
+
+An argument the form would refuse — an unknown field, the wrong type, an option that is not on the list — is answered as an error and nothing is applied.
+
+### Describing the form
+
+Three ways, and you pick one.
+
+<TypeTable
+  type={{
+    fields: {
+      type: "Record<string, Field>",
+      description:
+        "The light DSL: `type` (`\"string\" | \"number\" | \"boolean\"`), `label`, `required`, and `options`. Every property of the derived schema is optional, so a partial fill is a valid call; `required` and the options are listed in the description instead.",
+    },
+    schema: {
+      type: "StandardSchemaV1",
+      description:
+        "Any Standard Schema value — zod, valibot, arktype. Where the library implements the v1.1 JSON Schema hook, as zod 4 does, the parameters come from the schema itself. Offered to the model exactly as written, so make it partial if a partial fill should be valid.",
+    },
+    parameters: {
+      type: "object",
+      description:
+        "A JSON Schema of your own. Also what you pass next to a `schema` whose library cannot describe itself — `z.toJSONSchema(schema)` is the zod spelling.",
+    },
+  }}
+/>
+
+### Blanks mean "leave it alone"
+
+A provider whose function calling is strict — `openai_responses` among them — makes the model fill **every** property of the schema, whatever `required` says. So a field the person never mentioned arrives as `""`, and applying that would wipe what they had already typed.
+
+`formTool` drops every blank before it validates. The description tells the model it may leave a field blank, and a field with `options` carries `""` among them so an enum can be declined too — without that last part the model has no way to say "not this one" and stops to ask the person instead.
+
+The drop goes all the way down, which is where it matters most: a nested form has the model filling `meta.message` blank as readily as `message`, and the write is by leaf. An object left entirely blank is dropped whole rather than written as `{}` — that would be the same clobber the leaf-by-leaf write exists to avoid. An array is a value, not a level: replacing one whole is what writing it means.
+
+### When `apply` has to commit first
+
+`apply` resolves once the values are in place, and `execute` awaits it before it calls `read`.
+
+An adapter whose `apply` and `read` share one synchronous store — `fromReactHookForm`, and any form library that keeps the values itself — needs nothing more. An `apply` that sets React state under a `read` of the DOM does: the DOM only carries the values once React has committed, so that `apply` has to commit before it returns.
+
+```ts
+apply: (values) => flushSync(() => setSettings(values)),
+```
+
+A single input is a form with one field; there is no separate helper.
+
+## `submitTool`
+
+```ts
+submitTool({
+	description: "Submit the contact form.",
+	submit: async () => await send(), // false when the form refused it
+	read: () => ({ values: form.getValues(), errors: errorsOf(form) }),
+});
+```
+
+**Sending a form is its own tool**, so an app declares it only where the model may send. A form the person alone submits simply has no submit tool, and the model can see that it has none. It takes no arguments, which is what stops a strict schema from inventing one.
+
+`submit` answers `false` when the form refused it — its own validation, most often — and the tool then reads the form and reports what it was unhappy about, so the model can fix the fields it named and submit again. Anything else counts as sent.
+
+`read` is consulted **only** on a refusal: a form that went through may have unmounted, and reading it then would be reading a ghost.
+
+### Submitting a react-hook-form
+
+`handleSubmit` answers before the errors it left behind have been validated and published, and `submitTool` reads the form as soon as `submit` resolves. So `submit` waits for the same two things the adapter's `apply` waits for after a fill — `trigger()`, then a turn of the task queue — and reports whether the valid branch actually ran:
+
+```tsx
+const sent = useRef(false);
+const submit = form.handleSubmit(async (values) => {
+	await create(values);
+	sent.current = true;
+	form.reset();
+	onClose();
+});
+
+const send = useCallback(async () => {
+	sent.current = false;
+	await submit();
+	await form.trigger();
+	await new Promise((resolve) => setTimeout(resolve, 0));
+	return sent.current;
+}, [form, submit]);
+
+useTool(
+	client,
+	"submit_add_todo",
+	submitTool({
+		description: "Submit the open add-todo form, which is what creates the todo. Fill it in first.",
+		submit: send,
+		read: () => ({ values: form.getValues(), errors: form.formState.errors }),
+	}),
+);
+```
+
+`form.formState.isSubmitSuccessful` looks like the shorter way and is subject to the same timing: it is published on the same delay. The ref is set inside the valid callback, so it is true exactly when that callback ran.
+
+## `fromFormElement`
+
+A **reader**, the way browser autofill reads a form. The controls' `name`, `type`, `<label>`, `required` and `<option>`s describe it, and `read` reports the current values with whatever the browser's own validation is unhappy with. Hidden, submit, button and password controls are left out.
+
+It provides no `apply` — writing to a form is the app's — so pass one next to it:
+
+```ts
+formTool({ ...fromFormElement(formRef), apply: (values) => fill(values) });
+```
+
+The fields are a **live reading**: they answer from whatever the ref holds when they are asked for, and `formTool` derives its schema when the client reads it. So a component builds its tool while rendering, before the form has reached the DOM, and the declaration that goes out carries the mounted form.
+
+## react-hook-form
+
+`@subako-ai/react-hook-form` answers with `fields` or `schema`, `apply` and `read` — everything `formTool` takes.
+
+```sh
+pnpm add @subako-ai/react-hook-form @subako-ai/tools
+```
+
+```tsx
+import { useTool } from "@subako-ai/react";
+import { fromReactHookForm } from "@subako-ai/react-hook-form";
+import { formTool } from "@subako-ai/tools";
+
+function ContactPage({ client }: { client: ToolClient }) {
+	const form = useForm({ defaultValues: { email: "", message: "" } });
+
+	useTool(client, "fill_contact_form", formTool({ ...fromReactHookForm(form), description: "The contact form." }));
+
+	return <form>{/* ... */}</form>;
+}
+```
+
+It writes with `setValue(name, value, { shouldValidate: true, shouldDirty: true })` and reads with `getValues()` and `formState.errors`, so the model sees what the form's own validation made of the fill. Nested and array errors use dotted paths — `meta.subject`, `signers.0.email` — and root errors are included, for example `root.server`.
+
+**Its `apply` waits for the form to catch up.** `setValue` returns before two things have happened: the validation it asked for, and the update that publishes the result to `formState`. So `apply` awaits `trigger()` and then a turn of the task queue — waiting for only the first is enough when a fill clears an error and not when it raises one.
+
+Requires react-hook-form 7.50 or newer.
+
+## Any other form library
+
+There is no adapter to wait for. `formTool` takes `apply` and `read` as plain functions, so a library that keeps its own values needs only those two:
+
+```ts
+formTool({
+	description: "The booking form.",
+	fields,
+	apply: (values) => store.setValues(values),
+	read: () => ({ values: store.values, errors: store.errors }),
+});
+```
+
+The only thing to get right is the one above: if `read` goes to the DOM and `apply` sets state, `apply` has to commit before it returns.

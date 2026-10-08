@@ -1,0 +1,32 @@
+{
+	"name": "@subako-ai/example-chat",
+	"version": "0.0.0",
+	"private": true,
+	"description": "A chat with a Subako agent, and nothing else: the smallest page the packages make",
+	"license": "UNLICENSED",
+	"type": "module",
+	"scripts": {
+		"dev": "vite",
+		"build": "vite build",
+		"server": "node server.mjs"
+	},
+	"dependencies": {
+		"@assistant-ui/react": "^0.15.18",
+		"@assistant-ui/react-markdown": "^0.14.15",
+		"@subako-ai/assistant-ui": "workspace:*",
+		"@subako-ai/react": "workspace:*",
+		"@subako-ai/sdk": "workspace:*",
+		"react": "^19.2.0",
+		"react-dom": "^19.2.0"
+	},
+	"devDependencies": {
+		"@types/react": "^19.2.0",
+		"@types/react-dom": "^19.2.0",
+		"@vitejs/plugin-react": "^6.1.0",
+		"typescript": "^7",
+		"vite": "^8.2.0"
+	},
+	"engines": {
+		"node": ">=22"
+	}
+}

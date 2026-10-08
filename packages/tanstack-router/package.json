@@ -1,0 +1,50 @@
+{
+	"name": "@subako-ai/tanstack-router",
+	"version": "0.1.14",
+	"description": "TanStack Router as a navigate tool for Subako sessions",
+	"homepage": "https://subako.ai",
+	"license": "Apache-2.0",
+	"author": "Kikuvi, Inc.",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/subako-ai/subako-sdk-typescript.git",
+		"directory": "packages/tanstack-router"
+	},
+	"files": [
+		"dist",
+		"src"
+	],
+	"type": "module",
+	"sideEffects": false,
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"default": "./dist/index.js"
+		},
+		"./package.json": "./package.json"
+	},
+	"publishConfig": {
+		"access": "public"
+	},
+	"scripts": {
+		"prepack": "node ../../scripts/prepack.mjs"
+	},
+	"devDependencies": {
+		"@subako-ai/sdk": "workspace:*",
+		"@subako-ai/tools": "workspace:*",
+		"@tanstack/react-router": "^1.170.0",
+		"@types/react": "^19.2.0",
+		"@types/react-dom": "^19.2.0",
+		"happy-dom": "^20.14.0",
+		"react": "^19.2.0",
+		"react-dom": "^19.2.0",
+		"typescript": "^7"
+	},
+	"peerDependencies": {
+		"@subako-ai/tools": "workspace:^",
+		"@tanstack/react-router": ">=1.100.0"
+	},
+	"engines": {
+		"node": ">=22"
+	}
+}

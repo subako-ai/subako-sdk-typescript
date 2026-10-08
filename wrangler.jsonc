@@ -1,0 +1,14 @@
+{
+	"$schema": "./node_modules/wrangler/config-schema.json",
+	// The docs site is a Worker with no script of its own. `blume build` writes a
+	// plain static site to `dist/`, and the assets binding serves it; nothing runs
+	// at request time, so there is no `main` here.
+	"name": "subako-sdk-typescript-docs",
+	"compatibility_date": "2026-09-14",
+	"assets": {
+		"directory": "./dist",
+		// Blume emits its own `404.html`. Without this, an unmatched path would get
+		// Cloudflare's bare 404 instead of the site's.
+		"not_found_handling": "404-page",
+	},
+}

@@ -1,0 +1,12 @@
+packages:
+  - "packages/*"
+  - "examples/*"
+allowBuilds:
+  # Telemetry that runs on install, and nothing the build needs.
+  "@scarf/scarf": false
+  # Its postinstall only swaps the JS shim for the platform binary the lockfile
+  # already pins, or fetches that binary unpinned when it is missing.
+  esbuild: false
+  # Wrangler's local Worker runtime. The docs site has no script to run: its
+  # deploy only uploads `dist/`, and `blume preview` serves it locally.
+  workerd: false

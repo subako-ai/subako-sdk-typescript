@@ -1,0 +1,101 @@
+---
+title: Overview
+description: What the Subako TypeScript SDK does, which package you need, and where to start.
+sidebar:
+  order: 1
+---
+
+A session with an agent runs for a while. It outlives the request that started it, events arrive as they happen, and at some point the agent will ask your code to do something only your code can do: look up a record, call an internal service, fill in the form the person is looking at.
+
+This SDK is how you hold that conversation in TypeScript without writing a socket and a switch statement. It works the same in a backend job with nobody watching as it does in a browser.
+
+```sh
+pnpm add @subako-ai/sdk
+```
+
+Node 22 or newer. The package is **ESM only** and ships no runtime dependencies.
+
+## What is in it
+
+<CardGroup cols={2}>
+  <Card title="Two clients" href="/clients-and-auth" icon="key-round">
+    One for your backend that holds the API key, one for the browser that holds
+    a session token. The type says which routes each reaches.
+  </Card>
+  <Card title="A session connection" href="/sessions/connection" icon="waypoints">
+    Streams the log and reconnects by itself. Hand its snapshot to a renderer
+    and you are done.
+  </Card>
+  <Card title="Client tools" href="/tools/client-tools" icon="wrench">
+    Your code answering the agent's calls. Describe the arguments with zod, or
+    any other Standard Schema.
+  </Card>
+  <Card title="React bindings" href="/react" icon="component">
+    Hooks that scope a tool to a component, so it is offered exactly while that
+    component is mounted.
+  </Card>
+  <Card title="Agents" href="/workspace/agents" icon="bot">
+    Create one, publish the version a session binds to, and say what it is
+    allowed to reach.
+  </Card>
+  <Card title="Skills and vaults" href="/workspace/skills" icon="book-open">
+    Upload the bundles an agent reads, and store the credentials the broker
+    uses on its behalf.
+  </Card>
+</CardGroup>
+
+## The packages
+
+`@subako-ai/sdk` covers the whole API on its own. Reach for the others when you are building a page the agent drives.
+
+| Package | What it is |
+| ------- | ---------- |
+| [`@subako-ai/sdk`](/reference/packages#sdk) | The client. Sessions, streaming, tools, errors, pagination. |
+| [`@subako-ai/react`](/react) | A provider and four hooks over a session connection. |
+| [`@subako-ai/tools`](/tools/forms) | Ready-made tools that drive a page: fill a [form](/tools/forms), submit it, [navigate](/tools/navigation). |
+| [`@subako-ai/assistant-ui`](/assistant-ui) | A working chat over a session, or a runtime for your own thread. |
+| [`@subako-ai/react-hook-form`](/tools/forms#react-hook-form) | react-hook-form as a form-tool spec. |
+| [`@subako-ai/react-router`](/tools/navigation#react-router) | React Router as a navigate-tool spec. |
+| [`@subako-ai/tanstack-router`](/tools/navigation#tanstack-router) | TanStack Router as a navigate-tool spec. |
+
+Every package is Apache-2.0 and versioned together.
+
+## How the pieces fit
+
+<Steps>
+  <Step title="Your backend creates the session">
+    It holds the API key, names the agent, and gets back a session token —
+    scoped to that one session and safe to hand to a browser.
+  </Step>
+  <Step title="The browser opens a connection">
+    `connect(sessionId)` reads the log, opens the stream, and keeps both. A
+    dropped connection comes back on its own, resuming from the last sequence
+    number it saw.
+  </Step>
+  <Step title="Your page declares its tools">
+    A tool client registers what this page can do. The agent calls them by name;
+    your handler answers. Tools that reach an external service go through
+    Subako's broker instead, which holds the credential.
+  </Step>
+  <Step title="The UI renders a snapshot">
+    The connection keeps one immutable state object — the events, the
+    transcript, the approvals waiting on someone. A render draws what it
+    returns.
+  </Step>
+</Steps>
+
+## Where to go next
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" href="/quickstart" icon="play">
+    A backend that mints a token and a browser that drives the session, end to
+    end.
+  </Card>
+  <Card title="Running on a server" href="/server-jobs" icon="server">
+    The same thing in one process, for a job or a worker with no page.
+  </Card>
+  <Card title="Agents" href="/workspace/agents" icon="bot">
+    You need one before any of this runs. Start here if you have not published
+    a version yet.
+  </Card>
+</CardGroup>

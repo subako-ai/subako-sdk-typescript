@@ -1,0 +1,92 @@
+---
+title: Sandboxes
+description: Reading the Linux instances an agent was granted, and cleaning up the archive one leaves behind.
+sidebar:
+  order: 3
+---
+
+An agent's config can grant it sandboxes: Linux instances the session owns, each served to the model at `sandbox:{name}` with an `exec` tool. The SDK does not start or stop them — the grant does that — but it reads what they are doing and manages the archive a retired one leaves behind.
+
+Added in **0.1.1**.
+
+## Listing them
+
+```ts
+const { items } = await subako.sessions.listSandboxes(sessionId);
+
+for (const sandbox of items) {
+	console.log(sandbox.name, sandbox.status, sandbox.archive_bytes);
+}
+```
+
+This is the one listing that does not answer with a `Page`, and its type says so. A grant list is written into the agent's config, so the set is bounded and the whole of it travels at once: `{ items }`, no cursor, nothing to follow.
+
+<TypeTable
+  type={{
+    name: {
+      type: "string",
+      required: true,
+      description:
+        "The label the agent's config invented. The model reaches this sandbox at `sandbox:{name}`.",
+    },
+    status: {
+      type: "dormant | provisioning | running | draining | suspended | archived | failed",
+      required: true,
+      description:
+        "Where the instance is in its life. A sandbox idles into `suspended` and retires into `archived`.",
+    },
+    environment: {
+      type: "SessionSandboxEnvironmentBody",
+      required: true,
+      description: "Which image it boots.",
+    },
+    network: {
+      type: "SessionSandboxNetworkBody",
+      required: true,
+      description: "Where it may reach, as its grant said when the session was made.",
+    },
+    class: { type: "string", required: true, description: "The machine class it runs on." },
+    created_at: { type: "string", required: true, description: "When the sandbox was made." },
+    last_used_at: { type: "string | null", description: "When it last ran something." },
+    archive_bytes: {
+      type: "number | null",
+      description:
+        "Size of the last published snapshot, which can predate the latest exec.",
+    },
+    archive_refused_bytes: {
+      type: "number | null",
+      description: "What the workspace packed to when a backup was last refused for size.",
+    },
+  }}
+/>
+
+## The archive
+
+A retired sandbox publishes a snapshot. Reading it answers with a presigned download that lapses:
+
+```ts
+const archive = await subako.sessions.getSandboxArchive(sessionId, "build");
+
+archive.url; // fetch it before it expires
+archive.bytes;
+archive.expires_at;
+```
+
+An archive that is no longer worth keeping is deleted by name, which stops the storage it is billed for:
+
+```ts
+await subako.sessions.deleteSandboxArchive(sessionId, "build");
+```
+
+A sandbox with no published archive answers `404` — `NotFoundError`.
+
+A delete answers `409` — `ConflictError` — while the sandbox is `provisioning`, `running`, `draining`, or `suspended`. Retirement is automatic, so wait for the status to reach `archived` or `failed` and ask again; the SDK does not retry a `409`, and would have nothing to gain by it. Idling only suspends an instance — retirement follows the configured suspended duration or the instance lifetime — and a concurrent `exec` can restart it before the deletion lands.
+
+## Reachable from either client
+
+All three sit on the half both clients bind, so a browser holding a session token reaches them exactly as a backend does:
+
+```ts
+await subako.listSandboxes(sessionId); // SubakoSessionClient
+await subako.sessions.listSandboxes(sessionId); // SubakoClient
+```

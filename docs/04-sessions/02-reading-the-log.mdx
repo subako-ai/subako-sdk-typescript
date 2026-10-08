@@ -1,0 +1,99 @@
+---
+title: Reading the log
+description: What a session's events look like, and how to turn them into a transcript.
+sidebar:
+  order: 2
+---
+
+A session is an append-only log of events, each with a sequence number and the time it was appended (`created_at`). That log is the source of truth. A chat's transcript, the approval dialog, the "thinking" spinner — all of it is derived from the events, and the SDK derives none of it unless you ask. That is deliberate: what an event means is a decision your UI gets to make.
+
+## Turning events into something you can render
+
+Three functions do the deriving.
+
+```ts
+import { isRunning, pendingApprovals, transcript } from "@subako-ai/sdk";
+
+const messages = transcript(events);
+const waiting = pendingApprovals(events);
+const busy = isRunning(events);
+```
+
+`transcript` gives you the user and assistant messages in seq order, each with the time the log appended it (`createdAt`). Each assistant message carries its `tool_call` blocks with their `tool_result` and approval already joined on, so you do not have to walk the log to match a call to its answer. That includes an approval the log holds ahead of the message that made the call: the engine reports the message and makes the call separately, so the request can land first. A call's approval is `pending`, `allowed`, `denied`, or `voided`: the run ended before anyone decided, and the request went with it.
+
+`pendingApprovals` gives you the `approval_requested` events that no decision has settled yet. A run that ends, however it ends, takes its approvals with it, so they leave this list without an `approval_resolved` of their own.
+
+`isRunning` tells you whether a run is queued or under way.
+
+They are pure functions over `readonly SessionEventBody[]`. They keep no state, hand back the events' own message objects, and stringify nothing — so they work on any log, including one you fetched by hand or stored somewhere.
+
+On a connection you rarely call them yourself. The same three values sit on `state` and on the connection, memoized against the `events` array.
+
+```ts
+session.state.transcript; // in a render or a subscribe listener
+session.transcript; // anywhere the latest is what you want
+```
+
+## Where a tool comes from
+
+A `tool_call` names the tool the way the model called it. The engine spells a granted tool `<source>__<name>__<tool>`, and `toolOrigin` reads it back:
+
+```ts
+import { toolOrigin } from "@subako-ai/sdk";
+
+toolOrigin("mcp__rooms__lookup"); // { kind: "mcp", source: "rooms", tool: "lookup" }
+toolOrigin("client__page__fill_form"); // { kind: "client", source: "page", tool: "fill_form" }
+toolOrigin("think"); // { kind: "engine", tool: "think" }
+```
+
+`kind` is `mcp`, `skill`, `sandbox`, or `client`: an MCP server, a skill, or a sandbox the agent's grant names, or a client a page registered. Anything else is the engine's own tool.
+
+## Walking the log by hand
+
+`listEvents` pages the log without opening a stream. It is the one listing whose cursor changes name with the direction — `before_seq` descending, `after_seq` ascending — and the `Page` sends back whichever the listing asked for.
+
+```ts
+const page = await subako.sessions.listEvents(sessionId, { after_seq: 41, order: "asc" });
+for await (const event of page) {
+	// every event from that page onward
+}
+```
+
+Both bounds are exclusive, so a window is `{ after_seq, before_seq }`. See [Pagination](/reference/pagination) for how cursors work across the rest of the API.
+
+## Posting input
+
+```ts
+await subako.sessions.postEvent(sessionId, { type: "input", text: "book me a room" });
+```
+
+That queues a run, or steers the one already going. On a connection, `session.send(text)` is the same thing.
+
+## Canceling
+
+```ts
+await subako.sessions.cancelRun(sessionId);
+```
+
+The run stops at its next checkpoint rather than immediately — a tool call already dispatched still gets to answer.
+
+## Approvals
+
+When an agent wants to do something that needs a person, the log carries an `approval_requested` event and the run waits.
+
+```ts
+for (const approval of session.approvals) {
+	// approval.call_id, and what the agent is asking to do
+}
+
+await session.resolveApproval(callId, "allow");
+await session.resolveApproval(callId, "deny", "not this one"); // an optional reason
+```
+
+Off a connection it is the same call with the session named:
+
+```ts
+await subako.sessions.resolveApproval(sessionId, callId, { decision: "allow" });
+```
+
+The broker holding the call reads the decision on its next tick. Nothing is interpreted here either: `pendingApprovals` only tells you which requests no decision has settled, and what to show the person is yours to decide.

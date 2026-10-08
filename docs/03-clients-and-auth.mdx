@@ -1,0 +1,134 @@
+---
+title: Clients and authentication
+description: Which client to use, what credential it takes, and when the SDK asks for a new token.
+sidebar:
+  order: 3
+---
+
+There are two clients because there are two kinds of credential, and they do not reach the same things. Picking the wrong one is a compile error rather than a runtime surprise.
+
+| Client | Credential | Reaches |
+| ------ | ---------- | ------- |
+| `SubakoClient` | `apiKey` or `accessToken` | Everything: agents, skills, vaults, workspaces, and the session routes among them. |
+| `SubakoSessionClient` | one token per session | Only the session routes, and only for the sessions it holds a token for. |
+
+`SubakoClient` belongs on a backend, where the API key can be kept secret. It is the only client that creates, lists, and deletes sessions, and the only one that mints session tokens.
+
+`SubakoSessionClient` belongs in a browser, or anywhere else that is handed session tokens rather than a key. There are no namespaces on it and no `workspaceId` to set, because a session token already implies its workspace. The session methods sit at the top level:
+
+```ts
+const subako = new SubakoSessionClient({
+	getToken: (sessionId) => fetch(`/api/subako/token/${sessionId}`).then((r) => r.text()),
+});
+
+await subako.get(sessionId);
+await subako.listEvents(sessionId, { after_seq: 41 });
+await subako.postEvent(sessionId, { type: "input", text });
+await subako.cancelRun(sessionId);
+await subako.resolveApproval(sessionId, callId, { decision: "allow" });
+await subako.listSandboxes(sessionId);
+const session = subako.connect(sessionId);
+```
+
+## Credentials
+
+Exactly one credential per `SubakoClient`, sent as `Authorization: Bearer`.
+
+<TypeTable
+  type={{
+    apiKey: {
+      type: "string | (() => string | Promise<string>)",
+      description:
+        "`sbk_ak_...`. Reaches one workspace, with the permissions the key was minted with.",
+    },
+    accessToken: {
+      type: "string | (() => string | Promise<string>)",
+      description:
+        "`sbk_at_...`. Reaches whatever the signed-in user may reach; workspace routes need a `workspaceId`.",
+    },
+  }}
+/>
+
+A session token (`sbk_st_...`) reaches one session's own routes and nothing else, so it is not an option here: it goes to `SubakoSessionClient` as `getToken`, which answers with one per session.
+
+Missing or duplicated credentials throw a `TypeError` from the constructor.
+
+## API endpoint
+
+Both clients default to `https://api.us.cloud.subako.ai`. Omit `baseUrl` or pass `undefined` to use Subako Cloud. To use another deployment, set its endpoint explicitly:
+
+```ts
+const subako = new SubakoClient({
+	apiKey: process.env["SUBAKO_API_KEY"]!,
+	baseUrl: "http://localhost:8080",
+});
+```
+
+An explicitly empty or non-string `baseUrl` throws a `TypeError`.
+
+## When the SDK asks for a new token
+
+Either option takes a string or a function, sync or async:
+
+```ts
+const subako = new SubakoClient({
+	accessToken: () => auth.currentAccessToken(),
+	workspaceId,
+});
+```
+
+A function is called when a token is first needed, **not on every request**. What it answers with is cached and carried by every request after it, including the event stream, and requests that start together share one call rather than each making their own.
+
+It is called again only when the server answers `401`. The refused request then goes once more with the fresh token, under the same `Idempotency-Key` and **without spending a retry**; a second `401` throws `UnauthorizedError`. So a caller can fetch a token from wherever it lives and leave it to the SDK to decide when that is worth doing again.
+
+A string credential has nothing to refresh, so its `401` throws at once. A function that throws surfaces its own error, and the next request calls it again.
+
+`SubakoSessionClient.getToken` is the same contract, keyed by session: one call per session, one cached token per session, one refresh per session.
+
+## Workspaces
+
+`workspaceId` rides every `SubakoClient` request as `Kikuvi-Workspace`. A user credential needs it for workspace-scoped routes; an API key implies its own workspace and refuses a header naming another, and so does a session token — which is why `SubakoSessionClient` has no such option.
+
+Any call may name a different workspace:
+
+```ts
+await subako.agents.list({ limit: 50 }, { workspaceId: other });
+```
+
+## Calling convention
+
+Path parameters are positional, in url order. Everything else is one `params` object under the field names the API itself uses. A trailing `options` object carries `signal`, `timeout`, `maxRetries`, `headers`, `workspaceId`, and `idempotencyKey`.
+
+```ts
+await subako.agents.get(agentId);
+await subako.agents.publishVersion(agentId, config);
+await subako.sessions.resolveApproval(sessionId, callId, { decision: "allow" }, { timeout: 5_000 });
+```
+
+Methods answer with the parsed response body, or `undefined` where the API answers `204`. Failures throw — see [Errors](/reference/errors).
+
+## Namespaces
+
+`SubakoClient` groups the API one namespace per resource:
+
+```ts
+subako.agents; // list, get, create, rename, publishVersion, ...
+subako.apiKeys; // mint, list, revoke
+subako.me; // the signed-in user, their orgs
+subako.modelProviders;
+subako.organization; // members, invitations, usage
+subako.sessions; // and everything a session token reaches
+subako.skills; // create, pushVersion, list
+subako.vaults; // credentials the broker draws on
+subako.workspaces;
+```
+
+`subako.sessions` is the half a session token also reaches, plus the workspace-scoped routes — `list`, `create`, `delete`, `mintToken` — that only a workspace credential can call. The shared half has a name, `SessionApi`, for code that takes either a `SubakoClient`'s `sessions` or a whole `SubakoSessionClient`:
+
+```ts
+import type { SessionApi } from "@subako-ai/sdk";
+
+function drive(api: SessionApi, sessionId: string) {
+	return api.connect(sessionId);
+}
+```

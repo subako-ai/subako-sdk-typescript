@@ -1,0 +1,113 @@
+---
+title: Skills
+description: Packaging a skill bundle and pushing new versions of it.
+sidebar:
+  order: 2
+---
+
+A skill is a bundle of knowledge and procedure that an agent can read. You upload it as an archive, and an agent version grants it by id.
+
+## The archive
+
+A skill is a gzipped tar of the bundle directory, with `SKILL.md` at its root.
+
+```sh
+tar -czf skill.tar.gz -C ./refunds .
+```
+
+The SDK takes the bytes in whatever form you have them:
+
+```ts
+type SkillArchive = Uint8Array | Blob | ReadableStream<Uint8Array>;
+```
+
+Files you hold in memory pack into one with `packSkill`, which refuses a set that breaks a bundle rule (no `SKILL.md`, a path outside the bundle, a file past the size limits) before anything is uploaded:
+
+```ts
+import { packSkill } from "@subako-ai/sdk";
+
+const archive = await packSkill([
+	{ path: "SKILL.md", content: new TextEncoder().encode("---\nname: refunds\ndescription: Issue refunds.\n---\n") },
+	{ path: "scripts/refund.py", content: script },
+]);
+```
+
+What `SKILL.md` says is Core's to judge: an upload whose frontmatter it cannot accept comes back as an `InvalidRequestError` naming the problem.
+
+## Uploading
+
+```ts
+import { openAsBlob } from "node:fs";
+
+const skill = await subako.skills.create(await openAsBlob("./skill.tar.gz"));
+```
+
+That creates the skill and its first version. Later versions go to the same skill:
+
+```ts
+await subako.skills.pushVersion(skill.skill_id, new Uint8Array(archive));
+```
+
+Each push is a new numbered version. Nothing is overwritten.
+
+```ts
+const versions = await subako.skills.listVersions(skill.skill_id, { limit: 20 });
+const all = await subako.skills.list();
+
+await subako.skills.rename(skill.skill_id, { display_name: "Refunds (2026)" });
+await subako.skills.delete(skill.skill_id);
+```
+
+## Reading a version back
+
+A version reads back by its number. Its archive is a presigned download that lapses, which you fetch yourself; `unpackSkill` reads the files out of what it serves:
+
+```ts
+import { unpackSkill } from "@subako-ai/sdk";
+
+const v2 = await subako.skills.getVersion(skill.skill_id, 2);
+const bundle = await subako.skills.getBundle(skill.skill_id, 2);
+
+bundle.url; // fetch it before it expires
+bundle.bytes;
+bundle.expires_at;
+
+const files = await unpackSkill(await (await fetch(bundle.url)).blob());
+```
+
+The archive is the one Core stored, so pushing it again as a new version reproduces that version's files.
+
+## A stream is not retried
+
+A request whose body is a `ReadableStream` cannot be read twice, so the SDK does not retry it. If you want the retries, pass a `Blob` or a `Uint8Array` instead — the SDK can replay those. See [Timeouts and retries](/reference/timeouts-and-retries).
+
+## Granting it to an agent
+
+The upload does not make the skill reachable. An agent version has to name it:
+
+```ts
+await subako.agents.publishVersion(agentId, {
+	model: { format: "anthropic", model: "claude-sonnet-5", max_tokens: 64_000, context_window: 1_000_000 },
+	skills: [
+		{ name: "refunds", skill_id: skill.skill_id, version: { type: "latest" } },
+	],
+});
+```
+
+`name` is the label the model sees the skill under. The two version pins behave differently:
+
+<TypeTable
+  type={{
+    "{ type: \"latest\" }": {
+      type: "VersionPinBody",
+      description:
+        "Resolved when each session is created, child sessions included. A session started after you push version 4 sees version 4; one already running stays where it was.",
+    },
+    "{ type: \"pinned\", number: 3 }": {
+      type: "VersionPinBody",
+      description: "Always that version. Pushing a new one changes nothing until you publish a config that names it.",
+    },
+  }}
+/>
+
+`latest` is the one that surprises people: it does not update a live session, and it does not need a new agent version either. Pushing a skill version changes what tomorrow's sessions read.

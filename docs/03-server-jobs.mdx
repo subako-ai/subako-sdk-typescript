@@ -1,0 +1,151 @@
+---
+title: Running on a server
+description: Using a session from a backend job, with no browser and no session tokens.
+sidebar:
+  order: 3
+---
+
+Plenty of agent work has no page and no person watching. A nightly job that reconciles invoices, a queue worker that triages an inbox, a build step that asks an agent to summarize a diff — all of these run one session inside one process and then exit.
+
+None of that needs a session token, a browser, or CORS. `SubakoClient` reaches every session route, so one client does the whole job.
+
+## The shape of it
+
+```ts
+import { SubakoClient } from "@subako-ai/sdk";
+
+const subako = new SubakoClient({
+	apiKey: process.env["SUBAKO_API_KEY"]!,
+});
+
+const created = await subako.sessions.create({ agent_id: agentId, display_name: "nightly" });
+
+const session = subako.sessions.connect(created.id);
+await session.ready;
+
+await session.send("Reconcile yesterday's invoices and report anything that does not balance.");
+
+for await (const event of session) {
+	if (event.type === "run_completed") break;
+	if (event.type === "run_failed") throw new Error("the run failed");
+}
+
+const [answer] = session.transcript.slice(-1);
+session.close();
+```
+
+`create` gives you a session token you never use — nothing here needs one. Ignore it.
+
+## Tools, and why `never`
+
+If the job serves tools, the lifetime is the setting to change:
+
+```ts
+const client = session.createToolClient("worker", {
+	lifetime: { type: "never" },
+});
+
+client.addTool("lookup_invoice", {
+	description: "Read one invoice by number.",
+	schema: z.object({ number: z.string() }),
+	execute: async ({ number }) => JSON.stringify(await invoices.find(number)),
+});
+
+await client.ready;
+```
+
+The default is a 60-second ttl with a ping at half of it, and that default exists for browsers. A tab can be closed, put to sleep, or lose its network without ever telling the server, so the ping is the only way the server learns the tools are gone.
+
+A job is not like that. It runs under a supervisor, it knows when it is finished, and it can send the `DELETE` itself. `{ type: "never" }` says so: no ping goes out, and the client lives until something deletes it.
+
+The trade is real, though. **A `never` client that is never deleted stays registered**, and the agent keeps being offered tools that nothing will answer. A crashed process leaves one behind. So use `never` where cleanup is guaranteed, and keep the ttl where it is not — a job running somewhere that can be killed without warning is closer to a browser tab than it looks.
+
+## Shutting down
+
+Delete the client and close the connection before the process ends.
+
+```ts
+try {
+	// ... the work
+} finally {
+	await session.deleteToolClient(client);
+	session.close();
+}
+```
+
+`deleteToolClient` sends the `DELETE`, aborts the calls still in flight, and rejects if the server refused — which is worth retrying, because a `never` client that outlives its process is exactly the case above.
+
+**Do not rely on the process staying alive to keep the client serving.** The ping interval and the retry timer are both `unref`'d, so Node exits as soon as nothing else is holding it open. The thing that keeps a job running is your own `await`, not the SDK's timers.
+
+## Long runs and timeouts
+
+One attempt may take `timeout` milliseconds, 60 seconds by default. That bounds a single HTTP request, not the session and not a run — a run that thinks for ten minutes is fine, because the events arrive over the stream rather than as one long response.
+
+What a long job does want is more patience on the individual calls, and more retries:
+
+```ts
+const subako = new SubakoClient({
+	baseUrl,
+	apiKey,
+	timeout: 30_000,
+	maxRetries: 5,
+});
+```
+
+A tool that takes a while is bounded separately: `call.signal` aborts shortly before the server's five-minute result deadline, so a long-running handler can stop cleanly rather than have its answer arrive too late to count.
+
+```ts
+execute: async ({ number }, call) => {
+	const invoice = await invoices.find(number, { signal: call.signal });
+	return JSON.stringify(invoice);
+},
+```
+
+## Reconnects in a job
+
+The connection reconnects on its own while it can, and gives up after `maxReconnects` consecutive failures — five by default. In a browser that is where you render a "reconnect" button. In a job there is nobody to press it, so either raise the budget or watch the status and call `reconnect()` yourself:
+
+```ts
+const session = subako.sessions.connect(created.id, { maxReconnects: 20 });
+
+session.subscribe((state) => {
+	if (state.status === "failed") {
+		log.error({ err: state.error }, "session stream failed");
+	}
+});
+```
+
+## Not waiting at all
+
+A job does not have to hold a connection open. If the work is "start something and let it run", post the input and exit:
+
+```ts
+await subako.sessions.postEvent(created.id, { type: "input", text: prompt });
+```
+
+The run continues on the server. Read the log later, whenever the job next wakes:
+
+```ts
+const page = await subako.sessions.listEvents(sessionId, { order: "asc", after_seq: lastSeen });
+for await (const event of page) {
+	handle(event);
+}
+```
+
+Keeping the last `seq` you processed is enough to resume. See [Reading the log](/sessions/reading-the-log).
+
+## Idempotency for a job that gets retried
+
+A queue that redelivers, or a cron that fires twice, should not create two sessions. Pass your own key:
+
+```ts
+await subako.sessions.create({ agent_id: agentId }, { idempotencyKey: `nightly-${date}` });
+```
+
+The second attempt answers with a receipt describing the first, instead of acting again. [Timeouts, retries and idempotency](/reference/timeouts-and-retries) covers what comes back.
+
+## What you do not need
+
+- **Session tokens.** They exist so a browser can hold something narrower than an API key. A backend already holds the key.
+- **`allowed_origins`.** That is CORS, and it only applies to requests a browser makes. A server-to-server call never has an `Origin`.
+- **`@subako-ai/react` and the page tools.** They drive a DOM. A job has none.

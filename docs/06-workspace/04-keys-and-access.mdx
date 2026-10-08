@@ -1,0 +1,148 @@
+---
+title: Keys and access
+description: Minting API keys with the permissions they need, and managing who is in the workspace.
+sidebar:
+  order: 4
+---
+
+An API key is how a backend authenticates. It belongs to one workspace and carries the permissions you minted it with, so a key for one job cannot be used for another.
+
+## Minting a key
+
+```ts
+const key = await subako.apiKeys.mint({
+	label: "support backend",
+	permissions: ["session.create", "session.read", "session.manage"],
+	expires_at: "2027-01-01T00:00:00Z", // or null, for one that does not expire
+});
+
+if ("secret" in key) {
+	store(key.secret); // shown once
+}
+```
+
+The secret comes back **once**. The `in` check is there because a retried mint answers with a receipt instead — the key exists, and its `prefix`, `label` and `permissions` come back, but `secret` does not. [Receipts](/reference/timeouts-and-retries#receipts) explains when that happens and what to do about it.
+
+```ts
+const keys = await subako.apiKeys.list();
+await subako.apiKeys.revoke(key.id);
+```
+
+## The permissions
+
+Mint the narrowest set that does the job. A backend that only starts sessions and reads them does not need `agent.publish`.
+
+| Permission | Lets the key |
+| ---------- | ------------ |
+| `workspace.read` | Read the workspace itself |
+| `agent.read` | List and read agents and their versions |
+| `agent.publish` | Publish a new agent version |
+| `agent.delete` | Delete an agent |
+| `session.create` | Create sessions and mint session tokens |
+| `session.read` | Read sessions, their logs and their sandboxes |
+| `session.manage` | Post input, cancel runs, resolve approvals, delete sessions |
+| `skill.read` | List and read skills |
+| `skill.manage` | Upload skills and push versions |
+| `vault.read` | List vaults |
+| `vault.manage` | Create, update and delete vaults |
+| `credential.read` | List the credentials in a vault |
+| `credential.manage` | Add and remove credentials |
+| `model_provider.read` | List the workspace's model providers |
+| `model_provider.manage` | Add, update and remove them |
+
+A call the key lacks the permission for throws `ForbiddenError`, not `UnauthorizedError` — the credential was fine, the permission was not. See [Errors](/reference/errors).
+
+## Model providers
+
+A workspace either uses the platform's providers or brings its own keys.
+
+```ts
+const providers = await subako.modelProviders.list();
+```
+
+Each is either `type: "platform"`, which publishes a catalog of models you can name in an agent config, or a workspace provider using your own credentials.
+
+```ts
+const provider = await subako.modelProviders.create({ /* provider details */ });
+await subako.modelProviders.update(provider.id, { /* only what changes */ });
+await subako.modelProviders.delete(provider.id);
+```
+
+An absent field on update leaves that part of the provider as it stands, so you can rotate a key without resending everything else.
+
+## Workspaces
+
+```ts
+const workspace = await subako.workspaces.create({ name: "support" });
+await subako.workspaces.rename(workspace.id, { name: "support-eu" });
+
+const members = await subako.workspaces.listMembers(workspace.id);
+await subako.workspaces.addMember(workspace.id, { user_id: userId, role: "member" });
+await subako.workspaces.changeMemberRole(workspace.id, userId, { role: "admin" });
+await subako.workspaces.removeMember(workspace.id, userId);
+```
+
+Which workspace a call acts on comes from `workspaceId` — set on the client, or per call. An API key implies its own and refuses a header naming another. See [Workspaces](/clients-and-auth#workspaces).
+
+## The organization
+
+Above workspaces sits the organization: the people, their invitations, and the bill.
+
+```ts
+const org = await subako.organization.get();
+await subako.organization.rename({ name: "Example Inc" });
+
+await subako.organization.createInvitation({ email: "new@example.com", role: "member" });
+const invitations = await subako.organization.listInvitations();
+await subako.organization.revokeInvitation(invitationId);
+
+const members = await subako.organization.listMembers();
+await subako.organization.changeMemberRole(userId, { role: "admin" });
+await subako.organization.removeMember(userId);
+```
+
+## Usage and credits
+
+```ts
+const credits = await subako.organization.getCredits();
+const usage = await subako.organization.listUsage({ limit: 100 });
+const perWorkspace = await subako.workspaces.listUsage(workspaceId, { limit: 100 });
+```
+
+Both usage listings page like any other. See [Pagination](/reference/pagination).
+
+## Plans
+
+```ts
+const plan = await subako.organization.getPlan();
+for (const { resource, max, used } of plan.allowances) {
+	console.log(resource, max === null ? `${used}` : `${used} of ${max}`);
+}
+const { plans } = await subako.organization.listPlans();
+```
+
+`getPlan` answers the organization's plan with an allowance for every resource a
+plan can cap: how many the organization holds, and the cap, or `null` where the
+plan sets none. `used` can exceed `max` after a move to a smaller plan, since
+nothing held is taken away; only the next creation is refused. `listPlans`
+answers every plan the deployment offers, in the order its catalog declares them,
+each with the resources it caps. Any member may read both. Prices are not part of
+Core's API: a deployment that bills names them itself.
+
+## Who am I
+
+```ts
+const me = await subako.me.get();
+```
+
+Answers with the signed-in user and the organizations they belong to. It needs an `accessToken`, since an API key is not a person.
+
+```ts
+await subako.me.rename({ display_name: "Alice Anderson" });
+await subako.me.rename({ display_name: null });
+```
+
+`rename` sets the signed-in user's own name, trimmed of surrounding whitespace, or
+clears it with `null`. A user is one person across every organization they belong
+to, so the name shows in each of them. A sign-in names a user who has no name from
+what the identity provider says, and never replaces one.

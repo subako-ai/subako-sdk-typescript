@@ -1,0 +1,132 @@
+---
+title: Quickstart
+description: Create a session on your backend, hand the browser a token, and let the page answer the agent's tool calls.
+sidebar:
+  order: 2
+---
+
+There are two shapes this comes in, and which one you are building decides how much of the page below applies.
+
+**Everything in one process.** A job, a worker, a CLI. One `SubakoClient` with an API key does the whole thing — no tokens to hand out, no CORS. That is the shorter path: [Running on a server](/server-jobs).
+
+**A browser driving the session.** The API key has to stay on your server, so the server creates the session and hands the browser a token good for that one session. That is the rest of this page.
+
+```sh
+pnpm add @subako-ai/sdk
+```
+
+Both clients use `https://api.us.cloud.subako.ai` by default. Set `baseUrl` when connecting to another deployment.
+
+## The backend
+
+It holds the key, creates the session, and hands back the token that came with it.
+
+```ts
+import { type CreatedSessionBody, type CreatedSessionReceiptBody, SubakoClient } from "@subako-ai/sdk";
+
+const subako = new SubakoClient({
+	apiKey: process.env["SUBAKO_API_KEY"]!,
+});
+
+app.post("/api/subako/session", async (req, res) => {
+	const created = await subako.sessions.create({
+		agent_id: agentId,
+		display_name: "support",
+	});
+	res.json({ sessionId: created.id, token: await tokenFor(created) });
+});
+```
+
+`create` answers with the session **and** its token — once. If the SDK had to retry a lost response, the session is already there and the token is not sent a second time, so the answer is a receipt instead and a fresh mint is what gets you a token:
+
+```ts
+async function tokenFor(created: CreatedSessionBody | CreatedSessionReceiptBody): Promise<string> {
+	if ("session_token" in created) {
+		return created.session_token;
+	}
+	const minted = await subako.sessions.mintToken(created.id);
+	if ("session_token" in minted) {
+		return minted.session_token;
+	}
+	throw new Error(`no token in hand for session ${created.id}`);
+}
+```
+
+The `in` check is the whole narrowing — the receipt type simply has no `session_token` field. [Receipts](/reference/timeouts-and-retries#receipts) covers the five operations this applies to.
+
+## The browser
+
+It holds only session tokens, one per session.
+
+```ts
+import { SubakoSessionClient } from "@subako-ai/sdk";
+
+const subako = new SubakoSessionClient({
+	getToken: async (sessionId) => await mintToken(sessionId),
+});
+```
+
+`getToken` is called when a token is first needed, not on every request, and again only after a `401`. What it answers with is cached in between.
+
+## Connect, offer a tool, talk
+
+One connection follows the log. The client on it serves the tools this page offers.
+
+```ts
+const session = subako.connect(sessionId, { history: true });
+
+const client = session.createToolClient("web");
+client.addTool("open_contact_form", {
+	description: "Navigate to the contact page and prefill the form.",
+	schema: z.object({ text: z.string() }),
+	execute: async ({ text }) => await openContactForm(text),
+});
+await client.ready;
+
+await subako.postEvent(sessionId, { type: "input", text: "I want to send an inquiry." });
+
+for await (const event of session) {
+	if (event.type === "message_assistant") {
+		render(event.message);
+	}
+	if (event.type === "run_completed") {
+		break;
+	}
+}
+
+session.close();
+```
+
+A few things are load-bearing here:
+
+- **`history: true`** reads the log to its end before the stream opens, so a chat draws the conversation so far. Without it the connection starts at the live head and carries only what happens next.
+- **`await client.ready`** is where a refused registration surfaces. Until it resolves, the agent has not been told the tool exists.
+- **`break` stops iterating, not the connection.** `session.close()` is what ends the stream and deletes the clients on it.
+
+## If there is no browser
+
+Then most of the above was scaffolding you do not need. `SubakoClient` reaches every session route itself, so one process creates the session, connects to it, and serves the tools:
+
+```ts
+const session = subako.sessions.connect(sessionId);
+const client = session.createToolClient("worker", { lifetime: { type: "never" } });
+```
+
+The `lifetime` is the part worth knowing about — the default suits a browser tab and not a supervised process. [Running on a server](/server-jobs) covers that and what shutting down cleanly looks like.
+
+## Next
+
+<CardGroup cols={2}>
+  <Card title="The two clients" href="/clients-and-auth" icon="key-round">
+    Which credential reaches what, and how token refresh works.
+  </Card>
+  <Card title="The session connection" href="/sessions/connection" icon="waypoints">
+    State, subscriptions, reconnects, and what to render.
+  </Card>
+  <Card title="Client tools" href="/tools/client-tools" icon="wrench">
+    Schemas, validation, and what the model hears back.
+  </Card>
+  <Card title="Running on a server" href="/server-jobs" icon="server">
+    The same session from a job or a worker, with no browser in the picture.
+  </Card>
+</CardGroup>

@@ -1,0 +1,166 @@
+---
+title: Vaults
+description: Storing the credentials the broker uses on an agent's behalf.
+sidebar:
+  order: 3
+---
+
+When an agent calls a tool on an MCP server, something has to authenticate that call. That credential lives in a vault. The broker reads it and attaches it; the model never sees it, and neither does the session log.
+
+## Creating a vault
+
+```ts
+const vault = await subako.vaults.create({ display_name: "Support tools" });
+```
+
+A vault is a container. What matters is what goes in it.
+
+```ts
+await subako.vaults.update(vault.id, { display_name: "Support tools (prod)" });
+await subako.vaults.delete(vault.id);
+const vaults = await subako.vaults.list();
+const support = await subako.vaults.list({ search: "support" });
+```
+
+`search` keeps the vaults whose display name holds the term, ignoring case, or whose id does.
+
+## Adding a credential
+
+```ts
+await subako.vaults.addCredential(vault.id, {
+	display_name: "Tickets MCP",
+	protocol: "mcp",
+	target: "https://mcp.example.com/tickets",
+	payload: { auth_scheme: "static_bearer", token: process.env["TICKETS_TOKEN"]! },
+});
+```
+
+<TypeTable
+  type={{
+    protocol: {
+      type: '"mcp"',
+      required: true,
+      description: "What the credential authenticates. The server owns this vocabulary, so more may appear without an SDK release.",
+    },
+    target: {
+      type: "string",
+      required: true,
+      description: "What the broker matches a tool call against. For `mcp`, the server's exact URL.",
+    },
+    display_name: { type: "string", required: true, description: "For people reading the list, not for matching." },
+    payload: { type: "CredentialPayloadBody", required: true, description: "The secret itself. Two shapes, below." },
+  }}
+/>
+
+**`target` has to match the `url` in the agent's MCP grant exactly.** That is how the broker finds the credential for a call. A mismatch is not an error you get at publish time — it is a tool call that fails at runtime, which is a slower thing to debug.
+
+## The two payload shapes
+
+```ts
+// A token you hold
+{ auth_scheme: "static_bearer", token: "..." }
+
+// OAuth, where the broker can refresh
+{ auth_scheme: "oauth", access_token: "...", expires_at: "2026-10-01T00:00:00Z", refresh: { ... } }
+```
+
+`static_bearer` is sent as it stands. `oauth` lets the broker refresh the token when it lapses, so a long session does not die with the credential.
+
+## Connecting with OAuth
+
+An MCP server that signs people in with OAuth does not need you to hold a token at all. Core finds the server's authorization server, registers itself there as a client, and hands you a URL to send the browser to — a "Sign in with ..." button. The provider sends the browser back to a page of yours, and that page finishes the connection:
+
+```ts
+// On the button: start, then send the browser away.
+const started = await subako.vaults.startOAuth(vault.id, {
+	target: "https://mcp.example.com/tickets",
+	display_name: "Tickets MCP",
+	redirect_uri: "https://app.example.com/vaults/oauth/callback",
+});
+if ("authorization_url" in started) {
+	window.location.assign(started.authorization_url);
+}
+
+// On the page at redirect_uri: finish, with what the browser came back with.
+const query = new URLSearchParams(window.location.search);
+const { id } = await subako.vaults.completeOAuth(vault.id, {
+	state: query.get("state")!,
+	code: query.get("code")!,
+});
+```
+
+<TypeTable
+  type={{
+    target: {
+      type: "string",
+      required: true,
+      description: "The MCP server's URL, which becomes the credential's target. It must be OAuth protected and its authorization server must support dynamic client registration.",
+    },
+    display_name: { type: "string", required: true, description: "The credential's name, as `addCredential` takes it." },
+    redirect_uri: {
+      type: "string",
+      required: true,
+      description: "Your page the provider sends the browser back to: an absolute http(s) URL without a fragment.",
+    },
+  }}
+/>
+
+The URL carries the connection's `state`, which Core keeps only as a hash, so a retried start answers with a [receipt](/reference/timeouts-and-retries#receipts) instead — `expires_at` alone; start again to get a URL.
+
+The result is an `oauth` credential holding what the provider issued, refresh token included when it gave one. Only the caller that started a connection can complete it, once, within ten minutes; a `state` that names nothing of yours is a `404`. When the person declines at the provider, the browser comes back with `error=access_denied` instead of a code, and there is nothing to complete.
+
+### When the provider stops taking it
+
+Core refreshes an `oauth` credential on its own: a minute before its access token lapses, and once more whenever its server refuses it. When the provider refuses the refresh token too — the person revoked access, or the grant expired — the credential is listed with `status: "reconnect_required"`, and sessions stop sending it. Reconnecting takes the person through the provider again, for the same target and name, and puts the new grant in place under the same credential id:
+
+```ts
+const started = await subako.vaults.reconnectOAuth(vault.id, credential.id, {
+	redirect_uri: "https://app.example.com/vaults/oauth/callback",
+});
+if ("authorization_url" in started) {
+	window.location.assign(started.authorization_url);
+}
+
+// On the page at redirect_uri, exactly as for a new connection:
+const { id } = await subako.vaults.completeOAuth(vault.id, { state, code }); // id === credential.id
+```
+
+Only an `oauth` credential can be reconnected; a `static_bearer` one is a `400`. A retried reconnect answers with the same receipt a retried start does.
+
+### Checking a credential
+
+`checkCredential` asks the credential's server whether it still takes the credential, the way a session would reach it — an MCP `initialize`, after any refresh the credential is due:
+
+```ts
+const { result } = await subako.vaults.checkCredential(vault.id, credential.id);
+```
+
+| `result` | Meaning |
+| -------- | ------- |
+| `connected` | The server took it. |
+| `rejected` | The server refused a credential that cannot refresh itself, such as a `static_bearer` token. Nothing is marked. |
+| `reconnect_required` | The provider no longer refreshes it, or refused the token a refresh issued. The credential is marked, and stays so until it is reconnected. |
+
+A server that cannot be reached at all is a `400`, rather than a verdict on the credential.
+
+## Listing and removing
+
+```ts
+const credentials = await subako.vaults.listCredentials(vault.id, { limit: 50 });
+await subako.vaults.deleteCredential(vault.id, credentialId);
+```
+
+The listing describes the credentials — each with its `status`, `active` or `reconnect_required` — and does not return the secrets: those went in and do not come back out.
+
+## Giving a session access
+
+A vault is not attached to an agent. It is named when the session is created, so the same agent can run against different credentials:
+
+```ts
+const created = await subako.sessions.create({
+	agent_id: agentId,
+	vault_ids: [vault.id],
+});
+```
+
+That is what lets one agent serve several customers, or the same agent run against staging and production without republishing.

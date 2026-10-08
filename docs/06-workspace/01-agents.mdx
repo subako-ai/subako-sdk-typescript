@@ -1,0 +1,160 @@
+---
+title: Agents
+description: Creating an agent and publishing the versions a session binds to.
+sidebar:
+  order: 1
+---
+
+An agent is a model, a prompt, and the things the model is allowed to reach. You publish it as a version, and a session binds to that version for its whole life. Publishing a new one later does not change a session already running.
+
+These routes need a workspace credential, so they live on `SubakoClient` and not on `SubakoSessionClient`.
+
+## Creating one
+
+```ts
+const agent = await subako.agents.create({ name: "support" });
+```
+
+That gives you an agent with no versions yet. Nothing can run on it until you publish one.
+
+```ts
+await subako.agents.rename(agent.id, { name: "support-triage" });
+await subako.agents.delete(agent.id);
+
+const page = await subako.agents.list({ limit: 50 });
+const triage = await subako.agents.list({ search: "triage" });
+```
+
+`search` keeps the agents whose name holds the term, ignoring case, or whose id does, so a fragment of an id finds its agent too.
+
+## Publishing a version
+
+The config is the version. You send the whole document, and what comes back is immutable.
+
+```ts
+const version = await subako.agents.publishVersion(agent.id, {
+	model: {
+		format: "anthropic",
+		model: "claude-sonnet-5",
+		max_tokens: 64_000,
+		context_window: 1_000_000,
+	},
+	system_prompt: "You help people file support tickets.",
+});
+```
+
+`model` picks the wire format and carries that format's settings. There are two:
+
+```ts
+// Anthropic
+{ format: "anthropic", model: "claude-sonnet-5", max_tokens: 64_000, context_window: 1_000_000, thinking: { type: "adaptive" }, effort: "high" }
+
+// OpenAI Responses
+{ format: "openai_responses", model: "gpt-5", max_tokens: 64_000, context_window: 200_000, reasoning_effort: "medium" }
+```
+
+`max_tokens` caps what the model writes in one step of the agent loop: for Anthropic, its thinking, its answer and its tool calls all count against it. A step that reaches it is cut off, and you pay only for the tokens written, so set it well above your longest step. 64,000 suits most agents.
+
+`context_window` is the most the model reads at once. The engine fits each step's output limit into what the conversation leaves of it, and tells a conversation that has outgrown the model from an answer that was cut off. Claude 4.6 and newer models read 1,000,000 tokens, and Claude Haiku 4.5 reads 200,000; for OpenAI, use the window the model's page lists.
+
+For Anthropic, `thinking` and `effort` are optional, and leaving them out takes the model's own default, which every Claude model accepts:
+
+- `thinking: { type: "adaptive" }` lets the model decide when and how much to think. Claude 4.6 and newer models take it.
+- `thinking: { type: "disabled" }` turns thinking off. Claude Opus 5 takes it only at `high` effort or below, and Claude Opus 5.5, Sonnet 5.5 and Fable refuse it; on those, lower `effort` instead.
+- `thinking: { type: "between_tools" }` is how Claude Sonnet 5.5, the one model that takes it, turns thinking off: the model does no extended thinking, and its short notes between tool calls come back as thinking blocks. It needs `high` effort or below.
+- `thinking: { type: "enabled", budget_tokens }` caps thinking at a fixed budget of at least 1,024 and below `max_tokens`. Only models older than Claude 4.6 take it.
+- `effort` (`low`, `medium`, `high`, `xhigh` or `max`) sets how thoroughly the model works. Lower is faster and cheaper; `high` or `xhigh` suits coding and multi-step work. Left out, Claude Opus 5.5 works at `medium` and other models at `high`.
+
+Which models you can name depends on the providers the workspace has. `subako.modelProviders.list()` tells you.
+
+To see what has been published:
+
+```ts
+const versions = await subako.agents.listVersions(agent.id, { limit: 20 });
+```
+
+A version's `config` comes back as Core stored it, typed only as an object. `readAgentConfig` reads it in the shape `publishVersion` takes, with every field present, so a new version can start from an old one:
+
+```ts
+import { readAgentConfig } from "@subako-ai/sdk";
+
+const [latest] = versions.items;
+await subako.agents.publishVersion(agent.id, {
+	...readAgentConfig(latest),
+	model_provider_id: latest.model_provider_id,
+	system_prompt: "You help people file and track support tickets.",
+});
+```
+
+It throws `AgentConfigError`, naming the field, when the config holds something publishing cannot say. A client older than the Core that published the version can meet one.
+
+## What the config grants
+
+Beyond the model and the prompt, the config names what the agent may reach. Each grant gets a `name` that the model sees the thing under.
+
+### Skills
+
+```ts
+skills: [
+	{ name: "refunds", skill_id: refund.skill_id, version: { type: "latest" } },
+	{ name: "policy", skill_id: policy.skill_id, version: { type: "pinned", number: 3 } },
+]
+```
+
+`latest` is resolved when each session is created, so a session started tomorrow may see a newer bundle. `pinned` never moves. See [Skills](/workspace/skills).
+
+### MCP servers
+
+```ts
+mcp: [
+	{
+		name: "tickets",
+		url: "https://mcp.example.com/tickets",
+		default_policy: "require_approval",
+		tools: [{ name: "search_tickets", policy: "allow" }],
+	},
+]
+```
+
+The broker serves the server at `mcp:{name}`. `default_policy` is `allow`, `require_approval` or `deny`, and it covers any tool not named in `tools` — including a tool the server adds after this version was published. A `require_approval` call shows up in the session log as an `approval_requested` event and the run waits; see [Reading the log](/sessions/reading-the-log#approvals).
+
+Credentials for these do not go in the config. They live in a vault, and the broker attaches them — see [Vaults](/workspace/vaults).
+
+### Sandboxes
+
+```ts
+sandboxes: [
+	{
+		name: "build",
+		environment: { type: "platform", release: "2026" },
+		default_policy: "allow",
+	},
+]
+```
+
+Each grant is a Linux instance the session owns, served at `sandbox:{name}` with an `exec` tool. [Sandboxes](/sessions/sandboxes) covers reading them back.
+
+## Browser origins
+
+This only matters if a browser talks to Subako directly. An agent answers no cross-origin request until you say which origins are allowed, so a page using `SubakoSessionClient` will fail its preflight until you do. A server-side job never sends an `Origin` and never needs this.
+
+```ts
+await subako.agents.setSecurity(agent.id, {
+	allowed_origins: ["https://app.example.com"],
+});
+
+const security = await subako.agents.getSecurity(agent.id);
+```
+
+This is the piece people miss when a session works from their backend and not from their page.
+
+## Starting a session on it
+
+```ts
+const created = await subako.sessions.create({
+	agent_id: agent.id,
+	display_name: "support",
+});
+```
+
+The session binds the agent's current version at that moment. [Quickstart](/quickstart) shows what to do with the token that comes back.

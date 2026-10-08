@@ -1,0 +1,165 @@
+---
+title: React
+description: The provider and the four hooks, and what each of them owns.
+sidebar:
+  order: 6
+---
+
+`@subako-ai/react` opens a session and declares, for as long as a component is mounted, the tools that let an agent drive the page the person is already on. The events are the source of truth — everything here reads the SDK's session connection and derives the rest.
+
+Requires **React 19**.
+
+```sh
+pnpm add @subako-ai/react @subako-ai/sdk
+```
+
+## The provider
+
+Build the client once, outside React, and hand it to the provider:
+
+```tsx
+import { SubakoProvider } from "@subako-ai/react";
+import { SubakoSessionClient } from "@subako-ai/sdk";
+
+const subako = new SubakoSessionClient({
+	getToken: (sessionId) => fetch(`/api/subako/token/${sessionId}`).then((r) => r.text()),
+});
+
+export function App({ sessionId }: { sessionId: string }) {
+	return (
+		<SubakoProvider client={subako}>
+			<Assistant sessionId={sessionId} />
+		</SubakoProvider>
+	);
+}
+```
+
+The provider holds nothing but the client and an `onError`: there is no registry of open sessions. Each hook opens what it owns in an effect and closes it in the cleanup, so it hands back `null` until that effect has run — the first render — and each hook takes the `null` the one above it may still be handing back. That is also what makes them safe under `<StrictMode>`, whose dev-only remount closes the connection and lets the effect that follows open another.
+
+## The four hooks
+
+Three of them mirror the SDK's three layers, and the common case is one of each:
+
+```tsx
+const session = useSession(sessionId); // one SessionConnection, opened with the history
+const client = useToolClient(session, "chat"); // one client on it, named to the model
+useTool(client, "navigate", navigateTool(fromTanStackRouter(router)));
+```
+
+The fourth is the read. **`useSession` acquires; `useSessionState` reads.** Opening a connection and following it are separate things, the way valtio splits `proxy` from `useSnapshot`: `useSession` hands back a connection and re-renders its caller once, when there is one, and every component that draws what the session carries calls `useSessionState(session)`.
+
+```tsx
+function Transcript({ session }: { session: SessionConnection | null }) {
+	const state = useSessionState(session); // without this, the props never change and this never redraws
+	return (
+		<>
+			{state?.transcript.map((message) => (
+				<Message key={message.seq} message={message} />
+			))}
+		</>
+	);
+}
+```
+
+## `useSession`
+
+```tsx
+function Assistant({ sessionId }: { sessionId: string }) {
+	const session = useSession(sessionId);
+	const state = useSessionState(session); // this component draws the session, so it subscribes
+	if (session === null || state === null) {
+		return <p>Connecting…</p>;
+	}
+
+	return (
+		<>
+			{state.transcript.map((message) => (
+				<Message key={message.seq} message={message} />
+			))}
+			{state.approvals.map((approval) => (
+				<button key={approval.call_id} onClick={() => session.resolveApproval(approval.call_id, "allow")}>
+					Allow {approval.tool}
+				</button>
+			))}
+			<Composer onSend={(text) => session.send(text)} disabled={state.isRunning} />
+		</>
+	);
+}
+```
+
+It hands back the SDK's own `SessionConnection`, opened with `history: true` and closed on unmount. Everything on it is the SDK's; the hook adds nothing. A second argument passes the SDK's connect options through, and `latest` opens on the newest part of the log instead of all of it:
+
+```tsx
+const session = useSession(sessionId, { latest: 50 }); // the newest 50 events, back to the latest run
+await session?.loadEarlier(); // and further back, when the page asks
+```
+
+Connecting is an effect, so the type is `SessionConnection | null`: the first render — and the renders after `sessionId` changed — read `null`.
+
+An id of `null` opens nothing, so a page that learns which session it may follow only once a lookup answers calls the hook on every render all the same:
+
+```tsx
+const session = useSession(found?.id ?? null); // `null` until the lookup answers
+```
+
+**The hook does not reconnect on its own.** The SDK's connection reconnects while it can, and after `maxReconnects` consecutive failures its status is `failed` and it stays there. What puts it back is `session.reconnect()`, so an app renders a button rather than expecting the hook to try again:
+
+```tsx
+const state = useSessionState(session);
+if (state?.status === "failed") {
+	return <button onClick={() => session?.reconnect()}>Reconnect</button>;
+}
+```
+
+The hook owns the connection, so `useSession(id)` in two components opens **two** connections. That is not a mistake — the server's log is the source of truth, so both read the same session and behave alike — but it is work nobody asked for. Call `useSession` once and pass the connection down; each place subscribes for itself.
+
+## `useSessionState`
+
+```tsx
+const state = useSessionState(session); // SessionState | null
+```
+
+`useSyncExternalStore` over the session: it re-renders the calling component whenever the connection changes and hands back the snapshot that render was woken for, or `null` while the session is `null`.
+
+Call it in every component that renders the session, and only there:
+
+- **The component that renders is the one that subscribes.** `useSession` in a provider and `<Chat session={session} />` in its `children` is the shape that catches people out: the provider re-renders, the chat's props never change, and React skips it. Subscribing inside the chat is what fixes it.
+- A component that only passes the session along, or only calls `send`, `cancel` or `resolveApproval`, needs nothing.
+
+It takes anything carrying the connection's `state` and `subscribe`, so it works on a session from `useSession`, on one built with the SDK directly, and on the `null` either may still be.
+
+## `useToolClient`
+
+```tsx
+const client = useToolClient(session, "chat", { lifetime, onError });
+```
+
+Creates one client on the session for the component's lifetime and deletes it on unmount. It takes the `null` `useSession` may hand back and answers with `ToolClient | null` in turn.
+
+`name` is what the model sees the tools under — every tool reaches it as `client__<name>__<tool>` — and the server's rule for it is `[a-z0-9-]{1,32}`.
+
+Several `useToolClient` calls on one session are fine: each is its own named client on the one connection, which is how a session serves tools from more than one place (`chat` next to `contact-form`). Most apps want one. A tab that goes away without unmounting sends no delete; the client's ttl collects it instead.
+
+`lifetime` and `onError` are read when the client is created, and a later change to either is ignored — the lifetime is the server's, fixed at registration, and `onError` is the callback the client kept. Only a new session or a new name makes another client. So an `onError` that has to see fresh state reads it out of a ref, or is the provider's.
+
+## `useTool`
+
+```tsx
+function ContactPage({ client }: { client: ToolClient }) {
+	const form = useForm({ defaultValues: { email: "", message: "" } });
+	const formRef = useRef<HTMLFormElement>(null);
+
+	useTool(client, "navigate", navigateTool(fromTanStackRouter(router)));
+	useTool(client, "fill_contact_form", formTool({ ...fromReactHookForm(form), description: "The contact form." }), {
+		target: formRef,
+	});
+
+	return <form ref={formRef}>{/* ... */}</form>;
+}
+```
+
+The tool is offered for as long as the component is mounted: **the mounted components are the set**, and the client reconciles it with the server, one update per tick, so a page that swaps a screenful of tools sends one request.
+
+A re-render that builds a fresh definition swaps the handler and tells the server nothing, unless the description or the parameters changed. **So there is nothing to memoize**: build the definition inline on every render and its `execute` closes over what the component holds right now.
+
+A client with no tools stays registered: it belongs to the session, not to the tools. A `null` client declares nothing, so the call reads the same whether the session is open or not.

@@ -1,0 +1,56 @@
+name: release
+
+# Pushing a tag like `v0.1.3` publishes every package at 0.1.3. npm trusts this
+# file, in this repository, running in the `npm` environment: the job trades its
+# OIDC token for a publish token that lasts one publish, so no npm token is stored.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+
+jobs:
+  check:
+    uses: ./.github/workflows/ci.yml
+
+  publish:
+    needs: check
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: The tag is on main
+        run: git merge-base --is-ancestor "$GITHUB_SHA" origin/main
+
+      - name: The tag names every package's version
+        run: node scripts/check-release.mjs "$GITHUB_REF_NAME"
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0
+
+      # No `registry-url`, which would write an .npmrc expecting NODE_AUTH_TOKEN, and
+      # no cache, so nothing another workflow saved reaches the published build.
+      - name: Install Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version-file: .node-version
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # pnpm 11 does the OIDC exchange itself. Detached at the tag, the checkout is on
+      # no branch, hence --no-git-checks; the step above checked the tag against main.
+      - name: Publish
+        run: pnpm -r --filter './packages/*' publish --access public --no-git-checks

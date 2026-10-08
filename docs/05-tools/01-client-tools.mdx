@@ -1,0 +1,121 @@
+---
+title: Client tools
+description: How your code offers tools to a session and answers the calls an agent makes.
+sidebar:
+  order: 1
+---
+
+A tool client is your process telling one session "here is what I can do". You create it from a connection, and it takes care of registering itself, staying alive, and answering the calls that come back.
+
+"Your process" is as true of a queue worker as of a browser tab. The tools a job offers reach a database or an internal service; the ones a page offers reach the DOM. The client is the same either way — only [the lifetime](#choosing-a-lifetime) differs.
+
+```ts
+const client = session.createToolClient("web", {
+	// the model sees `client__web__open_contact_form`
+	lifetime: { type: "ttl", data: { seconds: 60 } }, // the default; pinged at half the ttl
+	onError: (error) => console.error(error), // a ping, an ack, an answer, a delete
+});
+
+client.addTool("open_contact_form", {
+	description: "Navigate to the contact page and prefill the form.",
+	schema: z.object({ text: z.string() }), // any Standard Schema: zod, valibot, arktype
+	execute: async ({ text }, call) => `Navigated to /contact with ${text.length} characters.`,
+});
+
+await client.ready; // registered; `client.state.id` and `client.state.name` are set
+
+client.removeTool("open_contact_form"); // stops offering it; a call already running still answers
+await session.deleteToolClient(client); // also run on session.close() and on the connection's abort
+```
+
+## Telling the model what a tool takes
+
+There are two ways, and you pick one.
+
+Pass a **`schema`** — any [Standard Schema](https://github.com/standard-schema/standard-schema) value, so zod, valibot or arktype — and it does double duty. The model reads it as the tool's parameters, and the SDK validates incoming arguments against it.
+
+Or write the **`parameters`** yourself and, if you want validation, put a `parse` beside them:
+
+```ts
+client.addTool("open_contact_form", {
+	description: "Navigate to the contact page and prefill the form.",
+	parameters: {
+		type: "object",
+		properties: { text: { type: "string" } },
+		required: ["text"],
+	},
+	parse: (args) => ContactArgs.parse(args), // optional; the arguments stay unknown without it
+	execute: async (args, call) => `Navigated to /contact.`,
+});
+```
+
+Either way `execute` takes what the tool said it takes: the schema's output, or whatever `parse` answered with, typed at the call site with nothing to annotate.
+
+The two spellings are **exclusive** — a `schema` next to a `parse` is two validations for one call — and a tool carrying neither has not said what it takes. A schema that cannot write itself as JSON Schema, which zod 4 can, takes a `parameters` beside it; one that can neither describe itself nor carry them is refused by `addTool` rather than at the next update to the server. `parametersOf(tool)` answers with what the client publishes, whichever spelling was used.
+
+Arguments the schema refuses never reach `execute`. The model is answered with **every issue it raised, each under the path it was at**, which is what lets it correct the call rather than only learn that it failed.
+
+The SDK ships no schema library, so `parse` is a hook rather than a schema system. Raw arguments are `unknown`; a handler that wants them typed annotates its own parameter and lets `parse` make the annotation true.
+
+## Declaring a set
+
+A client starts empty, and the tools added to it are the whole declaration.
+
+A tool added before the registration goes out with it; after it, every `addTool` and `removeTool` made in one tick reaches the server as a **single update**. A definition whose description and parameters are unchanged tells the server nothing and only swaps the handler behind the name, so rebuilding the same tools — a React render, a worker re-reading its config — costs no requests.
+
+## Watching calls come in
+
+A client is a store too, in the same shape as the connection: one immutable snapshot, replaced on every transition, and one subscription.
+
+```ts
+client.state.status; // "joining" | "serving" | "leaving" | "left" | "failed"
+client.state.error; // the registration's failure, set when the status is "failed"
+client.state.id; // and `name`: what the server called this client
+client.state.tools; // the tool names served right now
+client.state.calls; // the calls in flight, and the last 50 settled
+
+const stop = client.subscribe((state) => render(state));
+```
+
+Each call carries `callId`, `tool`, the `arguments` as dispatched, a `phase` — `acked`, `running`, then `answered` or `failed` — and, once it has one, the `answer` that was sent. `answered` means the server took the answer, error or not (`answer.is_error` says which); `failed` means it never got one.
+
+Nothing here is interpreted either. It is a record of what this client did, useful for a progress indicator or a log line; the session's events remain the source of truth.
+
+## Lifecycle
+
+Await `ready`: a registration the server refused is reported there, and only there, with the status at `failed` and `state.error` set. The status walks `joining`, `serving`, `leaving`, `left`. Once a client has left, `addTool` and `removeTool` reach the server no more.
+
+`deleteToolClient` sends the `DELETE`, aborts the calls in flight, ends the ping timer, and rejects if the server refuses — so a delete that failed is worth asking for again.
+
+## Choosing a lifetime
+
+This is the setting that differs most between a browser and a server, and the default is the browser's.
+
+<TypeTable
+  type={{
+    "{ type: \"ttl\", data: { seconds: 60 } }": {
+      type: "ClientLifetimeForm",
+      description:
+        "The default. The client pings at half the ttl, and the server drops it when the pings stop. For anything that can vanish without saying so — a closed tab, a killed container.",
+    },
+    "{ type: \"never\" }": {
+      type: "ClientLifetimeForm",
+      description:
+        "No ping at all. The client lives until something deletes it. For a process that will reliably run its own cleanup — see Running on a server.",
+    },
+  }}
+/>
+
+The ttl is the default because a ping is the server's only way to learn that a client went away silently, and a browser tab does exactly that. A server-side job usually does not: it finishes, and it can say so.
+
+Neither timer keeps a Node process running. Both the ping interval and the retry timer are `unref`'d, so a process that has nothing left to do exits even with a client still serving. That is a reason to delete the client deliberately rather than relying on the process staying up — see [Running on a server](/server-jobs).
+
+## The order things happen in
+
+Registration waits for the stream, so no dispatch can arrive before the client is listening. Per dispatch, in order: the call is acked at once, the handler is looked up, `parse`, then `execute(args, call)`. Calls run concurrently.
+
+`execute` answers with a `string`, or with `{ text, is_error }`. **Every path answers**, so the model always hears back: an unknown tool, a `parse` that threw, and an `execute` that threw all settle the call with `is_error: true` and a short reason.
+
+Asking a person first is `execute`'s own business: await the answer there, and return what they decided. A job with nobody to ask either answers or refuses.
+
+`call.signal` aborts when the client is deleted and shortly before the server's five-minute result deadline, so a long tool can stop rather than time out.

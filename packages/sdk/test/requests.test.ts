@@ -1,0 +1,129 @@
+import { describe, expect, it } from "vitest";
+import { empty, json, stubFetch, testClient } from "./support.js";
+
+describe("path parameters", () => {
+	it("fills the url from the positional arguments, in order", async () => {
+		const http = stubFetch(() => empty(204));
+		const client = testClient({ fetch: http.fetch });
+
+		await client.sessions.answerCall("s1", "c1", "call1", { text: "done" });
+
+		expect(http.calls[0]?.url).toBe("https://api.test/v1/sessions/s1/clients/c1/calls/call1/result");
+		expect(http.calls[0]?.method).toBe("POST");
+	});
+
+	it("escapes a path parameter", async () => {
+		const http = stubFetch(() => json({ id: "a/b" }));
+		const client = testClient({ fetch: http.fetch });
+
+		await client.agents.get("a/b");
+
+		expect(http.calls[0]?.url).toBe("https://api.test/v1/agents/a%2Fb");
+	});
+});
+
+describe("params", () => {
+	it("become the query of a read", async () => {
+		const http = stubFetch(() => json({ items: [] }));
+		const client = testClient({ fetch: http.fetch });
+
+		await client.skills.list({ limit: 25, order: "asc" });
+
+		const url = new URL(http.calls[0]!.url);
+		expect(url.pathname).toBe("/v1/skills");
+		expect(url.searchParams.get("limit")).toBe("25");
+		expect(url.searchParams.get("order")).toBe("asc");
+	});
+
+	it("become the json body of a write", async () => {
+		const http = stubFetch(() => json({ id: "a1" }, 201));
+		const client = testClient({ fetch: http.fetch });
+
+		await client.agents.create({ name: "triage" });
+
+		const request = http.calls[0]!;
+		expect(request.method).toBe("POST");
+		expect(request.headers.get("content-type")).toBe("application/json");
+		await expect(request.text()).resolves.toBe(JSON.stringify({ name: "triage" }));
+	});
+
+	it("ride the query of a listing, not its body", async () => {
+		const http = stubFetch(() => json({ items: [] }));
+		const client = testClient({ fetch: http.fetch });
+
+		await client.sessions.listEvents("s1", { after_seq: 41 });
+
+		expect(new URL(http.calls[0]!.url).searchParams.get("after_seq")).toBe("41");
+	});
+
+	it("carry a new API key in a provider update, the key alone", async () => {
+		const http = stubFetch(() => json({ id: "p1" }));
+		const client = testClient({ fetch: http.fetch });
+
+		await client.modelProviders.update("p1", { api_key: "sk-rotated" });
+
+		const request = http.calls[0]!;
+		expect(request.method).toBe("PATCH");
+		expect(new URL(request.url).pathname).toBe("/v1/model-providers/p1");
+		await expect(request.text()).resolves.toBe(JSON.stringify({ api_key: "sk-rotated" }));
+	});
+
+	it("narrow the model providers listing to one type", async () => {
+		const http = stubFetch(() => json({ items: [] }));
+		const client = testClient({ fetch: http.fetch });
+
+		await client.modelProviders.list({ type: "byok" });
+
+		const url = new URL(http.calls[0]!.url);
+		expect(url.pathname).toBe("/v1/model-providers");
+		expect(url.searchParams.get("type")).toBe("byok");
+	});
+});
+
+describe("requests without a body", () => {
+	it("send neither a body nor a content type", async () => {
+		const http = stubFetch(() => json({ run_id: null }));
+		const client = testClient({ fetch: http.fetch });
+
+		await client.sessions.cancelRun("s1");
+
+		const request = http.calls[0]!;
+		expect(request.method).toBe("POST");
+		expect(request.headers.has("content-type")).toBe(false);
+		await expect(request.text()).resolves.toBe("");
+	});
+});
+
+describe("responses", () => {
+	it("answer with the parsed body", async () => {
+		const http = stubFetch(() => json({ id: "a1", name: "triage" }));
+		const client = testClient({ fetch: http.fetch });
+
+		await expect(client.agents.get("a1")).resolves.toEqual({ id: "a1", name: "triage" });
+	});
+
+	it("answer with undefined when the server sends 204", async () => {
+		const http = stubFetch(() => empty(204));
+		const client = testClient({ fetch: http.fetch });
+
+		await expect(client.agents.delete("a1")).resolves.toBeUndefined();
+		expect(http.calls[0]?.method).toBe("DELETE");
+	});
+
+	it("carry the method the spec names", async () => {
+		const http = stubFetch(
+			() => empty(204),
+			() => json({ id: "s1" }),
+			() => json({}),
+		);
+		const client = testClient({ fetch: http.fetch });
+
+		await client.organization.changeMemberRole("u1", { role: "admin" });
+		await client.skills.rename("sk1", { display_name: "renamed" });
+		await client.me.rename({ display_name: null });
+
+		expect(http.calls.map((call) => call.method)).toEqual(["PUT", "PATCH", "PATCH"]);
+		// A clear travels as an explicit null, which Core requires rather than an absent field.
+		expect(await http.calls[2]?.json()).toEqual({ display_name: null });
+	});
+});

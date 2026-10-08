@@ -1,0 +1,37 @@
+{
+	"name": "@subako-ai/workspace",
+	"version": "0.0.0",
+	"private": true,
+	"description": "Workspace root for the Subako TypeScript packages",
+	"license": "Apache-2.0",
+	"type": "module",
+	"scripts": {
+		"sync": "./scripts/sync-openapi.sh",
+		"gen": "pnpm --filter @subako-ai/sdk run gen",
+		"gen:check": "./scripts/check-generated.sh",
+		"build": "node scripts/clean-dist.mjs && tsc -b",
+		"pack:check": "node scripts/clean-dist.mjs && node scripts/check-packages.mjs",
+		"typecheck": "tsc -b --force && tsc -p packages/sdk/tsconfig.test.json && tsc -p packages/tools/tsconfig.test.json && tsc -p packages/react/tsconfig.test.json && tsc -p packages/tanstack-router/tsconfig.test.json && tsc -p packages/react-router/tsconfig.test.json && tsc -p packages/react-hook-form/tsconfig.test.json && tsc -p packages/assistant-ui/tsconfig.test.json && tsc -p examples/todo/tsconfig.json && tsc -p examples/chat/tsconfig.json",
+		"test": "vitest run",
+		"testbed": "testbed/cloud.sh",
+		"testbed:down": "testbed/down.sh",
+		"testbed:smoke": "pnpm run build && node testbed/smoke.mjs",
+		"example": "testbed/example.sh",
+		"example:todo:verify": "pnpm --filter @subako-ai/example-todo run verify",
+		"docs:dev": "blume dev",
+		"docs:build": "blume build",
+		"docs:check": "blume doctor"
+	},
+	"devDependencies": {
+		"@hey-api/openapi-ts": "0.0.0-next-20260824173136",
+		"@types/node": "^24.13.3",
+		"blume": "^1.6.4",
+		"typescript": "^7",
+		"vitest": "^4.1.11",
+		"wrangler": "^4.131.1"
+	},
+	"engines": {
+		"node": ">=22"
+	},
+	"packageManager": "pnpm@11.18.0"
+}

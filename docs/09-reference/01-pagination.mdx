@@ -1,0 +1,84 @@
+---
+title: Pagination
+description: How listings page, and the one that does not.
+sidebar:
+  order: 1
+---
+
+Listings answer with a `Page`. Iterate it to walk every item from that page onward, or follow the cursor by hand.
+
+```ts
+for await (const agent of await subako.agents.list({ limit: 100 })) {
+	console.log(agent.name);
+}
+
+const page = await subako.sessions.listEvents(sessionId, { after_seq: 41 });
+console.log(page.items, page.nextCursor);
+const next = await page.nextPage(); // Page | null
+```
+
+## Direction
+
+Every listing answers **newest first**, and `order: "asc"` walks the other way. The cursor follows the direction of travel, so a walk continues past its last item whichever way it runs.
+
+```ts
+const oldest = await subako.agents.list({ order: "asc", limit: 100 });
+```
+
+## Stepping back
+
+A page from an id-keyed listing also knows the page before it. `previousPage()` reads it under `before`, its items in the same order as any page, and answers `null` on the first page. A pager needs nothing else: Next hands `nextCursor` back as `after`, Previous hands `previousCursor` back as `before`.
+
+```ts
+const page = await subako.workspaces.list({ limit: 25, after: cursor });
+const previous = await page.previousPage(); // Page | null
+if (page.previousCursor !== null) await subako.workspaces.list({ limit: 25, before: page.previousCursor });
+```
+
+A walk that turns around reads one way only: `previousPage()` drops the `after` the page came by, and `nextPage()` drops a `before`. The event log pages forward only, so its `previousCursor` is always `null`.
+
+## Cursors
+
+Cursors are plain values: a string id for most listings, a `number` seq for the session event log.
+
+The event log is the one listing whose cursor **changes name with the direction** — `before_seq` descending, `after_seq` ascending — and the `Page` sends back whichever the listing asked for. Both bounds are exclusive, so a window is `{ after_seq, before_seq }`:
+
+```ts
+const window = await subako.sessions.listEvents(sessionId, { after_seq: 100, before_seq: 200 });
+```
+
+## The one that is not a Page
+
+`listSandboxes` is the exception, and says so in its type. An agent's config names the sandboxes it grants, so the set is bounded and the whole of it travels at once. It answers with `{ items }` and no cursor:
+
+```ts
+const { items } = await subako.sessions.listSandboxes(sessionId);
+```
+
+A `Page` there would promise a second call that cannot be made — the route takes no cursor parameter at all. See [Sandboxes](/sessions/sandboxes).
+
+## What takes a cursor
+
+Every other listing accepts `limit`, `after`, `before`, and `order`. A page starts past one cursor or just before one, so `after` and `before` are exclusive, and the params' type (`IdPaged`) rejects both at once:
+
+```ts
+await subako.agents.list({ limit: 50, after: lastId, order: "asc" });
+await subako.agents.listVersions(agentId, { limit: 50 });
+await subako.apiKeys.list();
+await subako.modelProviders.list();
+await subako.organization.listMembers();
+await subako.organization.listInvitations();
+await subako.organization.listUsage({ limit: 100 });
+await subako.sessions.list();
+await subako.sessions.list({ agent_id: agentId }); // one agent's sessions
+await subako.skills.list();
+await subako.skills.listVersions(skillId);
+await subako.vaults.list();
+await subako.vaults.listCredentials(vaultId);
+await subako.workspaces.list();
+await subako.workspaces.list({ search: "research" }); // by a fragment of the name or the id
+await subako.workspaces.listMembers(workspaceId);
+await subako.workspaces.listUsage(workspaceId);
+```
+
+`sessions.listEvents` is the same, with `after_seq` and `before_seq` in place of `after` and `before`.

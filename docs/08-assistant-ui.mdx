@@ -1,0 +1,132 @@
+---
+title: assistant-ui
+description: Drop in a working chat, or build your own thread on the same runtime.
+sidebar:
+  order: 7
+---
+
+[assistant-ui](https://www.assistant-ui.com) over a Subako session: one hook that turns the session into an assistant-ui runtime, and one component that renders a working chat.
+
+Requires **React 19**, `@assistant-ui/react` 0.15 with `@assistant-ui/react-markdown` 0.14.
+
+```sh
+pnpm add @subako-ai/assistant-ui @subako-ai/react @subako-ai/sdk @assistant-ui/react @assistant-ui/react-markdown
+```
+
+## The whole chat
+
+The provider and the session are `@subako-ai/react`'s; this package draws them.
+
+```tsx
+import { SubakoChat } from "@subako-ai/assistant-ui";
+import { SubakoProvider, useSession } from "@subako-ai/react";
+
+function Assistant({ sessionId }: { sessionId: string }) {
+	// The app opens the session and hands it down, so the chat opens no second connection.
+	return <SubakoChat session={useSession(sessionId)} />;
+}
+
+export function App({ sessionId }: { sessionId: string }) {
+	return (
+		<SubakoProvider client={subako}>
+			<Assistant sessionId={sessionId} />
+		</SubakoProvider>
+	);
+}
+```
+
+That is the transcript, the tool calls with their results, the approval prompt, a composer, and a stop button while a run is under way. The assistant's text is drawn as markdown, tables and all, with links that open in a new tab; what the person typed is shown as typed.
+
+The session is the one the app opened, so the tools the app declares and the thread share one connection. `useSession` hands back `null` until its effect has connected, which the chat renders as an empty thread with a disabled composer.
+
+It brings its own small stylesheet, so it renders acceptably with nothing else installed — no CSS framework, no shadcn registry, no `@assistant-ui/styles`.
+
+## Styling
+
+`className` lands on the root element, and these class names are stable:
+
+| Class | What it is |
+| ----- | ---------- |
+| `.subako-chat` | The root. |
+| `.subako-viewport` | The scrolling message list. |
+| `.subako-message`, `-user`, `-assistant` | One bubble. |
+| `.subako-markdown` | The assistant's body, as markdown. |
+| `.subako-thinking` | A `thinking` block. |
+| `.subako-tool` | One tool call, folded to its name and status. |
+| `.subako-tool-args`, `.subako-tool-result` | The input and the output behind the fold. |
+| `.subako-approval` | The allow / deny prompt. |
+| `.subako-composer`, `.subako-input` | The composer. |
+
+Every rule of the stylesheet sits in a cascade layer named `subako`. A rule of the app's own that names one of those classes wins over it, at any specificity and from anywhere in the page:
+
+```css
+.subako-user {
+	border-radius: 4px;
+}
+```
+
+A rule that names no class — a reset's `*` and `button`, the app's own `pre` — does not reach the chat's own elements. Each carries a guard, in no layer, that turns unlayered element rules away and takes the layered ones instead, so Tailwind v3's preflight, a `normalize.css`, and the app's global `button` all leave the chat as it is.
+
+An app whose CSS is layered itself — Tailwind v4 is one — says where `subako` goes by naming it in its layer order, ahead of anything else that declares a layer:
+
+```css
+@layer theme, base, subako, components, utilities;
+@import "tailwindcss";
+```
+
+After `base`, so preflight does not strip the chat's own buttons; before `components` and `utilities`, so an override the app writes inside a layer of its own wins. Left unnamed, `subako` lands last and the chat's own rules beat the app's layered ones.
+
+### Colors
+
+Every surface names its own color and its own background, so the chat is legible on a page of any color instead of inheriting half of one. Eight custom properties drive it, light by default and dark under `prefers-color-scheme: dark`. Set them on `.subako-chat` itself — a value set above it is shadowed by the chat's own defaults — which is how an app whose dark mode is a class or a `data-theme` keeps the chat in step:
+
+```css
+.subako-chat {
+	--subako-bg: var(--card);
+	--subako-fg: var(--ink);
+	--subako-muted: var(--dim);
+	--subako-accent: var(--accent);
+	--subako-accent-fg: #fff;
+	--subako-border: var(--line);
+	--subako-surface: var(--bg);
+	--subako-error: var(--danger);
+	color-scheme: inherit;
+}
+```
+
+`--subako-bg` is the panel, the composer and its controls; `--subako-surface` is the raised one — the assistant bubble, the tool call's arguments and result, the approval bar; `--subako-accent` with `--subako-accent-fg` is the user bubble; `--subako-muted` is the reasoning block and the placeholder; `--subako-error` is a failed tool result.
+
+### A page with a Content Security Policy
+
+The stylesheet is an inline `<style>`, so a page whose `style-src-elem` names a nonce drops it and the thread renders unstyled. Hand the chat the same nonce the page puts on its own tags:
+
+```tsx
+<SubakoChat session={session} nonce={cspNonce} />
+```
+
+A page with no such policy needs nothing: left out, the attribute is not written at all.
+
+## `useSubakoRuntime`
+
+For a thread you build yourself:
+
+```tsx
+const session = useSession(sessionId);
+const runtime = useSubakoRuntime(session);
+```
+
+`useExternalStoreRuntime` over the session. **The log stays the only store**: the runtime keeps no messages of its own, so a send that fails leaves the thread as the server has it. A `null` session is a thread with no messages and a composer that cannot be typed into.
+
+The runtime subscribes to the session itself, so the thread follows the log wherever it is mounted. That matters because `useSession` only acquires: hand the session to a `<SubakoChat>` sitting in some provider's `children` and its props never change, so React would never redraw it. Nothing above the chat has to re-render for a new message to appear.
+
+| assistant-ui | Subako |
+| ------------ | ------ |
+| `messages` | `state.transcript`, through `convertMessage` |
+| `isRunning` | `state.isRunning` |
+| `onNew` | `send(text)`, over the text parts of the appended message |
+| `onCancel` | `cancel()` |
+| `onRespondToToolApproval` | `resolveApproval(callId, approved ? "allow" : "deny", reason)` |
+
+The argument is anything carrying those members, or `null`.
+
+`convertMessage` is the pure half, exported so an app can convert a transcript without a runtime.

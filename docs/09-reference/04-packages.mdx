@@ -1,0 +1,74 @@
+---
+title: Packages
+description: What each package is for and what it needs.
+sidebar:
+  order: 4
+---
+
+Seven packages under the `@subako-ai` scope, versioned together and released as one. Every one is **ESM only**, Apache-2.0, and needs **Node 22 or newer** to build against.
+
+## `@subako-ai/sdk` [#sdk]
+
+The client, and the only package that is not optional. Sessions, streaming, tools, errors, pagination.
+
+```sh
+pnpm add @subako-ai/sdk
+```
+
+Its one runtime dependency is `@standard-schema/spec`, which is types only. The generated HTTP client is vendored at codegen time, so nothing else is pulled in at install.
+
+## `@subako-ai/react`
+
+A provider and four hooks over a session connection. Requires **React 19**.
+
+```sh
+pnpm add @subako-ai/react @subako-ai/sdk
+```
+
+See [React](/react).
+
+## `@subako-ai/tools`
+
+`formTool`, `submitTool`, `navigateTool` and `fromFormElement` — the tools an agent needs to drive a page. Depends on no framework.
+
+```sh
+pnpm add @subako-ai/tools @subako-ai/sdk
+```
+
+See [Forms](/tools/forms) and [Navigation](/tools/navigation).
+
+## `@subako-ai/assistant-ui`
+
+A working chat over a session, or a runtime for a thread of your own. Requires **React 19**, `@assistant-ui/react` 0.15 and `@assistant-ui/react-markdown` 0.14.
+
+```sh
+pnpm add @subako-ai/assistant-ui @subako-ai/react @subako-ai/sdk @assistant-ui/react @assistant-ui/react-markdown
+```
+
+See [assistant-ui](/assistant-ui).
+
+## The library adapters
+
+Each answers with the spec its tool takes, so a spread is all an app writes.
+
+| Package | Peer | Answers with |
+| ------- | ---- | ------------ |
+| `@subako-ai/react-hook-form` [#react-hook-form] | react-hook-form 7.50+ | `fields`/`schema`, `apply`, `read` for `formTool` |
+| `@subako-ai/react-router` [#react-router] | React Router 6.4+ | `routes`, `navigate`, `read` for `navigateTool` |
+| `@subako-ai/tanstack-router` [#tanstack-router] | `@tanstack/react-router` 1.100+ | `routes`, `navigate`, `read` for `navigateTool` |
+
+```ts
+navigateTool(fromTanStackRouter(router));
+formTool({ ...fromReactHookForm(form), description: "The contact form." });
+```
+
+## What they have in common
+
+- **ESM only.** There is no CommonJS build, and none is planned.
+- **Unbundled.** The published `dist` is one output file per source file, emitted by `tsc`, with source maps pointing at the `src` that ships alongside. A bundler in your app tree-shakes at the granularity it would have had anyway, and a stack trace lands on real code.
+- **Typed against `NodeNext`.** Declaration maps ship too, so "go to definition" reaches the source rather than a `.d.ts`.
+- **`sideEffects: false`**, so an import you do not use is dropped.
+
+## Versions
+
+The packages move together: a release bumps all seven, and the peer ranges between them are written `^<that version>`. Mixing versions across the set is not tested and not supported.

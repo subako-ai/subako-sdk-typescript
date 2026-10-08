@@ -1,0 +1,8 @@
+{
+	"model": {
+		"format": "openai_responses",
+		"model": "hawk",
+		"max_tokens": 8192,
+		"context_window": 128000
+	}
+}

@@ -1,0 +1,58 @@
+{
+	"name": "@subako-ai/assistant-ui",
+	"version": "0.1.14",
+	"description": "assistant-ui runtime and chat for Subako sessions",
+	"homepage": "https://subako.ai",
+	"license": "Apache-2.0",
+	"author": "Kikuvi, Inc.",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/subako-ai/subako-sdk-typescript.git",
+		"directory": "packages/assistant-ui"
+	},
+	"files": [
+		"dist",
+		"src"
+	],
+	"type": "module",
+	"sideEffects": false,
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"default": "./dist/index.js"
+		},
+		"./package.json": "./package.json"
+	},
+	"publishConfig": {
+		"access": "public"
+	},
+	"scripts": {
+		"prepack": "node ../../scripts/prepack.mjs"
+	},
+	"dependencies": {
+		"remark-gfm": "^4.0.1"
+	},
+	"devDependencies": {
+		"@assistant-ui/react": "^0.15.18",
+		"@assistant-ui/react-markdown": "^0.14.15",
+		"@subako-ai/react": "workspace:*",
+		"@subako-ai/sdk": "workspace:*",
+		"@testing-library/react": "^16.3.0",
+		"@types/react": "^19.2.0",
+		"@types/react-dom": "^19.2.0",
+		"happy-dom": "^20.14.0",
+		"react": "^19.2.0",
+		"react-dom": "^19.2.0",
+		"typescript": "^7"
+	},
+	"peerDependencies": {
+		"@assistant-ui/react": "^0.15.0",
+		"@assistant-ui/react-markdown": "^0.14.15",
+		"@subako-ai/react": "workspace:^",
+		"@subako-ai/sdk": "workspace:^",
+		"react": "^19.0.0"
+	},
+	"engines": {
+		"node": ">=22"
+	}
+}

@@ -1,0 +1,52 @@
+/* The page around the chat. The chat styles itself and follows the OS color scheme on its own. */
+
+html,
+body,
+#root {
+	height: 100%;
+	margin: 0;
+}
+
+body {
+	font:
+		15px/1.5 system-ui,
+		sans-serif;
+	background: #f4f4f5;
+	color: #18181b;
+	color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+	body {
+		background: #09090b;
+		color: #f4f4f5;
+	}
+}
+
+.page {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	max-width: 48rem;
+	margin: 0 auto;
+}
+
+.title {
+	margin: 0;
+	padding: 16px;
+	font-size: 15px;
+	font-weight: 600;
+}
+
+/* The chat fills what the title leaves; the class lands on `.subako-chat`, so this wins as plain CSS. */
+.thread {
+	flex: 1 1 auto;
+	min-height: 0;
+	border-radius: 12px 12px 0 0;
+}
+
+.boot-error {
+	max-width: 480px;
+	margin: 80px auto;
+	color: #b91c1c;
+}

@@ -1,0 +1,23 @@
+# Local development catalog for `subako-core release`. Mirrors the shape of
+# infra/deployments/*/catalog.yaml in the backend repo, with a mock upstream.
+plans:
+  - slug: default
+    display_name: Local
+    description: Local development. No billing.
+
+identity:
+  issuer: http://127.0.0.1:8081/dev
+  client_id: subako-dev
+
+rates:
+  models:
+    - provider: anthropic
+      model: claude-sonnet-4-5-20250929
+      format: anthropic
+      sc_per_million_tokens:
+        input: "1"
+        cache_write: "1"
+        cache_read: "1"
+        output: "1"
+  harness:
+    pi: "0.00000001"

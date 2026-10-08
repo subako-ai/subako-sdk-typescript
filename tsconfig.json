@@ -1,0 +1,12 @@
+{
+	"files": [],
+	"references": [
+		{ "path": "packages/sdk" },
+		{ "path": "packages/tools" },
+		{ "path": "packages/react" },
+		{ "path": "packages/tanstack-router" },
+		{ "path": "packages/react-router" },
+		{ "path": "packages/react-hook-form" },
+		{ "path": "packages/assistant-ui" }
+	]
+}
