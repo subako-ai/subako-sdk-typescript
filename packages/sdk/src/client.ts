@@ -1,6 +1,7 @@
 import { clientCredential, Core, type SubakoClientOptions } from "./core.js";
 import { Agents } from "./resources/agents.js";
 import { ApiKeys } from "./resources/api-keys.js";
+import { Functions } from "./resources/functions.js";
 import { Me } from "./resources/me.js";
 import { ModelProviders } from "./resources/model-providers.js";
 import { Organization } from "./resources/organization.js";
@@ -16,6 +17,7 @@ import { Workspaces } from "./resources/workspaces.js";
 export class SubakoClient {
 	readonly agents: Agents;
 	readonly apiKeys: ApiKeys;
+	readonly functions: Functions;
 	readonly me: Me;
 	readonly modelProviders: ModelProviders;
 	readonly organization: Organization;
@@ -28,6 +30,7 @@ export class SubakoClient {
 		const core = new Core({ ...options, credential: clientCredential(options) });
 		this.agents = new Agents(core);
 		this.apiKeys = new ApiKeys(core);
+		this.functions = new Functions(core);
 		this.me = new Me(core);
 		this.modelProviders = new ModelProviders(core);
 		this.organization = new Organization(core);

@@ -5,7 +5,7 @@ sidebar:
   order: 3
 ---
 
-When an agent calls a tool on an MCP server, something has to authenticate that call. That credential lives in a vault. The broker reads it and attaches it; the model never sees it, and neither does the session log.
+When an agent calls a tool on an MCP server, or a function sends a request to an API, something has to authenticate that call. That credential lives in a vault. Subako reads it and attaches it; the model never sees it, and neither does the session log.
 
 ## Creating a vault
 
@@ -38,23 +38,36 @@ await subako.vaults.addCredential(vault.id, {
 <TypeTable
   type={{
     protocol: {
-      type: '"mcp"',
+      type: '"mcp" | "http"',
       required: true,
       description: "What the credential authenticates. The server owns this vocabulary, so more may appear without an SDK release.",
     },
     target: {
       type: "string",
       required: true,
-      description: "What the broker matches a tool call against. For `mcp`, the server's exact URL.",
+      description: "What the credential is matched by. For `mcp`, the server's exact URL; for `http`, an origin.",
     },
     display_name: { type: "string", required: true, description: "For people reading the list, not for matching." },
-    payload: { type: "CredentialPayloadBody", required: true, description: "The secret itself. Two shapes, below." },
+    payload: {
+      type: "McpPayloadBody | HttpPayloadBody",
+      required: true,
+      description: "The secret itself, in a shape the protocol takes. Three shapes, below.",
+    },
   }}
 />
 
 **`target` has to match the `url` in the agent's MCP grant exactly.** That is how the broker finds the credential for a call. A mismatch is not an error you get at publish time — it is a tool call that fails at runtime, which is a slower thing to debug.
 
-## The two payload shapes
+| `protocol` | `target` | `auth_scheme` |
+| ---------- | -------- | ------------- |
+| `mcp` | The MCP server's exact URL. | `static_bearer` or `oauth` |
+| `http` | An origin: `https://host` or `https://host:port`, with no path, query, fragment, or user name. | `header` |
+
+The body's type is a union on `protocol`, so TypeScript takes only the payloads a protocol does; a pairing outside the table is a `400`.
+
+An `http` target is stored as its origin's one spelling — the host in lowercase, the default port dropped, a trailing `/` removed — so `https://API.example.com:443/` and `https://api.example.com` are the same credential. Plain `http://` is refused unless the deployment lets Core reach the host that way, as a local development stack does for `localhost`.
+
+## The payload shapes
 
 ```ts
 // A token you hold
@@ -62,9 +75,14 @@ await subako.vaults.addCredential(vault.id, {
 
 // OAuth, where the broker can refresh
 { auth_scheme: "oauth", access_token: "...", expires_at: "2026-10-01T00:00:00Z", refresh: { ... } }
+
+// Headers sent with every request to an http credential's origin
+{ auth_scheme: "header", headers: [{ name: "x-api-key", value: "..." }] }
 ```
 
 `static_bearer` is sent as it stands. `oauth` lets the broker refresh the token when it lapses, so a long session does not die with the credential.
+
+`header` sends each of its `headers` as the request header `name: value`; for a bearer token, that is `{ name: "authorization", value: "Bearer ..." }`. It holds 1 to 16 headers, each name at most once. A name is an HTTP token, compared without regard to case and stored in lowercase, and cannot be one the client or a proxy owns: `host`, `content-length`, `transfer-encoding`, `connection`, `keep-alive`, `te`, `trailer`, `upgrade`, or any `proxy-*`. A value is at most 8192 bytes of visible characters, with spaces or tabs only between them.
 
 ## Connecting with OAuth
 
@@ -125,7 +143,7 @@ if ("authorization_url" in started) {
 const { id } = await subako.vaults.completeOAuth(vault.id, { state, code }); // id === credential.id
 ```
 
-Only an `oauth` credential can be reconnected; a `static_bearer` one is a `400`. A retried reconnect answers with the same receipt a retried start does.
+Only an `oauth` credential can be reconnected; a `static_bearer` or `header` one is a `400`. A retried reconnect answers with the same receipt a retried start does.
 
 ### Checking a credential
 
@@ -141,7 +159,7 @@ const { result } = await subako.vaults.checkCredential(vault.id, credential.id);
 | `rejected` | The server refused a credential that cannot refresh itself, such as a `static_bearer` token. Nothing is marked. |
 | `reconnect_required` | The provider no longer refreshes it, or refused the token a refresh issued. The credential is marked, and stays so until it is reconnected. |
 
-A server that cannot be reached at all is a `400`, rather than a verdict on the credential.
+A server that cannot be reached at all is a `400`, rather than a verdict on the credential. So is an `http` credential, which has no server to ask.
 
 ## Listing and removing
 
@@ -150,7 +168,7 @@ const credentials = await subako.vaults.listCredentials(vault.id, { limit: 50 })
 await subako.vaults.deleteCredential(vault.id, credentialId);
 ```
 
-The listing describes the credentials — each with its `status`, `active` or `reconnect_required` — and does not return the secrets: those went in and do not come back out.
+The listing describes the credentials — each with its `status`, `active` or `reconnect_required`, and an `http` one with the names of its `headers` — and does not return the secrets: those went in and do not come back out. A header's value is a secret; its name is not.
 
 ## Giving a session access
 

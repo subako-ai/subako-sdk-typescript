@@ -2,7 +2,7 @@
 
 import { client } from './client.gen.js';
 import type { Client, ClientMeta, Options as Options2, RequestResult, ServerSentEventsResult, TDataShape } from './client/index.js';
-import type { AckClientCallData, AckClientCallErrors, AckClientCallResponses, AddCredentialData, AddCredentialErrors, AddCredentialResponses, AddWorkspaceMemberData, AddWorkspaceMemberErrors, AddWorkspaceMemberResponses, AnswerClientCallData, AnswerClientCallErrors, AnswerClientCallResponses, CancelSessionRunData, CancelSessionRunErrors, CancelSessionRunResponses, ChangeMemberRoleData, ChangeMemberRoleErrors, ChangeMemberRoleResponses, ChangeWorkspaceMemberRoleData, ChangeWorkspaceMemberRoleErrors, ChangeWorkspaceMemberRoleResponses, CheckCredentialData, CheckCredentialErrors, CheckCredentialResponses, CompleteCredentialOauthData, CompleteCredentialOauthErrors, CompleteCredentialOauthResponses, CreateAgentData, CreateAgentErrors, CreateAgentResponses, CreateInvitationData, CreateInvitationErrors, CreateInvitationResponses, CreateSessionData, CreateSessionErrors, CreateSessionResponses, CreateSkillData, CreateSkillErrors, CreateSkillResponses, CreateVaultData, CreateVaultErrors, CreateVaultResponses, CreateWorkspaceData, CreateWorkspaceErrors, CreateWorkspaceModelProviderData, CreateWorkspaceModelProviderErrors, CreateWorkspaceModelProviderResponses, CreateWorkspaceResponses, DeleteAgentData, DeleteAgentErrors, DeleteAgentResponses, DeleteCredentialData, DeleteCredentialErrors, DeleteCredentialResponses, DeleteModelProviderData, DeleteModelProviderErrors, DeleteModelProviderResponses, DeleteSessionData, DeleteSessionErrors, DeleteSessionResponses, DeleteSessionSandboxArchiveData, DeleteSessionSandboxArchiveErrors, DeleteSessionSandboxArchiveResponses, DeleteSkillData, DeleteSkillErrors, DeleteSkillResponses, DeleteVaultData, DeleteVaultErrors, DeleteVaultResponses, DeleteWorkspaceData, DeleteWorkspaceErrors, DeleteWorkspaceResponses, GetAgentData, GetAgentErrors, GetAgentResponses, GetAgentSecurityData, GetAgentSecurityErrors, GetAgentSecurityResponses, GetCreditsData, GetCreditsErrors, GetCreditsResponses, GetMeData, GetMeErrors, GetMeResponses, GetModelProviderData, GetModelProviderErrors, GetModelProviderResponses, GetOrganizationData, GetOrganizationErrors, GetOrganizationPlanData, GetOrganizationPlanErrors, GetOrganizationPlanResponses, GetOrganizationResponses, GetSessionData, GetSessionErrors, GetSessionResponses, GetSkillBundleData, GetSkillBundleErrors, GetSkillBundleResponses, GetSkillData, GetSkillErrors, GetSkillResponses, GetSkillVersionData, GetSkillVersionErrors, GetSkillVersionResponses, GetVaultData, GetVaultErrors, GetVaultResponses, GetWorkspaceData, GetWorkspaceErrors, GetWorkspaceResponses, LeaveClientData, LeaveClientErrors, LeaveClientResponses, ListAgentsData, ListAgentsErrors, ListAgentsResponses, ListAgentVersionsData, ListAgentVersionsErrors, ListAgentVersionsResponses, ListApiKeysData, ListApiKeysErrors, ListApiKeysResponses, ListCredentialsData, ListCredentialsErrors, ListCredentialsResponses, ListInvitationsData, ListInvitationsErrors, ListInvitationsResponses, ListMembersData, ListMembersErrors, ListMembersResponses, ListModelProvidersData, ListModelProvidersErrors, ListModelProvidersResponses, ListPlansData, ListPlansErrors, ListPlansResponses, ListSessionEventsData, ListSessionEventsErrors, ListSessionEventsResponses, ListSessionSandboxesData, ListSessionSandboxesErrors, ListSessionSandboxesResponses, ListSessionsData, ListSessionsErrors, ListSessionsResponses, ListSkillsData, ListSkillsErrors, ListSkillsResponses, ListSkillVersionsData, ListSkillVersionsErrors, ListSkillVersionsResponses, ListUsageData, ListUsageErrors, ListUsageResponses, ListVaultsData, ListVaultsErrors, ListVaultsResponses, ListWorkspaceMembersData, ListWorkspaceMembersErrors, ListWorkspaceMembersResponses, ListWorkspacesData, ListWorkspacesErrors, ListWorkspacesResponses, ListWorkspaceUsageData, ListWorkspaceUsageErrors, ListWorkspaceUsageResponses, MintApiKeyData, MintApiKeyErrors, MintApiKeyResponses, MintSessionTokenData, MintSessionTokenErrors, MintSessionTokenResponses, PingClientData, PingClientErrors, PingClientResponses, PostSessionEventData, PostSessionEventErrors, PostSessionEventResponses, PublishVersionData, PublishVersionErrors, PublishVersionResponses, PushSkillVersionData, PushSkillVersionErrors, PushSkillVersionResponses, ReconnectCredentialOauthData, ReconnectCredentialOauthErrors, ReconnectCredentialOauthResponses, RegisterClientData, RegisterClientErrors, RegisterClientResponses, RemoveMemberData, RemoveMemberErrors, RemoveMemberResponses, RemoveWorkspaceMemberData, RemoveWorkspaceMemberErrors, RemoveWorkspaceMemberResponses, RenameAgentData, RenameAgentErrors, RenameAgentResponses, RenameMeData, RenameMeErrors, RenameMeResponses, RenameOrganizationData, RenameOrganizationErrors, RenameOrganizationResponses, RenameSkillData, RenameSkillErrors, RenameSkillResponses, RenameWorkspaceData, RenameWorkspaceErrors, RenameWorkspaceResponses, ResolveApprovalData, ResolveApprovalErrors, ResolveApprovalResponses, RevokeApiKeyData, RevokeApiKeyErrors, RevokeApiKeyResponses, RevokeInvitationData, RevokeInvitationErrors, RevokeInvitationResponses, SessionSandboxArchiveData, SessionSandboxArchiveErrors, SessionSandboxArchiveResponses, SetAgentSecurityData, SetAgentSecurityErrors, SetAgentSecurityResponses, StartCredentialOauthData, StartCredentialOauthErrors, StartCredentialOauthResponses, StreamSessionEventsData, StreamSessionEventsErrors, StreamSessionEventsResponse, StreamSessionEventsResponses, UpdateClientToolsData, UpdateClientToolsErrors, UpdateClientToolsResponses, UpdateModelProviderData, UpdateModelProviderErrors, UpdateModelProviderResponses, UpdateVaultData, UpdateVaultErrors, UpdateVaultResponses } from './types.gen.js';
+import type { AckClientCallData, AckClientCallErrors, AckClientCallResponses, AddCredentialData, AddCredentialErrors, AddCredentialResponses, AddWorkspaceMemberData, AddWorkspaceMemberErrors, AddWorkspaceMemberResponses, AnswerClientCallData, AnswerClientCallErrors, AnswerClientCallResponses, CancelSessionRunData, CancelSessionRunErrors, CancelSessionRunResponses, ChangeMemberRoleData, ChangeMemberRoleErrors, ChangeMemberRoleResponses, ChangeWorkspaceMemberRoleData, ChangeWorkspaceMemberRoleErrors, ChangeWorkspaceMemberRoleResponses, CheckCredentialData, CheckCredentialErrors, CheckCredentialResponses, CompleteCredentialOauthData, CompleteCredentialOauthErrors, CompleteCredentialOauthResponses, CreateAgentData, CreateAgentErrors, CreateAgentResponses, CreateFunctionData, CreateFunctionErrors, CreateFunctionResponses, CreateInvitationData, CreateInvitationErrors, CreateInvitationResponses, CreateSessionData, CreateSessionErrors, CreateSessionResponses, CreateSkillData, CreateSkillErrors, CreateSkillResponses, CreateVaultData, CreateVaultErrors, CreateVaultResponses, CreateWorkspaceData, CreateWorkspaceErrors, CreateWorkspaceModelProviderData, CreateWorkspaceModelProviderErrors, CreateWorkspaceModelProviderResponses, CreateWorkspaceResponses, DeleteAgentData, DeleteAgentErrors, DeleteAgentResponses, DeleteCredentialData, DeleteCredentialErrors, DeleteCredentialResponses, DeleteFunctionData, DeleteFunctionErrors, DeleteFunctionResponses, DeleteModelProviderData, DeleteModelProviderErrors, DeleteModelProviderResponses, DeleteSessionData, DeleteSessionErrors, DeleteSessionResponses, DeleteSessionSandboxArchiveData, DeleteSessionSandboxArchiveErrors, DeleteSessionSandboxArchiveResponses, DeleteSkillData, DeleteSkillErrors, DeleteSkillResponses, DeleteVaultData, DeleteVaultErrors, DeleteVaultResponses, DeleteVolumeData, DeleteVolumeErrors, DeleteVolumeFileData, DeleteVolumeFileErrors, DeleteVolumeFileResponses, DeleteVolumeResponses, DeleteWorkspaceData, DeleteWorkspaceErrors, DeleteWorkspaceResponses, GetAgentData, GetAgentErrors, GetAgentResponses, GetAgentSecurityData, GetAgentSecurityErrors, GetAgentSecurityResponses, GetCreditsData, GetCreditsErrors, GetCreditsResponses, GetFunctionData, GetFunctionErrors, GetFunctionResponses, GetFunctionVersionData, GetFunctionVersionErrors, GetFunctionVersionResponses, GetMeData, GetMeErrors, GetMeResponses, GetModelProviderData, GetModelProviderErrors, GetModelProviderResponses, GetOrganizationData, GetOrganizationErrors, GetOrganizationPlanData, GetOrganizationPlanErrors, GetOrganizationPlanResponses, GetOrganizationResponses, GetSessionData, GetSessionErrors, GetSessionResponses, GetSkillBundleData, GetSkillBundleErrors, GetSkillBundleResponses, GetSkillData, GetSkillErrors, GetSkillResponses, GetSkillVersionData, GetSkillVersionErrors, GetSkillVersionResponses, GetVaultData, GetVaultErrors, GetVaultResponses, GetVolumeFileData, GetVolumeFileErrors, GetVolumeFileResponses, GetWorkspaceData, GetWorkspaceErrors, GetWorkspaceResponses, LeaveClientData, LeaveClientErrors, LeaveClientResponses, ListAgentsData, ListAgentsErrors, ListAgentsResponses, ListAgentVersionsData, ListAgentVersionsErrors, ListAgentVersionsResponses, ListApiKeysData, ListApiKeysErrors, ListApiKeysResponses, ListCredentialsData, ListCredentialsErrors, ListCredentialsResponses, ListFunctionsData, ListFunctionsErrors, ListFunctionsResponses, ListFunctionVersionsData, ListFunctionVersionsErrors, ListFunctionVersionsResponses, ListInvitationsData, ListInvitationsErrors, ListInvitationsResponses, ListMembersData, ListMembersErrors, ListMembersResponses, ListModelProvidersData, ListModelProvidersErrors, ListModelProvidersResponses, ListPlansData, ListPlansErrors, ListPlansResponses, ListPlatformFunctionsData, ListPlatformFunctionsErrors, ListPlatformFunctionsResponses, ListSessionEventsData, ListSessionEventsErrors, ListSessionEventsResponses, ListSessionSandboxesData, ListSessionSandboxesErrors, ListSessionSandboxesResponses, ListSessionsData, ListSessionsErrors, ListSessionsResponses, ListSkillsData, ListSkillsErrors, ListSkillsResponses, ListSkillVersionsData, ListSkillVersionsErrors, ListSkillVersionsResponses, ListUsageData, ListUsageErrors, ListUsageResponses, ListVaultsData, ListVaultsErrors, ListVaultsResponses, ListVolumeFilesData, ListVolumeFilesErrors, ListVolumeFilesResponses, ListWorkspaceMembersData, ListWorkspaceMembersErrors, ListWorkspaceMembersResponses, ListWorkspacesData, ListWorkspacesErrors, ListWorkspacesResponses, ListWorkspaceUsageData, ListWorkspaceUsageErrors, ListWorkspaceUsageResponses, MintApiKeyData, MintApiKeyErrors, MintApiKeyResponses, MintSessionTokenData, MintSessionTokenErrors, MintSessionTokenResponses, PingClientData, PingClientErrors, PingClientResponses, PostSessionEventData, PostSessionEventErrors, PostSessionEventResponses, PublishVersionData, PublishVersionErrors, PublishVersionResponses, PushFunctionVersionData, PushFunctionVersionErrors, PushFunctionVersionResponses, PushSkillVersionData, PushSkillVersionErrors, PushSkillVersionResponses, PutVolumeFileData, PutVolumeFileErrors, PutVolumeFileResponses, ReconnectCredentialOauthData, ReconnectCredentialOauthErrors, ReconnectCredentialOauthResponses, RegisterClientData, RegisterClientErrors, RegisterClientResponses, RemoveMemberData, RemoveMemberErrors, RemoveMemberResponses, RemoveWorkspaceMemberData, RemoveWorkspaceMemberErrors, RemoveWorkspaceMemberResponses, RenameAgentData, RenameAgentErrors, RenameAgentResponses, RenameFunctionData, RenameFunctionErrors, RenameFunctionResponses, RenameMeData, RenameMeErrors, RenameMeResponses, RenameOrganizationData, RenameOrganizationErrors, RenameOrganizationResponses, RenameSessionData, RenameSessionErrors, RenameSessionResponses, RenameSkillData, RenameSkillErrors, RenameSkillResponses, RenameWorkspaceData, RenameWorkspaceErrors, RenameWorkspaceResponses, ResolveApprovalData, ResolveApprovalErrors, ResolveApprovalResponses, RevokeApiKeyData, RevokeApiKeyErrors, RevokeApiKeyResponses, RevokeInvitationData, RevokeInvitationErrors, RevokeInvitationResponses, SessionSandboxArchiveData, SessionSandboxArchiveErrors, SessionSandboxArchiveResponses, SetAgentSecurityData, SetAgentSecurityErrors, SetAgentSecurityResponses, StartCredentialOauthData, StartCredentialOauthErrors, StartCredentialOauthResponses, StreamSessionEventsData, StreamSessionEventsErrors, StreamSessionEventsResponse, StreamSessionEventsResponses, UpdateClientToolsData, UpdateClientToolsErrors, UpdateClientToolsResponses, UpdateModelProviderData, UpdateModelProviderErrors, UpdateModelProviderResponses, UpdateVaultData, UpdateVaultErrors, UpdateVaultResponses } from './types.gen.js';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
   /**
@@ -151,6 +151,105 @@ export const mintApiKey = <ThrowOnError extends boolean = false>(options: Option
 export const revokeApiKey = <ThrowOnError extends boolean = false>(options: Options<RevokeApiKeyData, ThrowOnError>): RequestResult<RevokeApiKeyResponses, RevokeApiKeyErrors, ThrowOnError> => (options.client ?? client).delete<RevokeApiKeyResponses, RevokeApiKeyErrors, ThrowOnError>({
   security: [{ scheme: 'bearer', type: 'http' }],
   url: '/v1/api-keys/{api_key_id}',
+  ...options
+});
+
+/**
+ * List function packages
+ */
+export const listFunctions = <ThrowOnError extends boolean = false>(options?: Options<ListFunctionsData, ThrowOnError>): RequestResult<ListFunctionsResponses, ListFunctionsErrors, ThrowOnError> => (options?.client ?? client).get<ListFunctionsResponses, ListFunctionsErrors, ThrowOnError>({
+  security: [{ scheme: 'bearer', type: 'http' }],
+  url: '/v1/functions',
+  ...options
+});
+
+/**
+ * Create a function package
+ */
+export const createFunction = <ThrowOnError extends boolean = false>(options: Options<CreateFunctionData, ThrowOnError>): RequestResult<CreateFunctionResponses, CreateFunctionErrors, ThrowOnError> => (options.client ?? client).post<CreateFunctionResponses, CreateFunctionErrors, ThrowOnError>({
+  bodySerializer: null,
+  security: [{ scheme: 'bearer', type: 'http' }],
+  url: '/v1/functions',
+  ...options,
+  headers: {
+    'Content-Type': 'application/gzip',
+    ...options.headers
+  }
+});
+
+/**
+ * List the platform function packages
+ *
+ * The same for every workspace, so any user or API key may read it.
+ */
+export const listPlatformFunctions = <ThrowOnError extends boolean = false>(options?: Options<ListPlatformFunctionsData, ThrowOnError>): RequestResult<ListPlatformFunctionsResponses, ListPlatformFunctionsErrors, ThrowOnError> => (options?.client ?? client).get<ListPlatformFunctionsResponses, ListPlatformFunctionsErrors, ThrowOnError>({
+  security: [{ scheme: 'bearer', type: 'http' }],
+  url: '/v1/functions/platform',
+  ...options
+});
+
+/**
+ * Delete a function package
+ */
+export const deleteFunction = <ThrowOnError extends boolean = false>(options: Options<DeleteFunctionData, ThrowOnError>): RequestResult<DeleteFunctionResponses, DeleteFunctionErrors, ThrowOnError> => (options.client ?? client).delete<DeleteFunctionResponses, DeleteFunctionErrors, ThrowOnError>({
+  security: [{ scheme: 'bearer', type: 'http' }],
+  url: '/v1/functions/{function_id}',
+  ...options
+});
+
+/**
+ * Get a function package
+ */
+export const getFunction = <ThrowOnError extends boolean = false>(options: Options<GetFunctionData, ThrowOnError>): RequestResult<GetFunctionResponses, GetFunctionErrors, ThrowOnError> => (options.client ?? client).get<GetFunctionResponses, GetFunctionErrors, ThrowOnError>({
+  security: [{ scheme: 'bearer', type: 'http' }],
+  url: '/v1/functions/{function_id}',
+  ...options
+});
+
+/**
+ * Rename a function package
+ */
+export const renameFunction = <ThrowOnError extends boolean = false>(options: Options<RenameFunctionData, ThrowOnError>): RequestResult<RenameFunctionResponses, RenameFunctionErrors, ThrowOnError> => (options.client ?? client).patch<RenameFunctionResponses, RenameFunctionErrors, ThrowOnError>({
+  security: [{ scheme: 'bearer', type: 'http' }],
+  url: '/v1/functions/{function_id}',
+  ...options,
+  headers: {
+    'Content-Type': 'application/json',
+    ...options.headers
+  }
+});
+
+/**
+ * List a function package's versions
+ */
+export const listFunctionVersions = <ThrowOnError extends boolean = false>(options: Options<ListFunctionVersionsData, ThrowOnError>): RequestResult<ListFunctionVersionsResponses, ListFunctionVersionsErrors, ThrowOnError> => (options.client ?? client).get<ListFunctionVersionsResponses, ListFunctionVersionsErrors, ThrowOnError>({
+  security: [{ scheme: 'bearer', type: 'http' }],
+  url: '/v1/functions/{function_id}/versions',
+  ...options
+});
+
+/**
+ * Push a function package version
+ *
+ * A version is immutable once pushed: a change is a new version.
+ */
+export const pushFunctionVersion = <ThrowOnError extends boolean = false>(options: Options<PushFunctionVersionData, ThrowOnError>): RequestResult<PushFunctionVersionResponses, PushFunctionVersionErrors, ThrowOnError> => (options.client ?? client).post<PushFunctionVersionResponses, PushFunctionVersionErrors, ThrowOnError>({
+  bodySerializer: null,
+  security: [{ scheme: 'bearer', type: 'http' }],
+  url: '/v1/functions/{function_id}/versions',
+  ...options,
+  headers: {
+    'Content-Type': 'application/gzip',
+    ...options.headers
+  }
+});
+
+/**
+ * Get a function package version
+ */
+export const getFunctionVersion = <ThrowOnError extends boolean = false>(options: Options<GetFunctionVersionData, ThrowOnError>): RequestResult<GetFunctionVersionResponses, GetFunctionVersionErrors, ThrowOnError> => (options.client ?? client).get<GetFunctionVersionResponses, GetFunctionVersionErrors, ThrowOnError>({
+  security: [{ scheme: 'bearer', type: 'http' }],
+  url: '/v1/functions/{function_id}/versions/{version}',
   ...options
 });
 
@@ -398,6 +497,21 @@ export const getSession = <ThrowOnError extends boolean = false>(options: Option
 });
 
 /**
+ * Rename a session
+ *
+ * The name becomes the caller's: an agent whose display-name grant reads `until_user_edits` stops renaming the session, unless the name is empty. A `session_display_name_changed` event announces it on the session's log.
+ */
+export const renameSession = <ThrowOnError extends boolean = false>(options: Options<RenameSessionData, ThrowOnError>): RequestResult<RenameSessionResponses, RenameSessionErrors, ThrowOnError> => (options.client ?? client).patch<RenameSessionResponses, RenameSessionErrors, ThrowOnError>({
+  security: [{ scheme: 'bearer', type: 'http' }],
+  url: '/v1/sessions/{session_id}',
+  ...options,
+  headers: {
+    'Content-Type': 'application/json',
+    ...options.headers
+  }
+});
+
+/**
  * Resolve an approval
  *
  * Answers a tool call the agent's security document held for approval. A denial can carry a message that steers the model.
@@ -573,6 +687,64 @@ export const mintSessionToken = <ThrowOnError extends boolean = false>(options: 
 });
 
 /**
+ * Delete a session tree's volume files
+ *
+ * Removes every file in the volume; the tree's functions start from an empty one.
+ */
+export const deleteVolume = <ThrowOnError extends boolean = false>(options: Options<DeleteVolumeData, ThrowOnError>): RequestResult<DeleteVolumeResponses, DeleteVolumeErrors, ThrowOnError> => (options.client ?? client).delete<DeleteVolumeResponses, DeleteVolumeErrors, ThrowOnError>({
+  security: [{ scheme: 'bearer', type: 'http' }],
+  url: '/v1/sessions/{session_id}/volume',
+  ...options
+});
+
+/**
+ * List a session tree's volume files
+ *
+ * Every session of a tree shares its root's volume, so any of them names it.
+ */
+export const listVolumeFiles = <ThrowOnError extends boolean = false>(options: Options<ListVolumeFilesData, ThrowOnError>): RequestResult<ListVolumeFilesResponses, ListVolumeFilesErrors, ThrowOnError> => (options.client ?? client).get<ListVolumeFilesResponses, ListVolumeFilesErrors, ThrowOnError>({
+  security: [{ scheme: 'bearer', type: 'http' }],
+  url: '/v1/sessions/{session_id}/volume/files',
+  ...options
+});
+
+/**
+ * Delete a volume file
+ *
+ * Removes a file, or a directory and everything beneath it.
+ */
+export const deleteVolumeFile = <ThrowOnError extends boolean = false>(options: Options<DeleteVolumeFileData, ThrowOnError>): RequestResult<DeleteVolumeFileResponses, DeleteVolumeFileErrors, ThrowOnError> => (options.client ?? client).delete<DeleteVolumeFileResponses, DeleteVolumeFileErrors, ThrowOnError>({
+  security: [{ scheme: 'bearer', type: 'http' }],
+  url: '/v1/sessions/{session_id}/volume/files/{path}',
+  ...options
+});
+
+/**
+ * Download a volume file
+ */
+export const getVolumeFile = <ThrowOnError extends boolean = false>(options: Options<GetVolumeFileData, ThrowOnError>): RequestResult<GetVolumeFileResponses, GetVolumeFileErrors, ThrowOnError> => (options.client ?? client).get<GetVolumeFileResponses, GetVolumeFileErrors, ThrowOnError>({
+  security: [{ scheme: 'bearer', type: 'http' }],
+  url: '/v1/sessions/{session_id}/volume/files/{path}',
+  ...options
+});
+
+/**
+ * Upload a volume file
+ *
+ * Creates the file and its parent directories, or replaces the file.
+ */
+export const putVolumeFile = <ThrowOnError extends boolean = false>(options: Options<PutVolumeFileData, ThrowOnError>): RequestResult<PutVolumeFileResponses, PutVolumeFileErrors, ThrowOnError> => (options.client ?? client).put<PutVolumeFileResponses, PutVolumeFileErrors, ThrowOnError>({
+  bodySerializer: null,
+  security: [{ scheme: 'bearer', type: 'http' }],
+  url: '/v1/sessions/{session_id}/volume/files/{path}',
+  ...options,
+  headers: {
+    'Content-Type': 'application/octet-stream',
+    ...options.headers
+  }
+});
+
+/**
  * List skills
  */
 export const listSkills = <ThrowOnError extends boolean = false>(options?: Options<ListSkillsData, ThrowOnError>): RequestResult<ListSkillsResponses, ListSkillsErrors, ThrowOnError> => (options?.client ?? client).get<ListSkillsResponses, ListSkillsErrors, ThrowOnError>({
@@ -734,7 +906,7 @@ export const listCredentials = <ThrowOnError extends boolean = false>(options: O
 /**
  * Add a credential
  *
- * The payload is sealed on the way in and is never returned by any route.
+ * The payload is sealed on the way in and is never returned by any route. An `mcp` credential targets its server's URL and is `oauth` or `static_bearer`; an `http` one targets an origin (`https://host[:port]`, nothing past it) and is `header`, a list of headers sent with every request to it.
  */
 export const addCredential = <ThrowOnError extends boolean = false>(options: Options<AddCredentialData, ThrowOnError>): RequestResult<AddCredentialResponses, AddCredentialErrors, ThrowOnError> => (options.client ?? client).post<AddCredentialResponses, AddCredentialErrors, ThrowOnError>({
   security: [{ scheme: 'bearer', type: 'http' }],

@@ -85,6 +85,18 @@ export function isRunning(events: readonly api.SessionEventBody[]): boolean {
 	return open.size > 0;
 }
 
+/** A display name the log announced, and who wrote it. */
+export type DisplayNameChange = EventOf<"session_display_name_changed">;
+
+/**
+ * The last display name the log announced, or `undefined` while it announced none.
+ * A name given at creation is not on the log, so a session nobody renamed reads
+ * its name from `sessions.get` instead.
+ */
+export function latestDisplayName(events: readonly api.SessionEventBody[]): DisplayNameChange | undefined {
+	return events.findLast((event): event is DisplayNameChange => event.type === "session_display_name_changed");
+}
+
 /** Where one `tool_call` sits: the message that carries it, and its place among that message's calls. */
 interface CallPlace {
 	readonly index: number;

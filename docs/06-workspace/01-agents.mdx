@@ -134,6 +134,18 @@ sandboxes: [
 
 Each grant is a Linux instance the session owns, served at `sandbox:{name}` with an `exec` tool. [Sandboxes](/sessions/sandboxes) covers reading them back.
 
+### Builtin servers
+
+```ts
+builtin: {
+	session_display_name: { when: "until_user_edits" },
+}
+```
+
+`builtin` holds the settings of the servers Subako serves itself. Each has a fixed name, which is its key here and its handle `builtin:{name}`, so a config holds one setting per server and none takes a `name`. A version's config reads back with every setting written out; one left out when publishing takes its default.
+
+`session_display_name` says whether the agent names the session it runs in, through a `set` tool served at `builtin:session_display_name`. `when` is `never` (the default: the agent gets no such tool), `empty` (it may name the session only while it has no name), or `until_user_edits` (it may also revise its own name, until someone renames the session). A name a person wrote is never overwritten unless it is blank, and a call the setting does not allow comes back to the agent as an error. A session's `display_name_author` says who wrote its current name, and a `session_display_name_changed` event announces every change. See [Reading the log](/sessions/reading-the-log#display-name).
+
 ## Browser origins
 
 This only matters if a browser talks to Subako directly. An agent answers no cross-origin request until you say which origins are allowed, so a page using `SubakoSessionClient` will fail its preflight until you do. A server-side job never sends an `Origin` and never needs this.

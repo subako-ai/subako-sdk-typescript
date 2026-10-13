@@ -5,6 +5,8 @@ import type {
 	ApprovalDecision,
 	CreatedSessionBody,
 	CreatedSessionReceiptBody,
+	FunctionBody,
+	FunctionVersionBody,
 	Page,
 	PendingApproval,
 	SessionConnection,
@@ -22,6 +24,13 @@ type Equals<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B 
 
 // A read answers with the response body the spec declares.
 const getsOneAgent: Equals<Awaited<ReturnType<typeof client.agents.get>>, AgentBody> = true;
+
+// A package's reads answer with the bodies the SDK names for them.
+const getsOneFunction: Equals<Awaited<ReturnType<typeof client.functions.get>>, FunctionBody> = true;
+const pagesFunctionVersions: Equals<
+	Awaited<ReturnType<typeof client.functions.listVersions>>["items"],
+	readonly FunctionVersionBody[]
+> = true;
 
 // A 204 answers with nothing.
 const deletesAnAgent: Equals<Awaited<ReturnType<typeof client.agents.delete>>, void> = true;
@@ -118,6 +127,8 @@ describe("method signatures", () => {
 	it("hold at compile time", () => {
 		expect([
 			getsOneAgent,
+			getsOneFunction,
+			pagesFunctionVersions,
 			deletesAnAgent,
 			createsOrReplays,
 			pagesAgentsById,
@@ -129,7 +140,7 @@ describe("method signatures", () => {
 			decides,
 			connectsFromBrowser,
 			readsOneSession,
-		]).toEqual(Array.from({ length: 12 }, () => true));
+		]).toEqual(Array.from({ length: 14 }, () => true));
 		expect(Object.keys(tools)).toEqual(["navigate", "raw"]);
 		expect(typeof declares).toBe("function");
 	});

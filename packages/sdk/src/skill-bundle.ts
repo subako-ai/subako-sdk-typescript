@@ -107,6 +107,11 @@ export async function packSkill(files: readonly SkillFile[]): Promise<Uint8Array
 	if (problems.length > 0) {
 		throw new SkillBundleError(problems);
 	}
+	return packTar(files);
+}
+
+/** Packs files, whatever bundle they make, into a gzipped tar; entries go in path order, so the same files give the same bytes. */
+export async function packTar(files: readonly SkillFile[]): Promise<Uint8Array<ArrayBuffer>> {
 	const sorted = [...files].sort((a, b) => compare(a.path, b.path));
 	const tar = concat([...sorted.flatMap((file) => entry(file.path, file.content)), new Uint8Array(BLOCK * 2)]);
 	return readAll(new Blob([tar]).stream().pipeThrough(new CompressionStream("gzip")), Number.POSITIVE_INFINITY);
@@ -164,7 +169,7 @@ function describeProblem(problem: SkillBundleProblem): string {
 	}
 }
 
-function isBundlePath(path: string): boolean {
+export function isBundlePath(path: string): boolean {
 	return (
 		path !== "" &&
 		!path.includes("\0") &&
@@ -173,7 +178,7 @@ function isBundlePath(path: string): boolean {
 }
 
 /** Every directory above `path`: `a` and `a/b` for `a/b/c`. */
-function ancestors(path: string): string[] {
+export function ancestors(path: string): string[] {
 	const segments = path.split("/");
 	return segments.slice(1).map((_, i) => segments.slice(0, i + 1).join("/"));
 }

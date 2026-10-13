@@ -85,6 +85,9 @@ export interface RequestOptions {
 /** A gzipped tar of a skill bundle. */
 export type SkillArchive = Uint8Array | Blob | ReadableStream<Uint8Array>;
 
+/** A gzipped tar of a function package bundle. */
+export type FunctionArchive = Uint8Array | Blob | ReadableStream<Uint8Array>;
+
 /** A generated operation function. */
 type Operation = (options: never) => unknown;
 
@@ -143,7 +146,7 @@ interface RawData {
 interface Transport {
 	readonly bodySerializer?: null;
 	readonly duplex?: "half";
-	readonly parseAs?: "stream";
+	readonly parseAs?: "blob" | "stream";
 }
 
 type RawInput = RawData &
@@ -299,6 +302,12 @@ export class Core {
 			archive instanceof ReadableStream ? { bodySerializer: null, duplex: "half" } : { bodySerializer: null };
 		const result = await this.#send(fn, { ...raw(data), body: archive }, options, transport);
 		return result.data as OperationSuccess<F>;
+	}
+
+	/** Sends one operation whose success response is raw bytes, whatever content type the server labels them with. */
+	async download<F extends Operation>(fn: F, data: UploadData<F>, options?: RequestOptions): Promise<Blob> {
+		const result = await this.#send(fn, raw(data), options, { parseAs: "blob" });
+		return result.data as Blob;
 	}
 
 	/** Reads the first page of a listing and follows its cursors under `keys` either way. */

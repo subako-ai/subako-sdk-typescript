@@ -1,0 +1,102 @@
+---
+title: Functions
+description: Packaging a function module and pushing new versions of it.
+sidebar:
+  order: 5
+---
+
+A function package is a compiled WebAssembly module plus a manifest naming the functions it exposes. You upload it as an archive, and an agent version grants it by id.
+
+## The archive
+
+A package is a gzipped tar holding `subako-package.json` and `module.wasm` at its root, and optionally an `assets/` directory, and nothing else.
+
+```sh
+tar -czf package.tar.gz subako-package.json module.wasm assets
+```
+
+The files under `assets/` (regular files and directories only, at most `FUNCTION_ASSETS_MAX_FILES` of them) are what the module reads at `/package` while it runs: `assets/data/words.txt` is `/package/data/words.txt`. They are read-only, and a call sees only its own package's assets. Empty directories are not kept.
+
+The SDK takes the bytes in whatever form you have them:
+
+```ts
+type FunctionArchive = Uint8Array | Blob | ReadableStream<Uint8Array>;
+```
+
+A manifest and module you hold in memory pack into one with `packFunction`, which refuses a set that breaks a bundle rule before anything is uploaded: no functions, a repeated function name, a description over `FUNCTION_DESCRIPTION_MAX_CHARS` characters, a schema over `FUNCTION_SCHEMA_MAX_BYTES` as JSON, a manifest over `FUNCTION_MANIFEST_MAX_BYTES`, an asset path outside `assets/` or over `FUNCTION_ASSET_PATH_MAX_BYTES`, more than `FUNCTION_ASSETS_MAX_FILES` assets, or files over `FUNCTION_BUNDLE_MAX_BYTES` either together or packed:
+
+```ts
+import { packFunction } from "@subako-ai/sdk";
+
+const archive = await packFunction({
+	manifest: {
+		name: "csv-tools",
+		description: "CSV helpers.",
+		functions: [
+			{
+				name: "parse",
+				description: "Parse a CSV document.",
+				input_schema: { type: "object", properties: { text: { type: "string" } } },
+				output_schema: {},
+			},
+		],
+	},
+	module,
+	assets: { "data/words.txt": new TextEncoder().encode("alpha\nbeta\n") },
+});
+```
+
+Whether the module is valid WebAssembly, and which imports it may name, is Core's to judge: an upload it cannot accept comes back as an `InvalidRequestError` naming the problem.
+
+## Uploading
+
+```ts
+const pkg = await subako.functions.create(archive);
+```
+
+That creates the package and its first version. Later versions go to the same package, each as a new numbered version; nothing is overwritten:
+
+```ts
+await subako.functions.pushVersion(pkg.function_id, archive);
+
+const versions = await subako.functions.listVersions(pkg.function_id, { limit: 20 });
+const all = await subako.functions.list();
+const v2 = await subako.functions.getVersion(pkg.function_id, 2);
+
+await subako.functions.rename(pkg.function_id, { display_name: "CSV tools" });
+await subako.functions.delete(pkg.function_id);
+```
+
+A package an agent version or a session still references cannot be deleted.
+
+As with skills, a request whose body is a `ReadableStream` is not retried; pass a `Blob` or a `Uint8Array` to get the retries.
+
+## Granting it to an agent
+
+An agent version names the package, with the same version pins as a skill:
+
+```ts
+await subako.agents.publishVersion(agentId, {
+	model: { format: "anthropic", model: "claude-sonnet-5", max_tokens: 64_000, context_window: 1_000_000 },
+	functions: [
+		{
+			name: "csv",
+			source: { type: "workspace", function_id: pkg.function_id, version: { type: "latest" } },
+			default_policy: "allow",
+		},
+	],
+});
+```
+
+`latest` is resolved when each session is created, so pushing a version changes what new sessions run without republishing the agent. `{ type: "pinned", number: 3 }` always runs that version.
+
+## Platform packages
+
+The deployment ships packages of its own, the same in every workspace. `platform` lists each with its manifest, and a grant names one by its name rather than an id:
+
+```ts
+const { packages } = await subako.functions.platform();
+// packages[0].name === "files", packages[0].functions lists its tools
+
+const grant = { name: "files", source: { type: "platform", package: "files" }, default_policy: "allow" };
+```

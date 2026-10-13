@@ -7,16 +7,21 @@
  * answers publishes the same config again.
  */
 import type * as api from "./generated/index.js";
-import { AnthropicEffortBody, PolicyActionBody, ReasoningEffortBody } from "./generated/index.js";
+import { AnthropicEffortBody, DisplayNameWhenBody, PolicyActionBody, ReasoningEffortBody } from "./generated/index.js";
 
 /** `T` with every field present: a list left out is empty, a setting left out `null`. */
 type Present<T> = { [K in keyof T]-?: Exclude<T[K], undefined> };
 
 /** A version's config with every field present, which publishing takes as it is. */
-export type AgentVersionConfig = Present<Omit<api.AgentConfigBody, "model" | "mcp" | "sandboxes">> & {
+export type AgentVersionConfig = Present<
+	Omit<api.AgentConfigBody, "model" | "mcp" | "sandboxes" | "builtin" | "functions" | "volume">
+> & {
 	model: Present<api.ModelConfigBody>;
 	mcp: Present<api.McpGrantBody>[];
 	sandboxes: Present<api.SandboxGrantBody>[];
+	builtin: Present<api.BuiltinGrantsBody>;
+	functions: Present<api.FunctionGrantBody>[];
+	volume: Present<api.VolumeConfigBody>;
 };
 
 /**
@@ -37,19 +42,32 @@ export class AgentConfigError extends Error {
 
 /** Reads the config `version` was published with, as `publishVersion` takes one. */
 export function readAgentConfig(version: Pick<api.AgentVersionBody, "config">): AgentVersionConfig {
-	const config = record(version.config, "", ["system_prompt", "model", "mcp", "skills", "sandboxes"]);
+	const config = record(version.config, "", [
+		"system_prompt",
+		"model",
+		"mcp",
+		"skills",
+		"sandboxes",
+		"builtin",
+		"functions",
+		"volume",
+	]);
 	return {
 		system_prompt: optional(config["system_prompt"], (prompt) => string(prompt, "system_prompt")),
 		model: readModel(config["model"], "model"),
 		mcp: list(config["mcp"], "mcp", readMcp),
 		skills: list(config["skills"], "skills", readSkill),
 		sandboxes: list(config["sandboxes"], "sandboxes", readSandbox),
+		builtin: readBuiltin(config["builtin"], "builtin"),
+		functions: list(config["functions"], "functions", readFunction),
+		volume: readVolume(config["volume"], "volume"),
 	};
 }
 
 const POLICIES = Object.values(PolicyActionBody);
 const REASONING_EFFORTS = Object.values(ReasoningEffortBody);
 const ANTHROPIC_EFFORTS = Object.values(AnthropicEffortBody);
+const DISPLAY_NAME_WHENS = Object.values(DisplayNameWhenBody);
 
 const at = (path: string, key: string | number): string =>
 	typeof key === "number" ? `${path}[${key}]` : path === "" ? key : `${path}.${key}`;
@@ -239,5 +257,98 @@ function readSandbox(value: unknown, path: string): Present<api.SandboxGrantBody
 					},
 		default_policy: oneOf(grant["default_policy"], at(path, "default_policy"), POLICIES),
 		tools: readTools(grant["tools"], at(path, "tools")),
+	};
+}
+
+/** A config published before a builtin setting existed leaves it out, and it reads as its default. */
+function readBuiltin(value: unknown, path: string): Present<api.BuiltinGrantsBody> {
+	const grants = value === undefined ? {} : record(value, path, ["session_display_name"]);
+	const displayName = grants["session_display_name"];
+	return {
+		session_display_name:
+			displayName === undefined
+				? { when: "never" }
+				: readSessionDisplayName(displayName, at(path, "session_display_name")),
+	};
+}
+
+function readSessionDisplayName(value: unknown, path: string): api.SessionDisplayNameGrantBody {
+	const grant = record(value, path, ["when"]);
+	return { when: oneOf(grant["when"], at(path, "when"), DISPLAY_NAME_WHENS) };
+}
+
+function readFunctionSource(value: unknown, path: string): api.FunctionSourceBody {
+	const source = record(value, path, ["type", "package", "function_id", "version"]);
+	const type = oneOf(source["type"], at(path, "type"), ["platform", "workspace"] as const);
+	switch (type) {
+		case "platform":
+			record(value, path, ["type", "package"]);
+			return { type, package: string(source["package"], at(path, "package")) };
+		case "workspace":
+			record(value, path, ["type", "function_id", "version"]);
+			return {
+				type,
+				function_id: string(source["function_id"], at(path, "function_id")),
+				version: readVersionPin(source["version"], at(path, "version")),
+			};
+		default:
+			return type satisfies never;
+	}
+}
+
+/** Core leaves a function grant's network out when it is `none`. */
+function readFunctionNetwork(value: unknown, path: string): api.FunctionNetworkBody {
+	if (value === undefined) {
+		return { type: "none" };
+	}
+	const network = record(value, path, ["type", "hosts"]);
+	const type = oneOf(network["type"], at(path, "type"), ["none", "unrestricted", "allowlist"] as const);
+	switch (type) {
+		case "none":
+		case "unrestricted":
+			record(value, path, ["type"]);
+			return { type };
+		case "allowlist":
+			return { type, hosts: list(network["hosts"], at(path, "hosts"), string) };
+		default:
+			return type satisfies never;
+	}
+}
+
+function readFunction(value: unknown, path: string): Present<api.FunctionGrantBody> {
+	const grant = record(value, path, [
+		"name",
+		"source",
+		"default_policy",
+		"tools",
+		"timeout_secs",
+		"network",
+		"http_credentials",
+	]);
+	return {
+		name: string(grant["name"], at(path, "name")),
+		source: readFunctionSource(grant["source"], at(path, "source")),
+		default_policy: oneOf(grant["default_policy"], at(path, "default_policy"), POLICIES),
+		tools: readTools(grant["tools"], at(path, "tools")),
+		timeout_secs: optional(grant["timeout_secs"], (secs) => count(secs, at(path, "timeout_secs"), 1)),
+		network: readFunctionNetwork(grant["network"], at(path, "network")),
+		http_credentials: list(grant["http_credentials"], at(path, "http_credentials"), string),
+	};
+}
+
+const VOLUME_DATA = ["disabled", "enabled"] as const;
+
+/** A config published before the volume existed leaves it out, and it reads as its default: no `/data`. */
+function readVolume(value: unknown, path: string): Present<api.VolumeConfigBody> {
+	const volume = value === undefined ? {} : record(value, path, ["data"]);
+	const data = volume["data"];
+	if (data === undefined) {
+		return { data: { type: "disabled" } };
+	}
+	const dataPath = at(path, "data");
+	return {
+		data: {
+			type: oneOf(record(data, dataPath, ["type"])["type"], at(dataPath, "type"), VOLUME_DATA),
+		},
 	};
 }

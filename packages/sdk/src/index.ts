@@ -3,6 +3,7 @@ export { SubakoClient } from "./client.js";
 export type {
 	ClientOptions,
 	Credential,
+	FunctionArchive,
 	RequestOptions,
 	SkillArchive,
 	SubakoClientOptions,
@@ -24,7 +25,9 @@ export {
 } from "./errors.js";
 export {
 	type ApprovalState,
+	type DisplayNameChange,
 	isRunning,
+	latestDisplayName,
 	type PendingApproval,
 	pendingApprovals,
 	type ToolCallResult,
@@ -35,6 +38,20 @@ export {
 export { Page } from "./pagination.js";
 export type { IdCursor, IdPaged, PreviousPage } from "./pagination.js";
 export { SubakoSessionClient, type SubakoSessionClientOptions } from "./session-client.js";
+export {
+	checkFunctionFiles,
+	FUNCTION_ASSET_PATH_MAX_BYTES,
+	FUNCTION_ASSETS_DIR,
+	FUNCTION_ASSETS_MAX_FILES,
+	FUNCTION_BUNDLE_MAX_BYTES,
+	FUNCTION_DESCRIPTION_MAX_CHARS,
+	FUNCTION_MANIFEST_MAX_BYTES,
+	FUNCTION_SCHEMA_MAX_BYTES,
+	FunctionBundleError,
+	type FunctionBundleProblem,
+	type FunctionFiles,
+	packFunction,
+} from "./function-bundle.js";
 export {
 	checkSkillFiles,
 	packSkill,
@@ -81,6 +98,7 @@ export { VERSION } from "./version.js";
 
 export type { Agents, ListAgentsParams, ListAgentVersionsParams } from "./resources/agents.js";
 export type { ApiKeys, ListApiKeysParams } from "./resources/api-keys.js";
+export type { Functions, ListFunctionsParams, ListFunctionVersionsParams } from "./resources/functions.js";
 export type { Me } from "./resources/me.js";
 export type { ListModelProvidersParams, ModelProviders } from "./resources/model-providers.js";
 export type {
@@ -118,6 +136,7 @@ export type {
 	ApiKeyBody,
 	ApiKeyReceiptBody,
 	ApprovalDecisionForm,
+	BuiltinGrantsBody,
 	CancelOutcomeBody,
 	ChangeMemberRoleBody,
 	ChangeWorkspaceMemberRoleBody,
@@ -138,10 +157,19 @@ export type {
 	CreateWorkspaceModelProviderBodyWritable,
 	CredentialBody,
 	CredentialCreated,
+	CredentialHeaderNameBody,
 	EnvironmentRefBody,
 	ErrorBody,
 	ErrorDetail,
+	FunctionAssetsBody,
+	FunctionBody,
+	FunctionGrantBody,
+	FunctionManifestBody,
+	FunctionNetworkBody,
+	FunctionSourceBody,
+	FunctionVersionBody,
 	InvitationBody,
+	ManifestFunctionBody,
 	McpGrantBody,
 	MeBody,
 	MemberRemovedBody,
@@ -163,6 +191,7 @@ export type {
 	PlanBody,
 	PlanLimitBody,
 	PlanListBody,
+	PlatformFunctionListBody,
 	PlatformModelBody,
 	PostSessionEventBody,
 	PublishAgentVersionBody,
@@ -170,7 +199,9 @@ export type {
 	RegisterClientBody,
 	RegisteredClientBody,
 	RenameAgentBody,
+	RenameFunctionBody,
 	RenameOrganizationBody,
+	RenameSessionBody,
 	RenameSkillBody,
 	RenameWorkspaceBody,
 	SandboxArchiveBody,
@@ -197,6 +228,11 @@ export type {
 	VaultBody,
 	VaultCreated,
 	VersionPinBody,
+	VolumeConfigBody,
+	VolumeFileBody,
+	VolumeFileListBody,
+	VolumeFileWrittenBody,
+	VolumeDataBody,
 	WorkspaceBody,
 	WorkspaceMemberBody,
 } from "./generated/index.js";
@@ -207,15 +243,18 @@ export type {
 export {
 	AnthropicEffortBody,
 	ApprovalDecisionBody,
-	AuthSchemeBody,
 	ClientCallFailureBody,
 	ClientLeaveReasonBody,
 	CredentialCheckResult,
 	CredentialStatusBody,
 	CreditSourceBody,
+	DisplayNameAuthorBody,
+	DisplayNameWhenBody,
 	ErrorCode,
+	HttpSchemeBody,
 	InputSourceBody,
 	KeyPermissionSchema,
+	McpSchemeBody,
 	ModelProviderFormatBody,
 	ModelProviderOwnerBody,
 	ModelProviderTypeParam,
@@ -228,6 +267,8 @@ export {
 	RoleBody,
 	SessionSandboxStatusBody,
 	SessionStatusBody,
+	StorageSubjectBody,
 	SubmitKindBody,
+	VolumeFileKindBody,
 	WorkspaceRoleBody,
 } from "./generated/index.js";

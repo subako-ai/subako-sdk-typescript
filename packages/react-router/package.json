@@ -1,6 +1,6 @@
 {
 	"name": "@subako-ai/react-router",
-	"version": "0.1.14",
+	"version": "0.2.0",
 	"description": "React Router as a navigate tool for Subako sessions",
 	"homepage": "https://subako.ai",
 	"license": "Apache-2.0",

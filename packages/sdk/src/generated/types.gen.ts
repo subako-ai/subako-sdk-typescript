@@ -14,11 +14,23 @@ export type ActorBody = {
   user_id: string;
 };
 
+/**
+ * A new credential: what it authenticates against, and how. The protocol
+ * decides which auth schemes the payload may take.
+ */
 export type AddCredentialBody = {
   display_name: string;
-  payload: CredentialPayloadBody;
-  protocol: ProtocolBody;
+  payload: McpPayloadBody;
+  protocol: 'mcp';
+  /**
+   * The MCP server's exact URL.
+   */
   target: string;
+} | {
+  display_name: string;
+  payload: HttpPayloadBody;
+  protocol: 'http';
+  target: HttpOriginBody;
 };
 
 export type AddWorkspaceMemberBody = {
@@ -42,11 +54,22 @@ export type AgentBody = {
  * reach.
  */
 export type AgentConfigBody = {
+  /**
+   * The servers the platform serves itself, one setting per server under
+   * its fixed name. A setting left out takes its default.
+   */
+  builtin?: BuiltinGrantsBody;
+  functions?: Array<FunctionGrantBody>;
   mcp?: Array<McpGrantBody>;
   model: ModelConfigBody;
   sandboxes?: Array<SandboxGrantBody>;
   skills?: Array<SkillGrantBody>;
   system_prompt?: string | null;
+  /**
+   * The session tree's file volume. Only the root session's config is
+   * read; a child's is ignored.
+   */
+  volume?: VolumeConfigBody;
 };
 
 /**
@@ -220,16 +243,15 @@ export type ApprovalDecisionForm = {
 };
 
 /**
- * How a credential authenticates against its target: an OAuth grant this
- * vault refreshes, or a bearer token supplied once.
+ * The servers the platform serves itself, each at `builtin:{key}`.
  */
-export const AuthSchemeBody = { OAUTH: 'oauth', STATIC_BEARER: 'static_bearer' } as const;
-
-/**
- * How a credential authenticates against its target: an OAuth grant this
- * vault refreshes, or a bearer token supplied once.
- */
-export type AuthSchemeBody = typeof AuthSchemeBody[keyof typeof AuthSchemeBody];
+export type BuiltinGrantsBody = {
+  /**
+   * Whether the agent names the session it runs in, through the
+   * `builtin:session_display_name` server. `never` when left out.
+   */
+  session_display_name?: SessionDisplayNameGrantBody;
+};
 
 /**
  * What the cancel touched. A running run stops cooperatively at its next
@@ -462,11 +484,29 @@ export type CreatedSessionReceiptBody = {
  * payload it seals is never returned, by this route or any other.
  */
 export type CredentialBody = {
-  auth_scheme: AuthSchemeBody;
+  auth_scheme: McpSchemeBody;
   display_name: string;
   id: string;
-  protocol: ProtocolBody;
+  protocol: 'mcp';
   status: CredentialStatusBody;
+  /**
+   * The MCP server's exact URL.
+   */
+  target: string;
+  vault_id: string;
+} | {
+  auth_scheme: HttpSchemeBody;
+  display_name: string;
+  /**
+   * Every header the credential is sent as, in the order it was added.
+   */
+  headers: Array<CredentialHeaderNameBody>;
+  id: string;
+  protocol: 'http';
+  status: CredentialStatusBody;
+  /**
+   * The origin, as the vault stores it.
+   */
   target: string;
   vault_id: string;
 };
@@ -497,14 +537,33 @@ export type CredentialCreated = {
   id: string;
 };
 
-export type CredentialPayloadBody = {
-  access_token: string;
-  auth_scheme: 'oauth';
-  expires_at?: string | null;
-  refresh?: null | RefreshBlockBody;
-} | {
-  auth_scheme: 'static_bearer';
-  token: string;
+/**
+ * One header an `http` credential is sent as.
+ */
+export type CredentialHeaderBody = {
+  /**
+   * An HTTP token, compared without regard to case and stored in
+   * lowercase. A header the client or a proxy owns (`host`,
+   * `content-length`, `transfer-encoding`, `connection`, `keep-alive`,
+   * `te`, `trailer`, `upgrade`, `proxy-*`) is refused.
+   */
+  name: string;
+  /**
+   * Visible characters, with spaces or tabs only between them; at most
+   * 8192 bytes.
+   */
+  value: string;
+};
+
+/**
+ * A header an `http` credential is sent as, by name only: its value is
+ * never returned.
+ */
+export type CredentialHeaderNameBody = {
+  /**
+   * The header's name, in lowercase.
+   */
+  name: string;
 };
 
 /**
@@ -564,6 +623,30 @@ export type CreditsBody = {
 };
 
 /**
+ * Who wrote a session's display name.
+ */
+export const DisplayNameAuthorBody = { USER: 'user', AGENT: 'agent' } as const;
+
+/**
+ * Who wrote a session's display name.
+ */
+export type DisplayNameAuthorBody = typeof DisplayNameAuthorBody[keyof typeof DisplayNameAuthorBody];
+
+/**
+ * Which session display names the agent may overwrite.
+ */
+export const DisplayNameWhenBody = {
+  NEVER: 'never',
+  EMPTY: 'empty',
+  UNTIL_USER_EDITS: 'until_user_edits'
+} as const;
+
+/**
+ * Which session display names the agent may overwrite.
+ */
+export type DisplayNameWhenBody = typeof DisplayNameWhenBody[keyof typeof DisplayNameWhenBody];
+
+/**
  * The deployment's current image for a named platform release line.
  */
 export type EnvironmentRefBody = {
@@ -614,6 +697,155 @@ export type ErrorDetail = {
 };
 
 /**
+ * The files under a bundle's `assets/`, which Core stores as one archive and
+ * a call's module reads read-only at `/package`. `sha256` is the hex SHA-256
+ * of that archive and `bytes` its size.
+ */
+export type FunctionAssetsBody = {
+  bytes: number;
+  sha256: string;
+};
+
+/**
+ * A function package's identity and current state. `name` and
+ * `description` are the latest version's manifest; `display_name` is the
+ * platform label, empty when unset. `updated_at` is when the latest version
+ * was pushed.
+ */
+export type FunctionBody = {
+  created_at: string;
+  description: string;
+  display_name: string;
+  id: string;
+  latest_version: number;
+  name: string;
+  updated_at: string;
+};
+
+/**
+ * Grants access to the tools of one function package.
+ */
+export type FunctionGrantBody = {
+  /**
+   * Applies to any tool not named in `tools`, including one the package
+   * adds after this version is published.
+   */
+  default_policy: PolicyActionBody;
+  /**
+   * Origins whose credential, from the session's vaults, is attached to
+   * each request the package sends there. Each must be reachable under
+   * `network` and listed once. A call is refused, naming the origin, when
+   * the session's vaults hold none, more than one, or one that must be
+   * reconnected.
+   */
+  http_credentials?: Array<HttpOriginBody>;
+  /**
+   * The broker serves the package at `fn:{name}`. Unique within
+   * `functions`; `parent` is reserved.
+   */
+  name: string;
+  /**
+   * Which hosts the package's HTTP requests may reach; `none` when
+   * omitted.
+   */
+  network?: FunctionNetworkBody;
+  source: FunctionSourceBody;
+  /**
+   * How long one call may run, in seconds; 60 when unset.
+   */
+  timeout_secs?: number | null;
+  tools?: Array<ToolRuleBody>;
+};
+
+/**
+ * A version's `subako-package.json`.
+ */
+export type FunctionManifestBody = {
+  description: string;
+  functions: Array<ManifestFunctionBody>;
+  name: string;
+};
+
+/**
+ * Where a function's HTTP requests may go. Every variant refuses private
+ * and metadata addresses.
+ */
+export type FunctionNetworkBody = {
+  type: 'none';
+} | {
+  type: 'unrestricted';
+} | {
+  hosts: Array<HostPatternBody>;
+  type: 'allowlist';
+};
+
+/**
+ * Where the package comes from. `platform` names a package the deployment
+ * ships, e.g. `files`; `workspace` names one this workspace uploaded.
+ */
+export type FunctionSourceBody = {
+  package: string;
+  type: 'platform';
+} | {
+  function_id: string;
+  type: 'workspace';
+  /**
+   * Resolved when each session is created, including child sessions.
+   * `latest` selects the newest version then; later uploads affect new
+   * sessions without republishing the agent.
+   */
+  version: VersionPinBody;
+};
+
+/**
+ * One immutable package version. `module_sha256` is the hex SHA-256 of its
+ * `module.wasm`; `assets` is null for a bundle without an `assets/`
+ * directory.
+ */
+export type FunctionVersionBody = {
+  assets: null | FunctionAssetsBody;
+  created_at: string;
+  function_id: string;
+  id: string;
+  manifest: FunctionManifestBody;
+  module_bytes: number;
+  module_sha256: string;
+  version: number;
+};
+
+/**
+ * `api.example.com` admits that host alone; `*.example.com` admits every subdomain of `example.com`, but not `example.com` itself. An IP address is admitted only when spelled out exactly.
+ */
+export type HostPatternBody = string;
+
+/**
+ * `https://host[:port]`, nothing past the authority; plain `http` only where the deployment allows it. The host is lowercased and a default port dropped, as the vault stores a credential's target.
+ */
+export type HttpOriginBody = string;
+
+/**
+ * How an `http` credential authenticates: headers sent with every request
+ * to its origin.
+ */
+export type HttpPayloadBody = {
+  auth_scheme: 'header';
+  /**
+   * Each name at most once.
+   */
+  headers: Array<CredentialHeaderBody>;
+};
+
+/**
+ * How an `http` credential authenticates against its origin.
+ */
+export const HttpSchemeBody = { HEADER: 'header' } as const;
+
+/**
+ * How an `http` credential authenticates against its origin.
+ */
+export type HttpSchemeBody = typeof HttpSchemeBody[keyof typeof HttpSchemeBody];
+
+/**
  * How a user turn reached the session.
  */
 export const InputSourceBody = {
@@ -659,6 +891,8 @@ export const KeyPermissionSchema = {
   SESSION_MANAGE: 'session.manage',
   SKILL_READ: 'skill.read',
   SKILL_MANAGE: 'skill.manage',
+  FUNCTION_READ: 'function.read',
+  FUNCTION_MANAGE: 'function.manage',
   MODEL_PROVIDER_READ: 'model_provider.read',
   MODEL_PROVIDER_MANAGE: 'model_provider.manage'
 } as const;
@@ -667,6 +901,22 @@ export const KeyPermissionSchema = {
  * One thing a key may do. A key holds a set of these, and a route refuses a caller whose key lacks the permission it names.
  */
 export type KeyPermissionSchema = typeof KeyPermissionSchema[keyof typeof KeyPermissionSchema];
+
+/**
+ * One function a package serves as a tool.
+ */
+export type ManifestFunctionBody = {
+  description: string;
+  /**
+   * JSON Schema for the tool's arguments.
+   */
+  input_schema: unknown;
+  name: string;
+  /**
+   * JSON Schema for the tool's output.
+   */
+  output_schema: unknown;
+};
 
 /**
  * Grants access to one MCP server under a policy.
@@ -685,6 +935,30 @@ export type McpGrantBody = {
   tools?: Array<ToolRuleBody>;
   url: string;
 };
+
+/**
+ * How an `mcp` credential authenticates: an OAuth grant this vault
+ * refreshes, or a bearer token supplied once.
+ */
+export type McpPayloadBody = {
+  access_token: string;
+  auth_scheme: 'oauth';
+  expires_at?: string | null;
+  refresh?: null | RefreshBlockBody;
+} | {
+  auth_scheme: 'static_bearer';
+  token: string;
+};
+
+/**
+ * How an `mcp` credential authenticates against its server.
+ */
+export const McpSchemeBody = { OAUTH: 'oauth', STATIC_BEARER: 'static_bearer' } as const;
+
+/**
+ * How an `mcp` credential authenticates against its server.
+ */
+export type McpSchemeBody = typeof McpSchemeBody[keyof typeof McpSchemeBody];
 
 /**
  * The organization named here is the one the caller's access token was
@@ -1017,6 +1291,30 @@ export type PageOutCredentialBody = {
   prev_cursor: string | null;
 };
 
+export type PageOutFunctionBody = {
+  items: Array<FunctionBody>;
+  /**
+   * Pass back as `after` for the next page; `null` on the last page.
+   */
+  next_cursor: string | null;
+  /**
+   * Pass back as `before` for the previous page; `null` on the first page.
+   */
+  prev_cursor: string | null;
+};
+
+export type PageOutFunctionVersionBody = {
+  items: Array<FunctionVersionBody>;
+  /**
+   * Pass back as `after` for the next page; `null` on the last page.
+   */
+  next_cursor: string | null;
+  /**
+   * Pass back as `before` for the previous page; `null` on the first page.
+   */
+  prev_cursor: string | null;
+};
+
 export type PageOutInvitationBody = {
   items: Array<InvitationBody>;
   /**
@@ -1170,6 +1468,7 @@ export const PlanResourceBody = {
   AGENTS: 'agents',
   VAULTS: 'vaults',
   SKILLS: 'skills',
+  FUNCTIONS: 'functions',
   API_KEYS: 'api_keys',
   MODEL_PROVIDERS: 'model_providers',
   SESSIONS: 'sessions',
@@ -1180,6 +1479,14 @@ export const PlanResourceBody = {
  * A resource a plan may cap.
  */
 export type PlanResourceBody = typeof PlanResourceBody[keyof typeof PlanResourceBody];
+
+/**
+ * The packages this deployment ships, which an agent version grants by name
+ * rather than by id.
+ */
+export type PlatformFunctionListBody = {
+  packages: Array<FunctionManifestBody>;
+};
 
 export type PlatformModelBody = {
   description: string;
@@ -1221,7 +1528,7 @@ export type PostSessionEventBody = {
 /**
  * The protocol a credential's target speaks.
  */
-export const ProtocolBody = { MCP: 'mcp' } as const;
+export const ProtocolBody = { MCP: 'mcp', HTTP: 'http' } as const;
 
 /**
  * The protocol a credential's target speaks.
@@ -1327,6 +1634,10 @@ export type RenameAgentBody = {
   name: string;
 };
 
+export type RenameFunctionBody = {
+  display_name: string;
+};
+
 export type RenameMeBody = {
   /**
    * The caller's new name, trimmed of surrounding whitespace, or `null` to
@@ -1337,6 +1648,14 @@ export type RenameMeBody = {
 
 export type RenameOrganizationBody = {
   name: string;
+};
+
+export type RenameSessionBody = {
+  /**
+   * Empty clears the name, which leaves it to an agent holding the
+   * display-name grant.
+   */
+  display_name: string;
 };
 
 export type RenameSkillBody = {
@@ -1423,6 +1742,11 @@ export type SessionBody = {
   created_at: string;
   created_by: SessionCreatorBody;
   display_name: string;
+  /**
+   * Who wrote `display_name`: a caller, at creation or on a rename, or the
+   * agent through its display-name grant.
+   */
+  display_name_author: DisplayNameAuthorBody;
   id: string;
   status: SessionStatusBody;
   workspace_id: string;
@@ -1438,6 +1762,15 @@ export type SessionCreatorBody = (ActorBody & {
   api_key_id: string;
   label: string;
   type: 'api_key';
+};
+
+/**
+ * Whether the agent gets a `set` tool for the session's display name. A
+ * name a user wrote is never overwritten unless it is blank; `when` decides
+ * the rest.
+ */
+export type SessionDisplayNameGrantBody = {
+  when: DisplayNameWhenBody;
 };
 
 /**
@@ -1573,6 +1906,10 @@ export type SessionEventPayloadBody = {
   client_id: string;
   reason: ClientCallFailureBody;
   type: 'client_tool_failed';
+} | {
+  author: DisplayNameAuthorBody;
+  display_name: string;
+  type: 'session_display_name_changed';
 } | {
   kind: string;
   payload: {
@@ -1782,6 +2119,16 @@ export type StartOAuthBody = {
 };
 
 /**
+ * What a storage event held.
+ */
+export const StorageSubjectBody = { ARCHIVE: 'archive', VOLUME: 'volume' } as const;
+
+/**
+ * What a storage event held.
+ */
+export type StorageSubjectBody = typeof StorageSubjectBody[keyof typeof StorageSubjectBody];
+
+/**
  * What the input did to the session.
  */
 export const SubmitKindBody = { NEW_RUN: 'new_run', STEERED: 'steered' } as const;
@@ -1891,6 +2238,24 @@ export type UsageResourceBody = {
   duration_ms: number;
   kind: 'storage';
   session_id: string;
+  subject: StorageSubjectBody;
+} | {
+  elapsed_ms: number;
+  /**
+   * The grant the call went through, as the agent's config names it.
+   */
+  grant: string;
+  kind: 'function_runtime';
+  run_id: string;
+  session_id: string;
+  tool: string;
+} | {
+  bytes: number;
+  grant?: string | null;
+  kind: 'volume_write';
+  run_id?: string | null;
+  session_id: string;
+  tool?: string | null;
 };
 
 /**
@@ -1925,6 +2290,63 @@ export type VersionPinBody = {
 } | {
   number: number;
   type: 'pinned';
+};
+
+/**
+ * The roots the session tree's functions reach beyond `/tmp`.
+ */
+export type VolumeConfigBody = {
+  /**
+   * `disabled` when left out.
+   */
+  data?: VolumeDataBody;
+};
+
+/**
+ * Whether the volume offers a persistent `/data` root. `enabled`
+ * mounts it for the session tree's functions.
+ */
+export type VolumeDataBody = {
+  type: 'disabled';
+} | {
+  type: 'enabled';
+};
+
+export type VolumeFileBody = {
+  kind: VolumeFileKindBody;
+  /**
+   * When the entry itself last changed, in UTC.
+   */
+  modified: string;
+  /**
+   * The entry's absolute volume path, e.g. `/tmp/notes.txt`.
+   */
+  path: string;
+  /**
+   * Bytes for a file; 0 for a directory or a symlink.
+   */
+  size: number;
+};
+
+export const VolumeFileKindBody = {
+  FILE: 'file',
+  DIR: 'dir',
+  SYMLINK: 'symlink'
+} as const;
+
+export type VolumeFileKindBody = typeof VolumeFileKindBody[keyof typeof VolumeFileKindBody];
+
+export type VolumeFileListBody = {
+  entries: Array<VolumeFileBody>;
+  /**
+   * True when the listing stopped before every entry beneath the prefix.
+   */
+  truncated: boolean;
+};
+
+export type VolumeFileWrittenBody = {
+  bytes: number;
+  path: string;
 };
 
 /**
@@ -2567,6 +2989,437 @@ export type RevokeApiKeyResponses = {
 };
 
 export type RevokeApiKeyResponse = RevokeApiKeyResponses[keyof RevokeApiKeyResponses];
+
+export type ListFunctionsData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace to list from. Required for a user caller; implied by the key for an API key caller.
+     */
+    'Kikuvi-Workspace'?: string | null;
+  };
+  path?: never;
+  query?: {
+    limit?: number;
+    /**
+     * Rows past this id in `order`'s direction: a page's `next_cursor`.
+     */
+    after?: string;
+    /**
+     * Rows just before this id, still in `order`'s direction: a page's `prev_cursor`.
+     */
+    before?: string;
+    /**
+     * Newest first when omitted.
+     */
+    order?: OrderParam;
+  };
+  url: '/v1/functions';
+};
+
+export type ListFunctionsErrors = {
+  /**
+   * Bad limit, cursor, or order, a malformed workspace header, or a user caller with no workspace header.
+   */
+  400: ErrorBody;
+  /**
+   * Missing, malformed, or invalid bearer token.
+   */
+  401: ErrorBody;
+  /**
+   * Caller lacks function.read, or an API key's Kikuvi-Workspace header names another workspace.
+   */
+  403: ErrorBody;
+  /**
+   * No such workspace, or the caller cannot see it.
+   */
+  404: ErrorBody;
+};
+
+export type ListFunctionsError = ListFunctionsErrors[keyof ListFunctionsErrors];
+
+export type ListFunctionsResponses = {
+  /**
+   * One page, newest first unless order=asc.
+   */
+  200: PageOutFunctionBody;
+};
+
+export type ListFunctionsResponse = ListFunctionsResponses[keyof ListFunctionsResponses];
+
+export type CreateFunctionData = {
+  /**
+   * A gzipped tar holding subako-package.json and module.wasm at its root.
+   */
+  body: Blob | File;
+  headers?: {
+    /**
+     * Retry the same operation with this key to return its saved receipt. Scoped by the operation's authenticated caller or resource. A different input under the same key returns 409. Receipts are retained for at least 7 days after completion, then removed by an hourly sweep. After removal the key can execute again. Fresh-only secrets are never included in a replay.
+     */
+    'Idempotency-Key'?: string;
+    /**
+     * Workspace to create in. Required for a user caller; implied by the key for an API key caller.
+     */
+    'Kikuvi-Workspace'?: string | null;
+  };
+  path?: never;
+  query?: never;
+  url: '/v1/functions';
+};
+
+export type CreateFunctionErrors = {
+  /**
+   * Malformed archive, a bundle validation failure, a malformed workspace header, or a user caller with no workspace header.
+   */
+  400: ErrorBody;
+  /**
+   * Missing, malformed, or invalid bearer token.
+   */
+  401: ErrorBody;
+  /**
+   * Caller lacks function.manage, or an API key's Kikuvi-Workspace header names another workspace.
+   */
+  403: ErrorBody;
+  /**
+   * No such workspace, or the caller cannot see it.
+   */
+  404: ErrorBody;
+  /**
+   * Idempotency-Key was already used for a different request.
+   */
+  409: ErrorBody;
+  /**
+   * Request body exceeds the upload size limit.
+   */
+  413: ErrorBody;
+};
+
+export type CreateFunctionError = CreateFunctionErrors[keyof CreateFunctionErrors];
+
+export type CreateFunctionResponses = {
+  /**
+   * The new package's first version.
+   */
+  201: FunctionVersionBody;
+};
+
+export type CreateFunctionResponse = CreateFunctionResponses[keyof CreateFunctionResponses];
+
+export type ListPlatformFunctionsData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: '/v1/functions/platform';
+};
+
+export type ListPlatformFunctionsErrors = {
+  /**
+   * Missing, malformed, or invalid bearer token.
+   */
+  401: ErrorBody;
+};
+
+export type ListPlatformFunctionsError = ListPlatformFunctionsErrors[keyof ListPlatformFunctionsErrors];
+
+export type ListPlatformFunctionsResponses = {
+  /**
+   * Every platform package, each with its manifest.
+   */
+  200: PlatformFunctionListBody;
+};
+
+export type ListPlatformFunctionsResponse = ListPlatformFunctionsResponses[keyof ListPlatformFunctionsResponses];
+
+export type DeleteFunctionData = {
+  body?: never;
+  path: {
+    /**
+     * Function package id
+     */
+    function_id: string;
+  };
+  query?: never;
+  url: '/v1/functions/{function_id}';
+};
+
+export type DeleteFunctionErrors = {
+  /**
+   * Malformed path parameter.
+   */
+  400: ErrorBody;
+  /**
+   * Missing, malformed, or invalid bearer token.
+   */
+  401: ErrorBody;
+  /**
+   * Caller lacks function.manage.
+   */
+  403: ErrorBody;
+  /**
+   * No such package, or the caller cannot see it.
+   */
+  404: ErrorBody;
+  /**
+   * A published agent version still grants this package, or a session still holds it. Delete the dependent agents or sessions first.
+   */
+  409: ErrorBody;
+};
+
+export type DeleteFunctionError = DeleteFunctionErrors[keyof DeleteFunctionErrors];
+
+export type DeleteFunctionResponses = {
+  /**
+   * The package and its versions are gone. Stored modules are purged asynchronously on a best-effort basis.
+   */
+  204: void;
+};
+
+export type DeleteFunctionResponse = DeleteFunctionResponses[keyof DeleteFunctionResponses];
+
+export type GetFunctionData = {
+  body?: never;
+  path: {
+    /**
+     * Function package id
+     */
+    function_id: string;
+  };
+  query?: never;
+  url: '/v1/functions/{function_id}';
+};
+
+export type GetFunctionErrors = {
+  /**
+   * Malformed path parameter.
+   */
+  400: ErrorBody;
+  /**
+   * Missing, malformed, or invalid bearer token.
+   */
+  401: ErrorBody;
+  /**
+   * Caller lacks function.read.
+   */
+  403: ErrorBody;
+  /**
+   * No such package, or the caller cannot see it.
+   */
+  404: ErrorBody;
+};
+
+export type GetFunctionError = GetFunctionErrors[keyof GetFunctionErrors];
+
+export type GetFunctionResponses = {
+  /**
+   * The package.
+   */
+  200: FunctionBody;
+};
+
+export type GetFunctionResponse = GetFunctionResponses[keyof GetFunctionResponses];
+
+export type RenameFunctionData = {
+  body: RenameFunctionBody;
+  path: {
+    /**
+     * Function package id
+     */
+    function_id: string;
+  };
+  query?: never;
+  url: '/v1/functions/{function_id}';
+};
+
+export type RenameFunctionErrors = {
+  /**
+   * Malformed body, a display name outside the bound, or a malformed path parameter.
+   */
+  400: ErrorBody;
+  /**
+   * Missing, malformed, or invalid bearer token.
+   */
+  401: ErrorBody;
+  /**
+   * Caller lacks function.manage.
+   */
+  403: ErrorBody;
+  /**
+   * No such package, or the caller cannot see it.
+   */
+  404: ErrorBody;
+};
+
+export type RenameFunctionError = RenameFunctionErrors[keyof RenameFunctionErrors];
+
+export type RenameFunctionResponses = {
+  /**
+   * Renamed.
+   */
+  200: FunctionBody;
+};
+
+export type RenameFunctionResponse = RenameFunctionResponses[keyof RenameFunctionResponses];
+
+export type ListFunctionVersionsData = {
+  body?: never;
+  path: {
+    /**
+     * Function package id
+     */
+    function_id: string;
+  };
+  query?: {
+    limit?: number;
+    /**
+     * Rows past this id in `order`'s direction: a page's `next_cursor`.
+     */
+    after?: string;
+    /**
+     * Rows just before this id, still in `order`'s direction: a page's `prev_cursor`.
+     */
+    before?: string;
+    /**
+     * Newest first when omitted.
+     */
+    order?: OrderParam;
+  };
+  url: '/v1/functions/{function_id}/versions';
+};
+
+export type ListFunctionVersionsErrors = {
+  /**
+   * Bad limit, cursor, order, or path parameter.
+   */
+  400: ErrorBody;
+  /**
+   * Missing, malformed, or invalid bearer token.
+   */
+  401: ErrorBody;
+  /**
+   * Caller lacks function.read.
+   */
+  403: ErrorBody;
+  /**
+   * No such package, or the caller cannot see it.
+   */
+  404: ErrorBody;
+};
+
+export type ListFunctionVersionsError = ListFunctionVersionsErrors[keyof ListFunctionVersionsErrors];
+
+export type ListFunctionVersionsResponses = {
+  /**
+   * One page, newest first unless order=asc.
+   */
+  200: PageOutFunctionVersionBody;
+};
+
+export type ListFunctionVersionsResponse = ListFunctionVersionsResponses[keyof ListFunctionVersionsResponses];
+
+export type PushFunctionVersionData = {
+  /**
+   * A gzipped tar holding subako-package.json and module.wasm at its root.
+   */
+  body: Blob | File;
+  headers?: {
+    /**
+     * Retry the same operation with this key to return its saved receipt. Scoped by the operation's authenticated caller or resource. A different input under the same key returns 409. Receipts are retained for at least 7 days after completion, then removed by an hourly sweep. After removal the key can execute again. Fresh-only secrets are never included in a replay.
+     */
+    'Idempotency-Key'?: string;
+  };
+  path: {
+    /**
+     * Function package id
+     */
+    function_id: string;
+  };
+  query?: never;
+  url: '/v1/functions/{function_id}/versions';
+};
+
+export type PushFunctionVersionErrors = {
+  /**
+   * Malformed archive, a bundle validation failure, or a malformed path parameter.
+   */
+  400: ErrorBody;
+  /**
+   * Missing, malformed, or invalid bearer token.
+   */
+  401: ErrorBody;
+  /**
+   * Caller lacks function.manage.
+   */
+  403: ErrorBody;
+  /**
+   * No such package, or the caller cannot see it.
+   */
+  404: ErrorBody;
+  /**
+   * Idempotency-Key was already used for a different request.
+   */
+  409: ErrorBody;
+  /**
+   * Request body exceeds the upload size limit.
+   */
+  413: ErrorBody;
+};
+
+export type PushFunctionVersionError = PushFunctionVersionErrors[keyof PushFunctionVersionErrors];
+
+export type PushFunctionVersionResponses = {
+  /**
+   * The newly pushed version.
+   */
+  201: FunctionVersionBody;
+};
+
+export type PushFunctionVersionResponse = PushFunctionVersionResponses[keyof PushFunctionVersionResponses];
+
+export type GetFunctionVersionData = {
+  body?: never;
+  path: {
+    /**
+     * Function package id
+     */
+    function_id: string;
+    /**
+     * Version number, counting from 1
+     */
+    version: number;
+  };
+  query?: never;
+  url: '/v1/functions/{function_id}/versions/{version}';
+};
+
+export type GetFunctionVersionErrors = {
+  /**
+   * Malformed path parameter.
+   */
+  400: ErrorBody;
+  /**
+   * Missing, malformed, or invalid bearer token.
+   */
+  401: ErrorBody;
+  /**
+   * Caller lacks function.read.
+   */
+  403: ErrorBody;
+  /**
+   * No such package or version, or the caller cannot see it.
+   */
+  404: ErrorBody;
+};
+
+export type GetFunctionVersionError = GetFunctionVersionErrors[keyof GetFunctionVersionErrors];
+
+export type GetFunctionVersionResponses = {
+  /**
+   * The version.
+   */
+  200: FunctionVersionBody;
+};
+
+export type GetFunctionVersionResponse = GetFunctionVersionResponses[keyof GetFunctionVersionResponses];
 
 export type GetMeData = {
   body?: never;
@@ -3522,6 +4375,48 @@ export type GetSessionResponses = {
 
 export type GetSessionResponse = GetSessionResponses[keyof GetSessionResponses];
 
+export type RenameSessionData = {
+  body: RenameSessionBody;
+  path: {
+    /**
+     * Session id
+     */
+    session_id: string;
+  };
+  query?: never;
+  url: '/v1/sessions/{session_id}';
+};
+
+export type RenameSessionErrors = {
+  /**
+   * Malformed body or path parameter, or a display_name over 200 characters.
+   */
+  400: ErrorBody;
+  /**
+   * Missing, malformed, or invalid bearer token.
+   */
+  401: ErrorBody;
+  /**
+   * A workspace credential lacking session.manage. A session token may rename only its own session and never lands here.
+   */
+  403: ErrorBody;
+  /**
+   * No such session, or the caller cannot see it.
+   */
+  404: ErrorBody;
+};
+
+export type RenameSessionError = RenameSessionErrors[keyof RenameSessionErrors];
+
+export type RenameSessionResponses = {
+  /**
+   * The renamed session.
+   */
+  200: SessionBody;
+};
+
+export type RenameSessionResponse = RenameSessionResponses[keyof RenameSessionResponses];
+
 export type ResolveApprovalData = {
   body: ApprovalDecisionForm;
   headers?: {
@@ -4306,6 +5201,236 @@ export type MintSessionTokenResponses = {
 
 export type MintSessionTokenResponse = MintSessionTokenResponses[keyof MintSessionTokenResponses];
 
+export type DeleteVolumeData = {
+  body?: never;
+  path: {
+    /**
+     * Session id
+     */
+    session_id: string;
+  };
+  query?: never;
+  url: '/v1/sessions/{session_id}/volume';
+};
+
+export type DeleteVolumeErrors = {
+  /**
+   * Malformed path parameter.
+   */
+  400: ErrorBody;
+  /**
+   * Missing, malformed, or invalid bearer token.
+   */
+  401: ErrorBody;
+  /**
+   * A workspace credential lacking session.manage. A session token may act only on its own session and never lands here.
+   */
+  403: ErrorBody;
+  /**
+   * No such session, or the caller cannot see it, or the tree has no function grant, or the deployment runs no functions.
+   */
+  404: ErrorBody;
+};
+
+export type DeleteVolumeError = DeleteVolumeErrors[keyof DeleteVolumeErrors];
+
+export type DeleteVolumeResponses = {
+  /**
+   * The volume is empty.
+   */
+  204: void;
+};
+
+export type DeleteVolumeResponse = DeleteVolumeResponses[keyof DeleteVolumeResponses];
+
+export type ListVolumeFilesData = {
+  body?: never;
+  path: {
+    /**
+     * Session id
+     */
+    session_id: string;
+  };
+  query?: {
+    /**
+     * The volume path to list beneath, `/tmp` when omitted.
+     */
+    prefix?: string;
+  };
+  url: '/v1/sessions/{session_id}/volume/files';
+};
+
+export type ListVolumeFilesErrors = {
+  /**
+   * Malformed path parameter or prefix, or a /data prefix the root agent does not enable.
+   */
+  400: ErrorBody;
+  /**
+   * Missing, malformed, or invalid bearer token.
+   */
+  401: ErrorBody;
+  /**
+   * A workspace credential lacking session.read. A session token carries no permissions and never lands here.
+   */
+  403: ErrorBody;
+  /**
+   * No such session, or the caller cannot see it, or the tree has no function grant, or the deployment runs no functions.
+   */
+  404: ErrorBody;
+};
+
+export type ListVolumeFilesError = ListVolumeFilesErrors[keyof ListVolumeFilesErrors];
+
+export type ListVolumeFilesResponses = {
+  /**
+   * Every entry beneath the prefix. Empty for a tree whose functions have written nothing yet.
+   */
+  200: VolumeFileListBody;
+};
+
+export type ListVolumeFilesResponse = ListVolumeFilesResponses[keyof ListVolumeFilesResponses];
+
+export type DeleteVolumeFileData = {
+  body?: never;
+  path: {
+    /**
+     * Session id
+     */
+    session_id: string;
+    /**
+     * The volume path without its leading slash, e.g. `tmp/notes.txt`.
+     */
+    path: string;
+  };
+  query?: never;
+  url: '/v1/sessions/{session_id}/volume/files/{path}';
+};
+
+export type DeleteVolumeFileErrors = {
+  /**
+   * Malformed path parameter, or a /data path the root agent does not enable.
+   */
+  400: ErrorBody;
+  /**
+   * Missing, malformed, or invalid bearer token.
+   */
+  401: ErrorBody;
+  /**
+   * A workspace credential lacking session.manage. A session token may act only on its own session and never lands here.
+   */
+  403: ErrorBody;
+  /**
+   * No such session or file, or the caller cannot see it, or the tree has no function grant, or the deployment runs no functions.
+   */
+  404: ErrorBody;
+};
+
+export type DeleteVolumeFileError = DeleteVolumeFileErrors[keyof DeleteVolumeFileErrors];
+
+export type DeleteVolumeFileResponses = {
+  /**
+   * The entry was removed.
+   */
+  204: void;
+};
+
+export type DeleteVolumeFileResponse = DeleteVolumeFileResponses[keyof DeleteVolumeFileResponses];
+
+export type GetVolumeFileData = {
+  body?: never;
+  path: {
+    /**
+     * Session id
+     */
+    session_id: string;
+    /**
+     * The volume path without its leading slash, e.g. `tmp/notes.txt`.
+     */
+    path: string;
+  };
+  query?: never;
+  url: '/v1/sessions/{session_id}/volume/files/{path}';
+};
+
+export type GetVolumeFileErrors = {
+  /**
+   * Malformed path parameter, or a /data path the root agent does not enable.
+   */
+  400: ErrorBody;
+  /**
+   * Missing, malformed, or invalid bearer token.
+   */
+  401: ErrorBody;
+  /**
+   * A workspace credential lacking session.read. A session token carries no permissions and never lands here.
+   */
+  403: ErrorBody;
+  /**
+   * No such session or file, or the caller cannot see it, or the tree has no function grant, or the deployment runs no functions.
+   */
+  404: ErrorBody;
+};
+
+export type GetVolumeFileError = GetVolumeFileErrors[keyof GetVolumeFileErrors];
+
+export type GetVolumeFileResponses = {
+  /**
+   * The file's bytes.
+   */
+  200: Blob | File;
+};
+
+export type GetVolumeFileResponse = GetVolumeFileResponses[keyof GetVolumeFileResponses];
+
+export type PutVolumeFileData = {
+  /**
+   * The file's bytes, at most 1 GiB.
+   */
+  body: Blob | File;
+  path: {
+    /**
+     * Session id
+     */
+    session_id: string;
+    /**
+     * The volume path without its leading slash, e.g. `tmp/notes.txt`.
+     */
+    path: string;
+  };
+  query?: never;
+  url: '/v1/sessions/{session_id}/volume/files/{path}';
+};
+
+export type PutVolumeFileErrors = {
+  /**
+   * Malformed path parameter, a /data path the root agent does not enable, a path the volume cannot hold, or a body over 1 GiB.
+   */
+  400: ErrorBody;
+  /**
+   * Missing, malformed, or invalid bearer token.
+   */
+  401: ErrorBody;
+  /**
+   * A workspace credential lacking session.manage, an organization suspended or out of credit, or a volume its last hourly measurement found at or over its 10 GiB quota; reads and deletes still work, and writes resume once a measurement finds it under. A session token may act only on its own session and never lands here.
+   */
+  403: ErrorBody;
+  /**
+   * No such session, or the caller cannot see it, or the tree has no function grant, or the deployment runs no functions.
+   */
+  404: ErrorBody;
+};
+
+export type PutVolumeFileError = PutVolumeFileErrors[keyof PutVolumeFileErrors];
+
+export type PutVolumeFileResponses = {
+  /**
+   * The file as written.
+   */
+  200: VolumeFileWrittenBody;
+};
+
+export type PutVolumeFileResponse = PutVolumeFileResponses[keyof PutVolumeFileResponses];
+
 export type ListSkillsData = {
   body?: never;
   headers?: {
@@ -5072,7 +6197,7 @@ export type AddCredentialData = {
 
 export type AddCredentialErrors = {
   /**
-   * Malformed body.
+   * Malformed body, including an auth scheme the protocol does not take; a header named twice; or an `http` target that is not an origin, or one the deployment's network policy does not reach.
    */
   400: ErrorBody;
   /**
@@ -5282,7 +6407,7 @@ export type CheckCredentialData = {
 
 export type CheckCredentialErrors = {
   /**
-   * Malformed path parameter; or the server or its provider's token endpoint could not be reached, or the deployment's network policy does not reach it.
+   * Malformed path parameter; an `http` credential, which has no server to check; or the server or its provider's token endpoint could not be reached, or the deployment's network policy does not reach it.
    */
   400: ErrorBody;
   /**

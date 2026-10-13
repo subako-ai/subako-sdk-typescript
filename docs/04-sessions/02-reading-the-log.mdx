@@ -42,11 +42,13 @@ A `tool_call` names the tool the way the model called it. The engine spells a gr
 import { toolOrigin } from "@subako-ai/sdk";
 
 toolOrigin("mcp__rooms__lookup"); // { kind: "mcp", source: "rooms", tool: "lookup" }
+toolOrigin("fn__files__write"); // { kind: "fn", source: "files", tool: "write" }
 toolOrigin("client__page__fill_form"); // { kind: "client", source: "page", tool: "fill_form" }
+toolOrigin("builtin__session_display_name__set"); // { kind: "builtin", source: "session_display_name", tool: "set" }
 toolOrigin("think"); // { kind: "engine", tool: "think" }
 ```
 
-`kind` is `mcp`, `skill`, `sandbox`, or `client`: an MCP server, a skill, or a sandbox the agent's grant names, or a client a page registered. Anything else is the engine's own tool.
+`kind` is `mcp`, `skill`, `sandbox`, `fn`, `builtin`, or `client`: an MCP server, a skill, a sandbox, or a function package the agent's grant names, a server the platform serves itself for a grant (such as `builtin:session_display_name`), or a client a page registered. Anything else is the engine's own tool.
 
 ## Walking the log by hand
 
@@ -68,6 +70,16 @@ await subako.sessions.postEvent(sessionId, { type: "input", text: "book me a roo
 ```
 
 That queues a run, or steers the one already going. On a connection, `session.send(text)` is the same thing.
+
+## Display name
+
+```ts
+await subako.sessions.rename(sessionId, { display_name: "Refund for order 1042" });
+```
+
+A rename makes the name the caller's. An agent whose `builtin.session_display_name` is not `never` may write a name too, and it never overwrites yours unless yours is blank. `display_name_author` on the session says whether the current name came from a person (`user`) or the agent (`agent`).
+
+Every change, from either side, lands on the log as a `session_display_name_changed` event. `latestDisplayName(events)` gives you the last one, or `undefined` while there has been none. A name given at creation is not on the log, so read that one from `sessions.get`.
 
 ## Canceling
 

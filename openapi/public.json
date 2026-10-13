@@ -1185,6 +1185,871 @@
         ]
       }
     },
+    "/v1/functions": {
+      "get": {
+        "tags": [
+          "functions"
+        ],
+        "summary": "List function packages",
+        "operationId": "list_functions",
+        "parameters": [
+          {
+            "name": "Kikuvi-Workspace",
+            "in": "header",
+            "description": "Workspace to list from. Required for a user caller; implied by the key for an API key caller.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "maximum": 200,
+              "minimum": 1
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "description": "Rows past this id in `order`'s direction: a page's `next_cursor`.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "description": "Rows just before this id, still in `order`'s direction: a page's `prev_cursor`.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "description": "Newest first when omitted.",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/OrderParam"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page, newest first unless order=asc.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageOut_FunctionBody"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad limit, cursor, or order, a malformed workspace header, or a user caller with no workspace header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, malformed, or invalid bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks function.read, or an API key's Kikuvi-Workspace header names another workspace.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such workspace, or the caller cannot see it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "functions"
+        ],
+        "summary": "Create a function package",
+        "operationId": "create_function",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Retry the same operation with this key to return its saved receipt. Scoped by the operation's authenticated caller or resource. A different input under the same key returns 409. Receipts are retained for at least 7 days after completion, then removed by an hourly sweep. After removal the key can execute again. Fresh-only secrets are never included in a replay.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 255,
+              "minLength": 1
+            }
+          },
+          {
+            "name": "Kikuvi-Workspace",
+            "in": "header",
+            "description": "Workspace to create in. Required for a user caller; implied by the key for an API key caller.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "A gzipped tar holding subako-package.json and module.wasm at its root.",
+          "content": {
+            "application/gzip": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "The new package's first version.",
+            "headers": {
+              "Idempotency-Replayed": {
+                "schema": {
+                  "type": "boolean"
+                },
+                "description": "True when returning a saved receipt."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FunctionVersionBody"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed archive, a bundle validation failure, a malformed workspace header, or a user caller with no workspace header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, malformed, or invalid bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks function.manage, or an API key's Kikuvi-Workspace header names another workspace.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such workspace, or the caller cannot see it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Idempotency-Key was already used for a different request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request body exceeds the upload size limit.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/functions/platform": {
+      "get": {
+        "tags": [
+          "functions"
+        ],
+        "summary": "List the platform function packages",
+        "description": "The same for every workspace, so any user or API key may read it.",
+        "operationId": "list_platform_functions",
+        "responses": {
+          "200": {
+            "description": "Every platform package, each with its manifest.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformFunctionListBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, malformed, or invalid bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/functions/{function_id}": {
+      "get": {
+        "tags": [
+          "functions"
+        ],
+        "summary": "Get a function package",
+        "operationId": "get_function",
+        "parameters": [
+          {
+            "name": "function_id",
+            "in": "path",
+            "description": "Function package id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The package.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FunctionBody"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed path parameter.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, malformed, or invalid bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks function.read.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such package, or the caller cannot see it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "functions"
+        ],
+        "summary": "Delete a function package",
+        "operationId": "delete_function",
+        "parameters": [
+          {
+            "name": "function_id",
+            "in": "path",
+            "description": "Function package id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The package and its versions are gone. Stored modules are purged asynchronously on a best-effort basis."
+          },
+          "400": {
+            "description": "Malformed path parameter.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, malformed, or invalid bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks function.manage.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such package, or the caller cannot see it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A published agent version still grants this package, or a session still holds it. Delete the dependent agents or sessions first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "functions"
+        ],
+        "summary": "Rename a function package",
+        "operationId": "rename_function",
+        "parameters": [
+          {
+            "name": "function_id",
+            "in": "path",
+            "description": "Function package id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenameFunctionBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Renamed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FunctionBody"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed body, a display name outside the bound, or a malformed path parameter.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, malformed, or invalid bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks function.manage.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such package, or the caller cannot see it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/functions/{function_id}/versions": {
+      "get": {
+        "tags": [
+          "functions"
+        ],
+        "summary": "List a function package's versions",
+        "operationId": "list_function_versions",
+        "parameters": [
+          {
+            "name": "function_id",
+            "in": "path",
+            "description": "Function package id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "maximum": 200,
+              "minimum": 1
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "description": "Rows past this id in `order`'s direction: a page's `next_cursor`.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "description": "Rows just before this id, still in `order`'s direction: a page's `prev_cursor`.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "description": "Newest first when omitted.",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/OrderParam"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page, newest first unless order=asc.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageOut_FunctionVersionBody"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad limit, cursor, order, or path parameter.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, malformed, or invalid bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks function.read.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such package, or the caller cannot see it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "functions"
+        ],
+        "summary": "Push a function package version",
+        "description": "A version is immutable once pushed: a change is a new version.",
+        "operationId": "push_function_version",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Retry the same operation with this key to return its saved receipt. Scoped by the operation's authenticated caller or resource. A different input under the same key returns 409. Receipts are retained for at least 7 days after completion, then removed by an hourly sweep. After removal the key can execute again. Fresh-only secrets are never included in a replay.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 255,
+              "minLength": 1
+            }
+          },
+          {
+            "name": "function_id",
+            "in": "path",
+            "description": "Function package id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "A gzipped tar holding subako-package.json and module.wasm at its root.",
+          "content": {
+            "application/gzip": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "The newly pushed version.",
+            "headers": {
+              "Idempotency-Replayed": {
+                "schema": {
+                  "type": "boolean"
+                },
+                "description": "True when returning a saved receipt."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FunctionVersionBody"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed archive, a bundle validation failure, or a malformed path parameter.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, malformed, or invalid bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks function.manage.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such package, or the caller cannot see it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Idempotency-Key was already used for a different request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request body exceeds the upload size limit.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/functions/{function_id}/versions/{version}": {
+      "get": {
+        "tags": [
+          "functions"
+        ],
+        "summary": "Get a function package version",
+        "operationId": "get_function_version",
+        "parameters": [
+          {
+            "name": "function_id",
+            "in": "path",
+            "description": "Function package id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "description": "Version number, counting from 1",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The version.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FunctionVersionBody"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed path parameter.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, malformed, or invalid bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks function.read.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such package or version, or the caller cannot see it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/v1/me": {
       "get": {
         "tags": [
@@ -3032,6 +3897,93 @@
             "bearer": []
           }
         ]
+      },
+      "patch": {
+        "tags": [
+          "sessions"
+        ],
+        "summary": "Rename a session",
+        "description": "The name becomes the caller's: an agent whose display-name grant reads `until_user_edits` stops renaming the session, unless the name is empty. A `session_display_name_changed` event announces it on the session's log.",
+        "operationId": "rename_session",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "description": "Session id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenameSessionBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The renamed session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionBody"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed body or path parameter, or a display_name over 200 characters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, malformed, or invalid bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "A workspace credential lacking session.manage. A session token may rename only its own session and never lands here.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such session, or the caller cannot see it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
       }
     },
     "/v1/sessions/{session_id}/approvals/{call_id}": {
@@ -4648,6 +5600,431 @@
         ]
       }
     },
+    "/v1/sessions/{session_id}/volume": {
+      "delete": {
+        "tags": [
+          "sessions"
+        ],
+        "summary": "Delete a session tree's volume files",
+        "description": "Removes every file in the volume; the tree's functions start from an empty one.",
+        "operationId": "delete_volume",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "description": "Session id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The volume is empty."
+          },
+          "400": {
+            "description": "Malformed path parameter.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, malformed, or invalid bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "A workspace credential lacking session.manage. A session token may act only on its own session and never lands here.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such session, or the caller cannot see it, or the tree has no function grant, or the deployment runs no functions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/sessions/{session_id}/volume/files": {
+      "get": {
+        "tags": [
+          "sessions"
+        ],
+        "summary": "List a session tree's volume files",
+        "description": "Every session of a tree shares its root's volume, so any of them names it.",
+        "operationId": "list_volume_files",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "description": "Session id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "prefix",
+            "in": "query",
+            "description": "The volume path to list beneath, `/tmp` when omitted.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Every entry beneath the prefix. Empty for a tree whose functions have written nothing yet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VolumeFileListBody"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed path parameter or prefix, or a /data prefix the root agent does not enable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, malformed, or invalid bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "A workspace credential lacking session.read. A session token carries no permissions and never lands here.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such session, or the caller cannot see it, or the tree has no function grant, or the deployment runs no functions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/sessions/{session_id}/volume/files/{path}": {
+      "get": {
+        "tags": [
+          "sessions"
+        ],
+        "summary": "Download a volume file",
+        "operationId": "get_volume_file",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "description": "Session id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "path",
+            "in": "path",
+            "description": "The volume path without its leading slash, e.g. `tmp/notes.txt`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The file's bytes.",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed path parameter, or a /data path the root agent does not enable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, malformed, or invalid bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "A workspace credential lacking session.read. A session token carries no permissions and never lands here.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such session or file, or the caller cannot see it, or the tree has no function grant, or the deployment runs no functions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "sessions"
+        ],
+        "summary": "Upload a volume file",
+        "description": "Creates the file and its parent directories, or replaces the file.",
+        "operationId": "put_volume_file",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "description": "Session id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "path",
+            "in": "path",
+            "description": "The volume path without its leading slash, e.g. `tmp/notes.txt`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "The file's bytes, at most 1 GiB.",
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The file as written.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VolumeFileWrittenBody"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed path parameter, a /data path the root agent does not enable, a path the volume cannot hold, or a body over 1 GiB.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, malformed, or invalid bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "A workspace credential lacking session.manage, an organization suspended or out of credit, or a volume its last hourly measurement found at or over its 10 GiB quota; reads and deletes still work, and writes resume once a measurement finds it under. A session token may act only on its own session and never lands here.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such session, or the caller cannot see it, or the tree has no function grant, or the deployment runs no functions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "sessions"
+        ],
+        "summary": "Delete a volume file",
+        "description": "Removes a file, or a directory and everything beneath it.",
+        "operationId": "delete_volume_file",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "description": "Session id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "path",
+            "in": "path",
+            "description": "The volume path without its leading slash, e.g. `tmp/notes.txt`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The entry was removed."
+          },
+          "400": {
+            "description": "Malformed path parameter, or a /data path the root agent does not enable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, malformed, or invalid bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "A workspace credential lacking session.manage. A session token may act only on its own session and never lands here.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such session or file, or the caller cannot see it, or the tree has no function grant, or the deployment runs no functions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/v1/skills": {
       "get": {
         "tags": [
@@ -6169,7 +7546,7 @@
           "vaults"
         ],
         "summary": "Add a credential",
-        "description": "The payload is sealed on the way in and is never returned by any route.",
+        "description": "The payload is sealed on the way in and is never returned by any route. An `mcp` credential targets its server's URL and is `oauth` or `static_bearer`; an `http` one targets an origin (`https://host[:port]`, nothing past it) and is `header`, a list of headers sent with every request to it.",
         "operationId": "add_credential",
         "parameters": [
           {
@@ -6224,7 +7601,7 @@
             }
           },
           "400": {
-            "description": "Malformed body.",
+            "description": "Malformed body, including an auth scheme the protocol does not take; a header named twice; or an `http` target that is not an origin, or one the deployment's network policy does not reach.",
             "content": {
               "application/json": {
                 "schema": {
@@ -6669,7 +8046,7 @@
             }
           },
           "400": {
-            "description": "Malformed path parameter; or the server or its provider's token endpoint could not be reached, or the deployment's network policy does not reach it.",
+            "description": "Malformed path parameter; an `http` credential, which has no server to check; or the server or its provider's token endpoint could not be reached, or the deployment's network policy does not reach it.",
             "content": {
               "application/json": {
                 "schema": {
@@ -7843,30 +9220,66 @@
         }
       },
       "AddCredentialBody": {
-        "type": "object",
-        "required": [
-          "protocol",
-          "target",
-          "display_name",
-          "payload"
-        ],
-        "properties": {
-          "display_name": {
-            "type": "string",
-            "maxLength": 200
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "target",
+              "display_name",
+              "payload",
+              "protocol"
+            ],
+            "properties": {
+              "display_name": {
+                "type": "string",
+                "maxLength": 200
+              },
+              "payload": {
+                "$ref": "#/components/schemas/McpPayloadBody"
+              },
+              "protocol": {
+                "type": "string",
+                "enum": [
+                  "mcp"
+                ]
+              },
+              "target": {
+                "type": "string",
+                "description": "The MCP server's exact URL.",
+                "maxLength": 2048,
+                "minLength": 1
+              }
+            }
           },
-          "payload": {
-            "$ref": "#/components/schemas/CredentialPayloadBody"
-          },
-          "protocol": {
-            "$ref": "#/components/schemas/ProtocolBody"
-          },
-          "target": {
-            "type": "string",
-            "maxLength": 2048,
-            "minLength": 1
+          {
+            "type": "object",
+            "required": [
+              "target",
+              "display_name",
+              "payload",
+              "protocol"
+            ],
+            "properties": {
+              "display_name": {
+                "type": "string",
+                "maxLength": 200
+              },
+              "payload": {
+                "$ref": "#/components/schemas/HttpPayloadBody"
+              },
+              "protocol": {
+                "type": "string",
+                "enum": [
+                  "http"
+                ]
+              },
+              "target": {
+                "$ref": "#/components/schemas/HttpOriginBody"
+              }
+            }
           }
-        }
+        ],
+        "description": "A new credential: what it authenticates against, and how. The protocol\ndecides which auth schemes the payload may take."
       },
       "AddWorkspaceMemberBody": {
         "type": "object",
@@ -7918,6 +9331,16 @@
           "model"
         ],
         "properties": {
+          "builtin": {
+            "$ref": "#/components/schemas/BuiltinGrantsBody",
+            "description": "The servers the platform serves itself, one setting per server under\nits fixed name. A setting left out takes its default."
+          },
+          "functions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FunctionGrantBody"
+            }
+          },
           "mcp": {
             "type": "array",
             "items": {
@@ -7944,6 +9367,10 @@
               "string",
               "null"
             ]
+          },
+          "volume": {
+            "$ref": "#/components/schemas/VolumeConfigBody",
+            "description": "The session tree's file volume. Only the root session's config is\nread; a child's is ignored."
           }
         }
       },
@@ -8355,13 +9782,15 @@
         ],
         "description": "How to answer a held call. Only a denial carries a message, which reaches\nthe model in place of the tool's result."
       },
-      "AuthSchemeBody": {
-        "type": "string",
-        "description": "How a credential authenticates against its target: an OAuth grant this\nvault refreshes, or a bearer token supplied once.",
-        "enum": [
-          "oauth",
-          "static_bearer"
-        ]
+      "BuiltinGrantsBody": {
+        "type": "object",
+        "description": "The servers the platform serves itself, each at `builtin:{key}`.",
+        "properties": {
+          "session_display_name": {
+            "$ref": "#/components/schemas/SessionDisplayNameGrantBody",
+            "description": "Whether the agent names the session it runs in, through the\n`builtin:session_display_name` server. `never` when left out."
+          }
+        }
       },
       "CancelOutcomeBody": {
         "type": "object",
@@ -8916,42 +10345,99 @@
         }
       },
       "CredentialBody": {
-        "type": "object",
-        "description": "A credential's metadata: what it authenticates against and how. The\npayload it seals is never returned, by this route or any other.",
-        "required": [
-          "id",
-          "vault_id",
-          "protocol",
-          "auth_scheme",
-          "target",
-          "display_name",
-          "status"
-        ],
-        "properties": {
-          "auth_scheme": {
-            "$ref": "#/components/schemas/AuthSchemeBody"
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "id",
+              "vault_id",
+              "auth_scheme",
+              "target",
+              "display_name",
+              "status",
+              "protocol"
+            ],
+            "properties": {
+              "auth_scheme": {
+                "$ref": "#/components/schemas/McpSchemeBody"
+              },
+              "display_name": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "protocol": {
+                "type": "string",
+                "enum": [
+                  "mcp"
+                ]
+              },
+              "status": {
+                "$ref": "#/components/schemas/CredentialStatusBody"
+              },
+              "target": {
+                "type": "string",
+                "description": "The MCP server's exact URL."
+              },
+              "vault_id": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
           },
-          "display_name": {
-            "type": "string"
-          },
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "protocol": {
-            "$ref": "#/components/schemas/ProtocolBody"
-          },
-          "status": {
-            "$ref": "#/components/schemas/CredentialStatusBody"
-          },
-          "target": {
-            "type": "string"
-          },
-          "vault_id": {
-            "type": "string",
-            "format": "uuid"
+          {
+            "type": "object",
+            "required": [
+              "id",
+              "vault_id",
+              "auth_scheme",
+              "target",
+              "headers",
+              "display_name",
+              "status",
+              "protocol"
+            ],
+            "properties": {
+              "auth_scheme": {
+                "$ref": "#/components/schemas/HttpSchemeBody"
+              },
+              "display_name": {
+                "type": "string"
+              },
+              "headers": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/CredentialHeaderNameBody"
+                },
+                "description": "Every header the credential is sent as, in the order it was added."
+              },
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "protocol": {
+                "type": "string",
+                "enum": [
+                  "http"
+                ]
+              },
+              "status": {
+                "$ref": "#/components/schemas/CredentialStatusBody"
+              },
+              "target": {
+                "type": "string",
+                "description": "The origin, as the vault stores it."
+              },
+              "vault_id": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
           }
-        }
+        ],
+        "description": "A credential's metadata: what it authenticates against and how. The\npayload it seals is never returned, by this route or any other."
       },
       "CredentialCheckResult": {
         "type": "string",
@@ -8986,61 +10472,40 @@
           }
         }
       },
-      "CredentialPayloadBody": {
-        "oneOf": [
-          {
-            "type": "object",
-            "required": [
-              "access_token",
-              "auth_scheme"
-            ],
-            "properties": {
-              "access_token": {
-                "type": "string"
-              },
-              "auth_scheme": {
-                "type": "string",
-                "enum": [
-                  "oauth"
-                ]
-              },
-              "expires_at": {
-                "type": [
-                  "string",
-                  "null"
-                ]
-              },
-              "refresh": {
-                "oneOf": [
-                  {
-                    "type": "null"
-                  },
-                  {
-                    "$ref": "#/components/schemas/RefreshBlockBody"
-                  }
-                ]
-              }
-            }
+      "CredentialHeaderBody": {
+        "type": "object",
+        "description": "One header an `http` credential is sent as.",
+        "required": [
+          "name",
+          "value"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "An HTTP token, compared without regard to case and stored in\nlowercase. A header the client or a proxy owns (`host`,\n`content-length`, `transfer-encoding`, `connection`, `keep-alive`,\n`te`, `trailer`, `upgrade`, `proxy-*`) is refused.",
+            "maxLength": 256,
+            "minLength": 1
           },
-          {
-            "type": "object",
-            "required": [
-              "token",
-              "auth_scheme"
-            ],
-            "properties": {
-              "auth_scheme": {
-                "type": "string",
-                "enum": [
-                  "static_bearer"
-                ]
-              },
-              "token": {
-                "type": "string"
-              }
-            }
+          "value": {
+            "type": "string",
+            "description": "Visible characters, with spaces or tabs only between them; at most\n8192 bytes.",
+            "maxLength": 8192,
+            "minLength": 1
           }
-        ]
+        }
+      },
+      "CredentialHeaderNameBody": {
+        "type": "object",
+        "description": "A header an `http` credential is sent as, by name only: its value is\nnever returned.",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The header's name, in lowercase."
+          }
+        }
       },
       "CredentialStatusBody": {
         "type": "string",
@@ -9128,6 +10593,23 @@
           }
         }
       },
+      "DisplayNameAuthorBody": {
+        "type": "string",
+        "description": "Who wrote a session's display name.",
+        "enum": [
+          "user",
+          "agent"
+        ]
+      },
+      "DisplayNameWhenBody": {
+        "type": "string",
+        "description": "Which session display names the agent may overwrite.",
+        "enum": [
+          "never",
+          "empty",
+          "until_user_edits"
+        ]
+      },
       "EnvironmentRefBody": {
         "oneOf": [
           {
@@ -9197,6 +10679,345 @@
           }
         }
       },
+      "FunctionAssetsBody": {
+        "type": "object",
+        "description": "The files under a bundle's `assets/`, which Core stores as one archive and\na call's module reads read-only at `/package`. `sha256` is the hex SHA-256\nof that archive and `bytes` its size.",
+        "required": [
+          "sha256",
+          "bytes"
+        ],
+        "properties": {
+          "bytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "sha256": {
+            "type": "string"
+          }
+        }
+      },
+      "FunctionBody": {
+        "type": "object",
+        "description": "A function package's identity and current state. `name` and\n`description` are the latest version's manifest; `display_name` is the\nplatform label, empty when unset. `updated_at` is when the latest version\nwas pushed.",
+        "required": [
+          "id",
+          "display_name",
+          "name",
+          "description",
+          "latest_version",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "description": {
+            "type": "string"
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "latest_version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "name": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "FunctionGrantBody": {
+        "type": "object",
+        "description": "Grants access to the tools of one function package.",
+        "required": [
+          "name",
+          "source",
+          "default_policy"
+        ],
+        "properties": {
+          "default_policy": {
+            "$ref": "#/components/schemas/PolicyActionBody",
+            "description": "Applies to any tool not named in `tools`, including one the package\nadds after this version is published."
+          },
+          "http_credentials": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HttpOriginBody"
+            },
+            "description": "Origins whose credential, from the session's vaults, is attached to\neach request the package sends there. Each must be reachable under\n`network` and listed once. A call is refused, naming the origin, when\nthe session's vaults hold none, more than one, or one that must be\nreconnected.",
+            "maxItems": 16
+          },
+          "name": {
+            "type": "string",
+            "description": "The broker serves the package at `fn:{name}`. Unique within\n`functions`; `parent` is reserved.",
+            "maxLength": 32,
+            "pattern": "^[a-z0-9-]+$"
+          },
+          "network": {
+            "$ref": "#/components/schemas/FunctionNetworkBody",
+            "description": "Which hosts the package's HTTP requests may reach; `none` when\nomitted."
+          },
+          "source": {
+            "$ref": "#/components/schemas/FunctionSourceBody"
+          },
+          "timeout_secs": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "How long one call may run, in seconds; 60 when unset.",
+            "maximum": 300,
+            "minimum": 1
+          },
+          "tools": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ToolRuleBody"
+            }
+          }
+        }
+      },
+      "FunctionManifestBody": {
+        "type": "object",
+        "description": "A version's `subako-package.json`.",
+        "required": [
+          "name",
+          "description",
+          "functions"
+        ],
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "functions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ManifestFunctionBody"
+            }
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "FunctionNetworkBody": {
+        "oneOf": [
+          {
+            "type": "object",
+            "description": "No request leaves.",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "none"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Any public host.",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "unrestricted"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Only the hosts a pattern admits.",
+            "required": [
+              "hosts",
+              "type"
+            ],
+            "properties": {
+              "hosts": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/HostPatternBody"
+                },
+                "maxItems": 64,
+                "minItems": 1
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "allowlist"
+                ]
+              }
+            }
+          }
+        ],
+        "description": "Where a function's HTTP requests may go. Every variant refuses private\nand metadata addresses."
+      },
+      "FunctionSourceBody": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "package",
+              "type"
+            ],
+            "properties": {
+              "package": {
+                "type": "string",
+                "maxLength": 32,
+                "pattern": "^[a-z0-9-]+$"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "platform"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "function_id",
+              "version",
+              "type"
+            ],
+            "properties": {
+              "function_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "workspace"
+                ]
+              },
+              "version": {
+                "$ref": "#/components/schemas/VersionPinBody",
+                "description": "Resolved when each session is created, including child sessions.\n`latest` selects the newest version then; later uploads affect new\nsessions without republishing the agent."
+              }
+            }
+          }
+        ],
+        "description": "Where the package comes from. `platform` names a package the deployment\nships, e.g. `files`; `workspace` names one this workspace uploaded."
+      },
+      "FunctionVersionBody": {
+        "type": "object",
+        "description": "One immutable package version. `module_sha256` is the hex SHA-256 of its\n`module.wasm`; `assets` is null for a bundle without an `assets/`\ndirectory.",
+        "required": [
+          "id",
+          "function_id",
+          "version",
+          "manifest",
+          "module_sha256",
+          "module_bytes",
+          "assets",
+          "created_at"
+        ],
+        "properties": {
+          "assets": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/FunctionAssetsBody"
+              }
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "function_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "manifest": {
+            "$ref": "#/components/schemas/FunctionManifestBody"
+          },
+          "module_bytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "module_sha256": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "HostPatternBody": {
+        "type": "string",
+        "description": "`api.example.com` admits that host alone; `*.example.com` admits every subdomain of `example.com`, but not `example.com` itself. An IP address is admitted only when spelled out exactly.",
+        "maxLength": 253,
+        "pattern": "^(\\*\\.)?[a-z0-9-]+(\\.[a-z0-9-]+)+$"
+      },
+      "HttpOriginBody": {
+        "type": "string",
+        "description": "`https://host[:port]`, nothing past the authority; plain `http` only where the deployment allows it. The host is lowercased and a default port dropped, as the vault stores a credential's target.",
+        "maxLength": 2048
+      },
+      "HttpPayloadBody": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "headers",
+              "auth_scheme"
+            ],
+            "properties": {
+              "auth_scheme": {
+                "type": "string",
+                "enum": [
+                  "header"
+                ]
+              },
+              "headers": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/CredentialHeaderBody"
+                },
+                "description": "Each name at most once.",
+                "maxItems": 16,
+                "minItems": 1
+              }
+            }
+          }
+        ],
+        "description": "How an `http` credential authenticates: headers sent with every request\nto its origin."
+      },
+      "HttpSchemeBody": {
+        "type": "string",
+        "description": "How an `http` credential authenticates against its origin.",
+        "enum": [
+          "header"
+        ]
+      },
       "InputSourceBody": {
         "type": "string",
         "description": "How a user turn reached the session.",
@@ -9258,9 +11079,35 @@
           "session.manage",
           "skill.read",
           "skill.manage",
+          "function.read",
+          "function.manage",
           "model_provider.read",
           "model_provider.manage"
         ]
+      },
+      "ManifestFunctionBody": {
+        "type": "object",
+        "description": "One function a package serves as a tool.",
+        "required": [
+          "name",
+          "description",
+          "input_schema",
+          "output_schema"
+        ],
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "input_schema": {
+            "description": "JSON Schema for the tool's arguments."
+          },
+          "name": {
+            "type": "string"
+          },
+          "output_schema": {
+            "description": "JSON Schema for the tool's output."
+          }
+        }
       },
       "McpGrantBody": {
         "type": "object",
@@ -9291,6 +11138,71 @@
             "type": "string"
           }
         }
+      },
+      "McpPayloadBody": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "access_token",
+              "auth_scheme"
+            ],
+            "properties": {
+              "access_token": {
+                "type": "string"
+              },
+              "auth_scheme": {
+                "type": "string",
+                "enum": [
+                  "oauth"
+                ]
+              },
+              "expires_at": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "refresh": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/RefreshBlockBody"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "token",
+              "auth_scheme"
+            ],
+            "properties": {
+              "auth_scheme": {
+                "type": "string",
+                "enum": [
+                  "static_bearer"
+                ]
+              },
+              "token": {
+                "type": "string"
+              }
+            }
+          }
+        ],
+        "description": "How an `mcp` credential authenticates: an OAuth grant this vault\nrefreshes, or a bearer token supplied once."
+      },
+      "McpSchemeBody": {
+        "type": "string",
+        "description": "How an `mcp` credential authenticates against its server.",
+        "enum": [
+          "oauth",
+          "static_bearer"
+        ]
       },
       "MeBody": {
         "type": "object",
@@ -10150,6 +12062,70 @@
           }
         }
       },
+      "PageOut_FunctionBody": {
+        "type": "object",
+        "required": [
+          "items",
+          "next_cursor",
+          "prev_cursor"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FunctionBody"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Pass back as `after` for the next page; `null` on the last page."
+          },
+          "prev_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Pass back as `before` for the previous page; `null` on the first page."
+          }
+        }
+      },
+      "PageOut_FunctionVersionBody": {
+        "type": "object",
+        "required": [
+          "items",
+          "next_cursor",
+          "prev_cursor"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FunctionVersionBody"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Pass back as `after` for the next page; `null` on the last page."
+          },
+          "prev_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Pass back as `before` for the previous page; `null` on the first page."
+          }
+        }
+      },
       "PageOut_InvitationBody": {
         "type": "object",
         "required": [
@@ -10543,11 +12519,27 @@
           "agents",
           "vaults",
           "skills",
+          "functions",
           "api_keys",
           "model_providers",
           "sessions",
           "members"
         ]
+      },
+      "PlatformFunctionListBody": {
+        "type": "object",
+        "description": "The packages this deployment ships, which an agent version grants by name\nrather than by id.",
+        "required": [
+          "packages"
+        ],
+        "properties": {
+          "packages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FunctionManifestBody"
+            }
+          }
+        }
       },
       "PlatformModelBody": {
         "type": "object",
@@ -10617,7 +12609,8 @@
         "type": "string",
         "description": "The protocol a credential's target speaks.",
         "enum": [
-          "mcp"
+          "mcp",
+          "http"
         ]
       },
       "PublishAgentVersionBody": {
@@ -10776,6 +12769,18 @@
           }
         }
       },
+      "RenameFunctionBody": {
+        "type": "object",
+        "required": [
+          "display_name"
+        ],
+        "properties": {
+          "display_name": {
+            "type": "string",
+            "maxLength": 200
+          }
+        }
+      },
       "RenameMeBody": {
         "type": "object",
         "required": [
@@ -10801,6 +12806,19 @@
         "properties": {
           "name": {
             "type": "string",
+            "maxLength": 200
+          }
+        }
+      },
+      "RenameSessionBody": {
+        "type": "object",
+        "required": [
+          "display_name"
+        ],
+        "properties": {
+          "display_name": {
+            "type": "string",
+            "description": "Empty clears the name, which leaves it to an agent holding the\ndisplay-name grant.",
             "maxLength": 200
           }
         }
@@ -10938,6 +12956,7 @@
           "agent_id",
           "agent_version_id",
           "display_name",
+          "display_name_author",
           "status",
           "created_by",
           "created_at"
@@ -10960,6 +12979,10 @@
           },
           "display_name": {
             "type": "string"
+          },
+          "display_name_author": {
+            "$ref": "#/components/schemas/DisplayNameAuthorBody",
+            "description": "Who wrote `display_name`: a caller, at creation or on a rename, or the\nagent through its display-name grant."
           },
           "id": {
             "type": "string",
@@ -11022,6 +13045,18 @@
           }
         ],
         "description": "Who created the session: the header-surface user or the API key a\nbackend presented."
+      },
+      "SessionDisplayNameGrantBody": {
+        "type": "object",
+        "description": "Whether the agent gets a `set` tool for the session's display name. A\nname a user wrote is never overwritten unless it is blank; `when` decides\nthe rest.",
+        "required": [
+          "when"
+        ],
+        "properties": {
+          "when": {
+            "$ref": "#/components/schemas/DisplayNameWhenBody"
+          }
+        }
       },
       "SessionEventBody": {
         "allOf": [
@@ -11536,6 +13571,29 @@
           },
           {
             "type": "object",
+            "description": "The session's display name changed, to `display_name` as `author`\nwrote it.",
+            "required": [
+              "display_name",
+              "author",
+              "type"
+            ],
+            "properties": {
+              "author": {
+                "$ref": "#/components/schemas/DisplayNameAuthorBody"
+              },
+              "display_name": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "session_display_name_changed"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
             "description": "Engine-defined state; `kind` is the engine's own dynamic event kind\nand `payload` passes through verbatim.",
             "required": [
               "kind",
@@ -11897,6 +13955,14 @@
           }
         }
       },
+      "StorageSubjectBody": {
+        "type": "string",
+        "description": "What a storage event held.",
+        "enum": [
+          "archive",
+          "volume"
+        ]
+      },
       "SubmitKindBody": {
         "type": "string",
         "description": "What the input did to the session.",
@@ -12192,9 +14258,10 @@
           },
           {
             "type": "object",
-            "description": "Bytes of a published workspace archive held over one interval.",
+            "description": "Bytes held over one interval: a published workspace archive, or a\nsession tree's volume, billed to its root.",
             "required": [
               "session_id",
+              "subject",
               "bytes",
               "duration_ms",
               "kind"
@@ -12217,6 +14284,92 @@
               "session_id": {
                 "type": "string",
                 "format": "uuid"
+              },
+              "subject": {
+                "$ref": "#/components/schemas/StorageSubjectBody"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "The worker's time on one function call.",
+            "required": [
+              "session_id",
+              "run_id",
+              "grant",
+              "tool",
+              "elapsed_ms",
+              "kind"
+            ],
+            "properties": {
+              "elapsed_ms": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "grant": {
+                "type": "string",
+                "description": "The grant the call went through, as the agent's config names it."
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "function_runtime"
+                ]
+              },
+              "run_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "session_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "tool": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Bytes written to a session tree's volume, as billed: by a function\ncall, which `run_id`, `grant`, and `tool` name, or by an upload, which\nleaves them absent.",
+            "required": [
+              "session_id",
+              "bytes",
+              "kind"
+            ],
+            "properties": {
+              "bytes": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "grant": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "volume_write"
+                ]
+              },
+              "run_id": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "uuid"
+              },
+              "session_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "tool": {
+                "type": [
+                  "string",
+                  "null"
+                ]
               }
             }
           }
@@ -12306,6 +14459,122 @@
           }
         ],
         "description": "The latest version at resolution time, or an exact one."
+      },
+      "VolumeConfigBody": {
+        "type": "object",
+        "description": "The roots the session tree's functions reach beyond `/tmp`.",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/VolumeDataBody",
+            "description": "`disabled` when left out."
+          }
+        }
+      },
+      "VolumeDataBody": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "disabled"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "enabled"
+                ]
+              }
+            }
+          }
+        ],
+        "description": "Whether the volume offers a persistent `/data` root. `enabled`\nmounts it for the session tree's functions."
+      },
+      "VolumeFileBody": {
+        "type": "object",
+        "required": [
+          "path",
+          "kind",
+          "size",
+          "modified"
+        ],
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/VolumeFileKindBody"
+          },
+          "modified": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the entry itself last changed, in UTC."
+          },
+          "path": {
+            "type": "string",
+            "description": "The entry's absolute volume path, e.g. `/tmp/notes.txt`."
+          },
+          "size": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Bytes for a file; 0 for a directory or a symlink.",
+            "minimum": 0
+          }
+        }
+      },
+      "VolumeFileKindBody": {
+        "type": "string",
+        "enum": [
+          "file",
+          "dir",
+          "symlink"
+        ]
+      },
+      "VolumeFileListBody": {
+        "type": "object",
+        "required": [
+          "entries",
+          "truncated"
+        ],
+        "properties": {
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VolumeFileBody"
+            }
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "True when the listing stopped before every entry beneath the prefix."
+          }
+        }
+      },
+      "VolumeFileWrittenBody": {
+        "type": "object",
+        "required": [
+          "path",
+          "bytes"
+        ],
+        "properties": {
+          "bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "path": {
+            "type": "string"
+          }
+        }
       },
       "WorkspaceBody": {
         "type": "object",
@@ -12406,6 +14675,10 @@
     {
       "name": "skills",
       "description": "Versioned bundles an agent may be granted."
+    },
+    {
+      "name": "functions",
+      "description": "Versioned WebAssembly packages whose functions an agent may be granted as tools."
     },
     {
       "name": "vaults",

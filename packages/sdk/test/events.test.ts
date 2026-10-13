@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ContentBlockBody, MessageBody, SessionEventBody } from "../src/index.js";
-import { isRunning, pendingApprovals, transcript } from "../src/index.js";
+import { isRunning, latestDisplayName, pendingApprovals, transcript } from "../src/index.js";
 import { EMPTY_TRANSCRIPT, foldTranscript } from "../src/events.js";
 
 /** When every event here was appended; the helpers read no time. */
@@ -152,6 +152,27 @@ describe("isRunning", () => {
 
 	it("ignores everything that is not a run", () => {
 		expect(isRunning([result(1, "call-1", "done")])).toBe(false);
+	});
+});
+
+describe("latestDisplayName", () => {
+	const renamed = (seq: number, name: string, author: "user" | "agent"): SessionEventBody => ({
+		seq,
+		created_at: AT,
+		type: "session_display_name_changed",
+		display_name: name,
+		author,
+	});
+
+	it("answers with undefined while the log announced no name", () => {
+		expect(latestDisplayName([])).toBeUndefined();
+		expect(latestDisplayName([result(1, "call-1", "done")])).toBeUndefined();
+	});
+
+	it("answers with the last announcement, as the event itself", () => {
+		const last = renamed(3, "Trip plan", "user");
+
+		expect(latestDisplayName([renamed(1, "Trip", "agent"), result(2, "call-1", "done"), last])).toBe(last);
 	});
 });
 

@@ -39,7 +39,156 @@ describe("readAgentConfig", () => {
 			mcp: [],
 			skills: [],
 			sandboxes: [],
+			builtin: { session_display_name: { when: "never" } },
+			functions: [],
+			volume: { data: { type: "disabled" } },
 		});
+	});
+
+	it("reads function grants and the volume setting", () => {
+		const config = readAgentConfig(
+			stored({
+				model: sonnet,
+				functions: [
+					{
+						name: "csv",
+						source: { type: "platform", package: "csv-tools" },
+						default_policy: "allow",
+						tools: [{ name: "parse", policy: "deny" }],
+						timeout_secs: 300,
+					},
+					{ name: "files", source: { type: "platform", package: "files" }, default_policy: "allow" },
+				],
+				volume: { data: { type: "enabled" } },
+			}),
+		);
+		expect(config.functions).toEqual([
+			{
+				name: "csv",
+				source: { type: "platform", package: "csv-tools" },
+				default_policy: "allow",
+				tools: [{ name: "parse", policy: "deny" }],
+				timeout_secs: 300,
+				network: { type: "none" },
+				http_credentials: [],
+			},
+			{
+				name: "files",
+				source: { type: "platform", package: "files" },
+				default_policy: "allow",
+				tools: [],
+				timeout_secs: null,
+				network: { type: "none" },
+				http_credentials: [],
+			},
+		]);
+		expect(config.volume).toEqual({ data: { type: "enabled" } });
+	});
+
+	it("reads a function grant's network and credential origins", () => {
+		const grant = (network: unknown, http_credentials?: unknown) => ({
+			name: "web",
+			source: { type: "platform", package: "http" },
+			default_policy: "allow",
+			network,
+			http_credentials,
+		});
+		const config = readAgentConfig(
+			stored({
+				model: sonnet,
+				functions: [
+					grant({ type: "allowlist", hosts: ["api.example.com", "*.example.org"] }, ["https://api.example.com"]),
+					grant({ type: "unrestricted" }),
+					grant({ type: "none" }),
+				],
+			}),
+		);
+		expect(config.functions.map(({ network, http_credentials }) => ({ network, http_credentials }))).toEqual([
+			{
+				network: { type: "allowlist", hosts: ["api.example.com", "*.example.org"] },
+				http_credentials: ["https://api.example.com"],
+			},
+			{ network: { type: "unrestricted" }, http_credentials: [] },
+			{ network: { type: "none" }, http_credentials: [] },
+		]);
+		expect(failure({ model: sonnet, functions: [grant({ type: "proxy" })] }).path).toBe("functions[0].network.type");
+		expect(failure({ model: sonnet, functions: [grant({ type: "none", hosts: [] })] }).path).toBe(
+			"functions[0].network.hosts",
+		);
+		expect(failure({ model: sonnet, functions: [grant({ type: "allowlist", hosts: [1] })] }).path).toBe(
+			"functions[0].network.hosts[0]",
+		);
+		expect(failure({ model: sonnet, functions: [grant({ type: "unrestricted" }, "https://a.example")] }).path).toBe(
+			"functions[0].http_credentials",
+		);
+	});
+
+	it("reads a workspace function source with its version pin", () => {
+		const config = readAgentConfig(
+			stored({
+				model: sonnet,
+				functions: [
+					{
+						name: "csv",
+						source: { type: "workspace", function_id: "fn1", version: { type: "pinned", number: 2 } },
+						default_policy: "allow",
+					},
+					{
+						name: "latest",
+						source: { type: "workspace", function_id: "fn2", version: { type: "latest" } },
+						default_policy: "deny",
+					},
+				],
+			}),
+		);
+		expect(config.functions.map((grant) => grant.source)).toEqual([
+			{ type: "workspace", function_id: "fn1", version: { type: "pinned", number: 2 } },
+			{ type: "workspace", function_id: "fn2", version: { type: "latest" } },
+		]);
+	});
+
+	it("refuses a function source it cannot spell, and a volume it cannot spell", () => {
+		const grant = (source: unknown) => ({ name: "csv", source, default_policy: "allow" });
+		const platform = { type: "platform", package: "csv-tools" };
+		expect(failure({ model: sonnet, functions: [grant({ type: "remote", package: "x" })] }).path).toBe(
+			"functions[0].source.type",
+		);
+		expect(failure({ model: sonnet, functions: [grant({ ...platform, function_id: "fn1" })] }).path).toBe(
+			"functions[0].source.function_id",
+		);
+		expect(
+			failure({
+				model: sonnet,
+				functions: [grant({ type: "workspace", function_id: "fn1", version: { type: "pinned", number: 0 } })],
+			}).path,
+		).toBe("functions[0].source.version.number");
+		expect(failure({ model: sonnet, functions: [grant({ type: "workspace", function_id: "fn1" })] }).path).toBe(
+			"functions[0].source.version",
+		);
+		expect(failure({ model: sonnet, functions: [{ ...grant(platform), timeout_secs: 0 }] }).path).toBe(
+			"functions[0].timeout_secs",
+		);
+		expect(failure({ model: sonnet, volume: { data: { type: "readonly" } } }).path).toBe("volume.data.type");
+		expect(failure({ model: sonnet, volume: { size: 1 } }).path).toBe("volume.size");
+	});
+
+	it("reads the display-name setting under builtin, absent as never", () => {
+		for (const when of ["never", "empty", "until_user_edits"] as const) {
+			expect(readAgentConfig(stored({ model: sonnet, builtin: { session_display_name: { when } } })).builtin).toEqual({
+				session_display_name: { when },
+			});
+		}
+		expect(readAgentConfig(stored({ model: sonnet, builtin: {} })).builtin).toEqual({
+			session_display_name: { when: "never" },
+		});
+		expect(failure({ model: sonnet, builtin: { session_display_name: null } }).path).toBe(
+			"builtin.session_display_name",
+		);
+		expect(failure({ model: sonnet, builtin: { session_display_name: { when: "always" } } }).path).toBe(
+			"builtin.session_display_name.when",
+		);
+		expect(failure({ model: sonnet, builtin: { subagent: {} } }).path).toBe("builtin.subagent");
+		expect(failure({ model: sonnet, session_display_name: { when: "empty" } }).path).toBe("session_display_name");
 	});
 
 	it("flattens each model format into the shape publishing takes", () => {
@@ -181,6 +330,9 @@ describe("readAgentConfig", () => {
 					tools: [],
 				},
 			],
+			builtin: { session_display_name: { when: "never" } },
+			functions: [],
+			volume: { data: { type: "disabled" } },
 		});
 	});
 

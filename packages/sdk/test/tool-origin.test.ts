@@ -6,7 +6,13 @@ describe("toolOrigin", () => {
 		expect(toolOrigin("mcp__rooms__lookup")).toEqual({ kind: "mcp", source: "rooms", tool: "lookup" });
 		expect(toolOrigin("skill__review__read")).toEqual({ kind: "skill", source: "review", tool: "read" });
 		expect(toolOrigin("sandbox__py-3__exec")).toEqual({ kind: "sandbox", source: "py-3", tool: "exec" });
+		expect(toolOrigin("fn__files__write")).toEqual({ kind: "fn", source: "files", tool: "write" });
 		expect(toolOrigin("client__page__fill_form")).toEqual({ kind: "client", source: "page", tool: "fill_form" });
+		expect(toolOrigin("builtin__session_display_name__set")).toEqual({
+			kind: "builtin",
+			source: "session_display_name",
+			tool: "set",
+		});
 	});
 
 	it("keeps a tool name that carries the separator itself whole", () => {

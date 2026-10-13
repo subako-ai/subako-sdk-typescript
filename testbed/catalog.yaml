@@ -21,3 +21,9 @@ rates:
         output: "1"
   harness:
     pi: "0.00000001"
+  function:
+    standard: "0.00000001"
+  volume:
+    write: "0.00000001"
+  storage:
+    volume: "0.00000001"

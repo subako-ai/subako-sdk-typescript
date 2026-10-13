@@ -5,6 +5,20 @@ import type { IdPaged } from "../pagination.js";
 import { type ConnectOptions, SessionConnection } from "../session.js";
 
 export type ListSessionsParams = IdPaged<NonNullable<api.ListSessionsData["query"]>>;
+export type ListVolumeFilesParams = NonNullable<api.ListVolumeFilesData["query"]>;
+
+/** The bytes of a volume file; text goes up as UTF-8. */
+export type VolumeFileContent = Blob | ArrayBuffer | Uint8Array | string;
+
+/** The route's path parameter: the volume path without its leading slash, which the client encodes whole. */
+const volumeRoute = (sessionId: string, path: string) => ({
+	session_id: sessionId,
+	path: path.replace(/^\/+/, ""),
+});
+
+const volumeBytes = (content: VolumeFileContent): Blob | Uint8Array =>
+	content instanceof Blob || content instanceof Uint8Array ? content : new Blob([content]);
+
 export type ListSessionEventsParams = NonNullable<api.ListSessionEventsData["query"]>;
 
 /** The routes a session token reaches, which `SubakoClient.sessions` and `SubakoSessionClient` both bind. */
@@ -14,6 +28,14 @@ export class SessionApi {
 	/** Reads one session. */
 	get(sessionId: string, options?: RequestOptions) {
 		return this.core.call(api.getSession, { path: { session_id: sessionId } }, options);
+	}
+
+	/**
+	 * Renames a session. The name becomes the caller's, so an agent granted
+	 * `until_user_edits` stops renaming it; an empty name hands it back to the agent.
+	 */
+	rename(sessionId: string, params: api.RenameSessionBody, options?: RequestOptions) {
+		return this.core.call(api.renameSession, { path: { session_id: sessionId }, body: params }, options);
 	}
 
 	/**
@@ -67,6 +89,31 @@ export class SessionApi {
 	/** Deletes a retired sandbox's archive, which stops the storage it is billed for. */
 	deleteSandboxArchive(sessionId: string, name: string, options?: RequestOptions) {
 		return this.core.call(api.deleteSessionSandboxArchive, { path: { session_id: sessionId, name } }, options);
+	}
+
+	/** Lists the session tree's volume files beneath `prefix`, `/tmp` when omitted. */
+	listVolumeFiles(sessionId: string, params?: ListVolumeFilesParams, options?: RequestOptions) {
+		return this.core.call(api.listVolumeFiles, { path: { session_id: sessionId }, query: params }, options);
+	}
+
+	/** Downloads a volume file by its absolute path, such as `/tmp/a.txt`. */
+	readVolumeFile(sessionId: string, path: string, options?: RequestOptions) {
+		return this.core.download(api.getVolumeFile, { path: volumeRoute(sessionId, path) }, options);
+	}
+
+	/** Creates or replaces a volume file, and its parent directories, at an absolute path such as `/tmp/a.txt`. */
+	writeVolumeFile(sessionId: string, path: string, content: VolumeFileContent, options?: RequestOptions) {
+		return this.core.upload(api.putVolumeFile, { path: volumeRoute(sessionId, path) }, volumeBytes(content), options);
+	}
+
+	/** Removes a volume file, or a directory and everything beneath it. */
+	deleteVolumeFile(sessionId: string, path: string, options?: RequestOptions) {
+		return this.core.call(api.deleteVolumeFile, { path: volumeRoute(sessionId, path) }, options);
+	}
+
+	/** Removes every file in the session tree's volume. */
+	deleteVolume(sessionId: string, options?: RequestOptions) {
+		return this.core.call(api.deleteVolume, { path: { session_id: sessionId } }, options);
 	}
 
 	/** Registers a tool-serving client and the tools it serves for the rest of the session. */
