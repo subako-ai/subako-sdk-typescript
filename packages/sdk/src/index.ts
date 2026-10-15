@@ -26,10 +26,18 @@ export {
 export {
 	type ApprovalState,
 	type DisplayNameChange,
+	EMPTY_LIVE,
+	foldDelta,
 	isRunning,
 	latestDisplayName,
+	type LiveBlock,
+	type LiveMessage,
+	type LiveState,
+	type LiveTarget,
+	liveKey,
 	type PendingApproval,
 	pendingApprovals,
+	settleLive,
 	type ToolCallResult,
 	transcript,
 	type TranscriptMessage,
@@ -40,16 +48,17 @@ export type { IdCursor, IdPaged, PreviousPage } from "./pagination.js";
 export { SubakoSessionClient, type SubakoSessionClientOptions } from "./session-client.js";
 export {
 	checkFunctionFiles,
+	FUNCTION_ABI,
 	FUNCTION_ASSET_PATH_MAX_BYTES,
 	FUNCTION_ASSETS_DIR,
 	FUNCTION_ASSETS_MAX_FILES,
 	FUNCTION_BUNDLE_MAX_BYTES,
 	FUNCTION_DESCRIPTION_MAX_CHARS,
 	FUNCTION_MANIFEST_MAX_BYTES,
-	FUNCTION_SCHEMA_MAX_BYTES,
 	FunctionBundleError,
 	type FunctionBundleProblem,
 	type FunctionFiles,
+	type FunctionManifestFile,
 	packFunction,
 } from "./function-bundle.js";
 export {
@@ -76,6 +85,7 @@ export type {
 	SessionConnection,
 	SessionState,
 } from "./session.js";
+export { LIVE_REDRAW_MS } from "./session.js";
 // A tool's own `parameters`, or the ones its schema writes: with either spelling allowed,
 // this is what the client publishes and what a caller should read.
 export { parametersOf } from "./tool-client.js";
@@ -95,9 +105,11 @@ export type {
 } from "./tool-client.js";
 export { type ToolOrigin, toolOrigin, type ToolSource } from "./tool-origin.js";
 export { VERSION } from "./version.js";
+export { formatVolumePath, parseVolumePath, VOLUME_MOUNT, type VolumePath } from "./volume.js";
 
 export type { Agents, ListAgentsParams, ListAgentVersionsParams } from "./resources/agents.js";
 export type { ApiKeys, ListApiKeysParams } from "./resources/api-keys.js";
+export { FUNCTION_UPLOAD_TIMEOUT_MS } from "./resources/functions.js";
 export type { Functions, ListFunctionsParams, ListFunctionVersionsParams } from "./resources/functions.js";
 export type { Me } from "./resources/me.js";
 export type { ListModelProvidersParams, ModelProviders } from "./resources/model-providers.js";
@@ -208,6 +220,7 @@ export type {
 	SandboxGrantBody,
 	SandboxNetworkBody,
 	SessionBody,
+	SessionDeltaBody,
 	SessionEventBody,
 	SessionEventPayloadBody,
 	SessionSandboxBody,
@@ -252,6 +265,8 @@ export {
 	DisplayNameWhenBody,
 	ErrorCode,
 	HttpSchemeBody,
+	ImageInputBody,
+	ImageMediaTypeBody,
 	InputSourceBody,
 	KeyPermissionSchema,
 	McpSchemeBody,
@@ -269,6 +284,8 @@ export {
 	SessionStatusBody,
 	StorageSubjectBody,
 	SubmitKindBody,
+	VolumeAreaParam,
 	VolumeFileKindBody,
+	VolumeListDepthParam,
 	WorkspaceRoleBody,
 } from "./generated/index.js";

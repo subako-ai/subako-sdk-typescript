@@ -72,17 +72,19 @@ describe("a session token", () => {
 });
 
 describe("the session volume", () => {
-	const written = { path: "/tmp/a b/c.txt", bytes: 2 };
+	const written = { path: "a b/c.txt", bytes: 2 };
 
 	it("writes to the path with each segment encoded once", async () => {
 		const http = stubFetch(() => json(written));
 		const client = testClient({ fetch: http.fetch });
 
-		await expect(client.sessions.writeVolumeFile("s1", "/tmp/a b/c.txt", "hi")).resolves.toEqual(written);
+		await expect(client.sessions.writeVolumeFile("s1", { area: "tmp", path: "a b/c.txt" }, "hi")).resolves.toEqual(
+			written,
+		);
 
 		const request = http.calls[0]!;
 		expect(request.method).toBe("PUT");
-		expect(new URL(request.url).pathname).toBe("/v1/sessions/s1/volume/files/tmp%2Fa%20b%2Fc.txt");
+		expect(new URL(request.url).pathname).toBe("/v1/sessions/s1/volume/tmp/a%20b%2Fc.txt");
 		expect(await request.text()).toBe("hi");
 	});
 
@@ -90,7 +92,7 @@ describe("the session volume", () => {
 		const http = stubFetch(() => json(written));
 		const client = testClient({ fetch: http.fetch });
 
-		await client.sessions.writeVolumeFile("s1", "/tmp/a.bin", new Uint8Array([1, 2, 3]));
+		await client.sessions.writeVolumeFile("s1", { area: "tmp", path: "a.bin" }, new Uint8Array([1, 2, 3]));
 
 		expect(new Uint8Array(await http.calls[0]!.arrayBuffer())).toEqual(new Uint8Array([1, 2, 3]));
 	});
@@ -99,33 +101,55 @@ describe("the session volume", () => {
 		const http = stubFetch(() => new Response("{}", { headers: { "content-type": "application/json" } }));
 		const client = testClient({ fetch: http.fetch });
 
-		const blob = await client.sessions.readVolumeFile("s1", "/tmp/a.json");
+		const blob = await client.sessions.readVolumeFile("s1", { area: "tmp", path: "a.json" });
 
 		expect(blob).toBeInstanceOf(Blob);
 		expect(await blob.text()).toBe("{}");
-		expect(new URL(http.calls[0]!.url).pathname).toBe("/v1/sessions/s1/volume/files/tmp%2Fa.json");
+		expect(new URL(http.calls[0]!.url).pathname).toBe("/v1/sessions/s1/volume/tmp/a.json");
 	});
 
-	it("lists beneath a prefix", async () => {
+	it("lists one area, beneath a prefix in it", async () => {
 		const http = stubFetch(() => json({ items: [] }));
 		const client = testClient({ fetch: http.fetch });
 
-		await client.sessions.listVolumeFiles("s1", { prefix: "/tmp/x" });
-		await client.sessions.listVolumeFiles("s1");
+		await client.sessions.listVolumeFiles("s1", "tmp", { prefix: "x" });
+		await client.sessions.listVolumeFiles("s1", "data");
 
-		expect(new URL(http.calls[0]!.url).searchParams.get("prefix")).toBe("/tmp/x");
+		expect(new URL(http.calls[0]!.url).pathname).toBe("/v1/sessions/s1/volume/tmp");
+		expect(new URL(http.calls[0]!.url).searchParams.get("prefix")).toBe("x");
+		expect(new URL(http.calls[1]!.url).pathname).toBe("/v1/sessions/s1/volume/data");
 		expect(new URL(http.calls[1]!.url).search).toBe("");
+	});
+
+	it("lists one directory a page at a time", async () => {
+		const http = stubFetch(() => json({ entries: [], truncated: false, next_cursor: null }));
+		const client = testClient({ fetch: http.fetch });
+
+		await client.sessions.listVolumeFiles("s1", "tmp", {
+			prefix: "repo",
+			depth: "children",
+			after: "repo/a.txt",
+			limit: 100,
+		});
+
+		const query = new URL(http.calls[0]!.url).searchParams;
+		expect(Object.fromEntries(query)).toEqual({
+			prefix: "repo",
+			depth: "children",
+			after: "repo/a.txt",
+			limit: "100",
+		});
 	});
 
 	it("deletes one file, or the whole volume", async () => {
 		const http = stubFetch(() => empty(204));
 		const client = testClient({ fetch: http.fetch });
 
-		await expect(client.sessions.deleteVolumeFile("s1", "/tmp/a.txt")).resolves.toBeUndefined();
+		await expect(client.sessions.deleteVolumeFile("s1", { area: "tmp", path: "a.txt" })).resolves.toBeUndefined();
 		await expect(client.sessions.deleteVolume("s1")).resolves.toBeUndefined();
 
 		expect(http.calls.map((call) => [call.method, new URL(call.url).pathname])).toEqual([
-			["DELETE", "/v1/sessions/s1/volume/files/tmp%2Fa.txt"],
+			["DELETE", "/v1/sessions/s1/volume/tmp/a.txt"],
 			["DELETE", "/v1/sessions/s1/volume"],
 		]);
 	});

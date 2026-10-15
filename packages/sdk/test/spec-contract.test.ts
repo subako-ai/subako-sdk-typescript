@@ -47,7 +47,7 @@ const HAND_WRITTEN: ReadonlySet<string> = new Set(["stream_session_events"]);
 
 describe("the resources cover the spec", () => {
 	it("names every operation just once", () => {
-		expect(operationIds).toHaveLength(96);
+		expect(operationIds).toHaveLength(97);
 		expect(new Set(operationIds).size).toBe(operationIds.length);
 	});
 

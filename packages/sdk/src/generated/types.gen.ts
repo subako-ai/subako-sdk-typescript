@@ -150,6 +150,7 @@ export type AnthropicEffortBody = typeof AnthropicEffortBody[keyof typeof Anthro
 export type AnthropicModelBody = {
   context_window: number;
   effort?: null | AnthropicEffortBody;
+  image_input?: null | ImageInputBody;
   max_tokens: number;
   model: string;
   thinking?: null | AnthropicThinkingBody;
@@ -399,6 +400,16 @@ export type ContentBlockBody = {
     thinking: string;
   };
   type: 'thinking';
+} | {
+  /**
+   * An image the model was shown. Its bytes are read from the session's
+   * images by `sha256`.
+   */
+  data: {
+    media_type: ImageMediaTypeBody;
+    sha256: string;
+  };
+  type: 'image';
 };
 
 export type CreateAgentBody = {
@@ -623,6 +634,63 @@ export type CreditsBody = {
 };
 
 /**
+ * What one delta frame says about its target.
+ */
+export type DeltaBody = {
+  /**
+   * The output grew by `parts`, in order.
+   */
+  data: {
+    parts: Array<DeltaPartBody>;
+  };
+  type: 'append';
+} | {
+  type: 'discard';
+};
+
+/**
+ * Text appended to one content block of the message being built. `index`
+ * is the block's position in the message the target commits.
+ */
+export type DeltaPartBody = {
+  data: {
+    index: number;
+    text: string;
+  };
+  type: 'text';
+} | {
+  data: {
+    index: number;
+    thinking: string;
+  };
+  type: 'thinking';
+} | {
+  /**
+   * A fragment of the call's JSON arguments, which parse once joined.
+   */
+  data: {
+    arguments: string;
+    id: string;
+    index: number;
+    name: string;
+  };
+  type: 'tool_call';
+};
+
+/**
+ * Ends at the `message_assistant` whose `model_call_id` is this one.
+ */
+export type DeltaTargetBody = {
+  /**
+   * Ends at the `message_assistant` whose `model_call_id` is this one.
+   */
+  data: {
+    model_call_id: string;
+  };
+  type: 'model_call';
+};
+
+/**
  * Who wrote a session's display name.
  */
 export const DisplayNameAuthorBody = { USER: 'user', AGENT: 'agent' } as const;
@@ -758,7 +826,8 @@ export type FunctionGrantBody = {
 };
 
 /**
- * A version's `subako-package.json`.
+ * What a version serves: the name and description its `subako-package.json`
+ * gives, and each tool its module lists.
  */
 export type FunctionManifestBody = {
   description: string;
@@ -846,6 +915,35 @@ export const HttpSchemeBody = { HEADER: 'header' } as const;
 export type HttpSchemeBody = typeof HttpSchemeBody[keyof typeof HttpSchemeBody];
 
 /**
+ * Whether the model reads images. Left out, it does. A model that does not
+ * is shown a note in place of each image a tool returns, since it would
+ * refuse a request carrying one.
+ */
+export const ImageInputBody = { SUPPORTED: 'supported', UNSUPPORTED: 'unsupported' } as const;
+
+/**
+ * Whether the model reads images. Left out, it does. A model that does not
+ * is shown a note in place of each image a tool returns, since it would
+ * refuse a request carrying one.
+ */
+export type ImageInputBody = typeof ImageInputBody[keyof typeof ImageInputBody];
+
+/**
+ * An image's format.
+ */
+export const ImageMediaTypeBody = {
+  IMAGE_PNG: 'image/png',
+  IMAGE_JPEG: 'image/jpeg',
+  IMAGE_GIF: 'image/gif',
+  IMAGE_WEBP: 'image/webp'
+} as const;
+
+/**
+ * An image's format.
+ */
+export type ImageMediaTypeBody = typeof ImageMediaTypeBody[keyof typeof ImageMediaTypeBody];
+
+/**
  * How a user turn reached the session.
  */
 export const InputSourceBody = {
@@ -913,7 +1011,7 @@ export type ManifestFunctionBody = {
   input_schema: unknown;
   name: string;
   /**
-   * JSON Schema for the tool's output.
+   * JSON Schema for the tool's output; `{}` when the tool names none.
    */
   output_schema: unknown;
 };
@@ -1153,6 +1251,7 @@ export type OAuthStarted = {
 
 export type OpenaiResponsesModelBody = {
   context_window: number;
+  image_input?: null | ImageInputBody;
   max_tokens: number;
   model: string;
   reasoning_effort?: null | ReasoningEffortBody;
@@ -1765,6 +1864,18 @@ export type SessionCreatorBody = (ActorBody & {
 };
 
 /**
+ * One delta frame on the stream: output still being produced, which the
+ * commit ending `target` replaces. Never part of the log, so it carries no
+ * `seq`; `n` counts the target's frames from 0.
+ */
+export type SessionDeltaBody = {
+  delta: DeltaBody;
+  n: number;
+  run_id: string;
+  target: DeltaTargetBody;
+};
+
+/**
  * Whether the agent gets a `set` tool for the session's display name. A
  * name a user wrote is never overwritten unless it is blank; `when` decides
  * the rest.
@@ -2030,6 +2141,13 @@ export const SessionStatusBody = { IDLE: 'idle', ACTIVE: 'active' } as const;
 export type SessionStatusBody = typeof SessionStatusBody[keyof typeof SessionStatusBody];
 
 /**
+ * One frame of the event stream, told apart by its SSE `event` name: a
+ * `SessionEventBody` under the wire `type`, or a `SessionDeltaBody` under
+ * `delta`.
+ */
+export type SessionStreamData = SessionEventBody | SessionDeltaBody;
+
+/**
  * An additional live token for the session.
  */
 export type SessionTokenBody = {
@@ -2293,7 +2411,21 @@ export type VersionPinBody = {
 };
 
 /**
- * The roots the session tree's functions reach beyond `/tmp`.
+ * One of a volume's two areas: `tmp`, always there and cleared a day after the
+ * tree's last activity, or `data`, kept until the root session is deleted where
+ * the root agent enables it.
+ */
+export const VolumeAreaParam = { TMP: 'tmp', DATA: 'data' } as const;
+
+/**
+ * One of a volume's two areas: `tmp`, always there and cleared a day after the
+ * tree's last activity, or `data`, kept until the root session is deleted where
+ * the root agent enables it.
+ */
+export type VolumeAreaParam = typeof VolumeAreaParam[keyof typeof VolumeAreaParam];
+
+/**
+ * The roots the session tree's functions reach beyond `/volume/tmp`.
  */
 export type VolumeConfigBody = {
   /**
@@ -2303,7 +2435,7 @@ export type VolumeConfigBody = {
 };
 
 /**
- * Whether the volume offers a persistent `/data` root. `enabled`
+ * Whether the volume offers a persistent `/volume/data` root. `enabled`
  * mounts it for the session tree's functions.
  */
 export type VolumeDataBody = {
@@ -2319,7 +2451,7 @@ export type VolumeFileBody = {
    */
   modified: string;
   /**
-   * The entry's absolute volume path, e.g. `/tmp/notes.txt`.
+   * The entry's path in the area, e.g. `notes/a.txt`.
    */
   path: string;
   /**
@@ -2339,15 +2471,34 @@ export type VolumeFileKindBody = typeof VolumeFileKindBody[keyof typeof VolumeFi
 export type VolumeFileListBody = {
   entries: Array<VolumeFileBody>;
   /**
-   * True when the listing stopped before every entry beneath the prefix.
+   * Pass back as `after` for the next page; `null` on the last page.
+   */
+  next_cursor: string | null;
+  /**
+   * True when another page follows, which `next_cursor` then starts.
    */
   truncated: boolean;
 };
 
 export type VolumeFileWrittenBody = {
   bytes: number;
+  /**
+   * The file's path in the area.
+   */
   path: string;
 };
+
+/**
+ * How far beneath its prefix a listing reads: `all` for every entry beneath
+ * it, `children` for only those directly in it.
+ */
+export const VolumeListDepthParam = { ALL: 'all', CHILDREN: 'children' } as const;
+
+/**
+ * How far beneath its prefix a listing reads: `all` for every entry beneath
+ * it, `children` for only those directly in it.
+ */
+export type VolumeListDepthParam = typeof VolumeListDepthParam[keyof typeof VolumeListDepthParam];
 
 /**
  * A workspace: the scope agents, sessions, vaults, skills, and keys
@@ -3049,7 +3200,7 @@ export type ListFunctionsResponse = ListFunctionsResponses[keyof ListFunctionsRe
 
 export type CreateFunctionData = {
   /**
-   * A gzipped tar holding subako-package.json and module.wasm at its root.
+   * A gzipped tar holding subako-package.json and module.wasm at its root. Core asks the module its tools through MCP's tools/list.
    */
   body: Blob | File;
   headers?: {
@@ -3069,7 +3220,7 @@ export type CreateFunctionData = {
 
 export type CreateFunctionErrors = {
   /**
-   * Malformed archive, a bundle validation failure, a malformed workspace header, or a user caller with no workspace header.
+   * Malformed archive, a bundle validation failure, a module that does not list valid tools, a deployment that runs no functions, a malformed workspace header, or a user caller with no workspace header.
    */
   400: ErrorBody;
   /**
@@ -3318,7 +3469,7 @@ export type ListFunctionVersionsResponse = ListFunctionVersionsResponses[keyof L
 
 export type PushFunctionVersionData = {
   /**
-   * A gzipped tar holding subako-package.json and module.wasm at its root.
+   * A gzipped tar holding subako-package.json and module.wasm at its root. Core asks the module its tools through MCP's tools/list.
    */
   body: Blob | File;
   headers?: {
@@ -3339,7 +3490,7 @@ export type PushFunctionVersionData = {
 
 export type PushFunctionVersionErrors = {
   /**
-   * Malformed archive, a bundle validation failure, or a malformed path parameter.
+   * Malformed archive, a bundle validation failure, a module that does not list valid tools, a deployment that runs no functions, or a malformed path parameter.
    */
   400: ErrorBody;
   /**
@@ -4973,6 +5124,11 @@ export type StreamSessionEventsData = {
      * 0 replays the whole log.
      */
     after_seq?: number;
+    /**
+     * Also send `delta` frames: output still being produced, before the log
+     * commits it. Off when omitted.
+     */
+    deltas?: boolean;
   };
   url: '/v1/sessions/{session_id}/events/stream';
 };
@@ -5000,12 +5156,58 @@ export type StreamSessionEventsError = StreamSessionEventsErrors[keyof StreamSes
 
 export type StreamSessionEventsResponses = {
   /**
-   * The event stream from after_seq, then live. The start position is fixed before the response begins, so a client that opens the stream, then pages /events newest-first and deduplicates on seq, misses nothing on that connection. An initial id-only frame establishes the reconnect cursor without dispatching a message. Continuity before that frame is received requires an explicit after_seq. Subsequent events carry the seq as their id, the wire type as their event name, and one SessionEventBody as their data. Stored rows the wire cannot render are skipped, and the cursor still advances over them.
+   * The event stream from after_seq, then live. The start position is fixed before the response begins, so a client that opens the stream, then pages /events newest-first and deduplicates on seq, misses nothing on that connection. An initial id-only frame establishes the reconnect cursor without dispatching a message. Continuity before that frame is received requires an explicit after_seq. Subsequent events carry the seq as their id, the wire type as their event name, and one SessionEventBody as their data. Stored rows the wire cannot render are skipped, and the cursor still advances over them. With deltas=true, `delta` frames carry one SessionDeltaBody and no id.
    */
-  200: SessionEventBody;
+  200: SessionStreamData;
 };
 
 export type StreamSessionEventsResponse = StreamSessionEventsResponses[keyof StreamSessionEventsResponses];
+
+export type GetSessionImageData = {
+  body?: never;
+  path: {
+    /**
+     * Session id
+     */
+    session_id: string;
+    /**
+     * The image's lowercase hex SHA-256, as an `image` content block names it.
+     */
+    sha256: string;
+  };
+  query?: never;
+  url: '/v1/sessions/{session_id}/images/{sha256}';
+};
+
+export type GetSessionImageErrors = {
+  /**
+   * Malformed path parameter.
+   */
+  400: ErrorBody;
+  /**
+   * Missing, malformed, or invalid bearer token.
+   */
+  401: ErrorBody;
+  /**
+   * A workspace credential lacking session.read. A session token carries no permissions and never lands here.
+   */
+  403: ErrorBody;
+  /**
+   * No such session or image, or the caller cannot see it.
+   */
+  404: ErrorBody;
+};
+
+export type GetSessionImageError = GetSessionImageErrors[keyof GetSessionImageErrors];
+
+export type GetSessionImageResponses = {
+  /**
+   * The image's bytes.
+   */
+  200: Blob | File;
+};
+
+export type GetSessionImageResponse = GetSessionImageResponses[keyof GetSessionImageResponses];
 
 export type ListSessionSandboxesData = {
   body?: never;
@@ -5250,19 +5452,36 @@ export type ListVolumeFilesData = {
      * Session id
      */
     session_id: string;
+    /**
+     * The area to list in.
+     */
+    area: VolumeAreaParam;
   };
   query?: {
     /**
-     * The volume path to list beneath, `/tmp` when omitted.
+     * The path in the area to list beneath, segments joined by `/`; the area
+     * itself when omitted.
      */
     prefix?: string;
+    /**
+     * `all` when omitted.
+     */
+    depth?: VolumeListDepthParam;
+    /**
+     * Entries past this path in the listing's order: a page's `next_cursor`.
+     */
+    after?: string;
+    /**
+     * 10000 when omitted.
+     */
+    limit?: number;
   };
-  url: '/v1/sessions/{session_id}/volume/files';
+  url: '/v1/sessions/{session_id}/volume/{area}';
 };
 
 export type ListVolumeFilesErrors = {
   /**
-   * Malformed path parameter or prefix, or a /data prefix the root agent does not enable.
+   * Malformed path parameter, prefix, depth, or limit, a cursor not beneath the prefix, or the data area where the root agent does not enable it.
    */
   400: ErrorBody;
   /**
@@ -5283,7 +5502,7 @@ export type ListVolumeFilesError = ListVolumeFilesErrors[keyof ListVolumeFilesEr
 
 export type ListVolumeFilesResponses = {
   /**
-   * Every entry beneath the prefix. Empty for a tree whose functions have written nothing yet.
+   * One page of the entries beneath the prefix. Empty for a tree whose functions have written nothing yet.
    */
   200: VolumeFileListBody;
 };
@@ -5298,17 +5517,21 @@ export type DeleteVolumeFileData = {
      */
     session_id: string;
     /**
-     * The volume path without its leading slash, e.g. `tmp/notes.txt`.
+     * The area the file sits in.
+     */
+    area: VolumeAreaParam;
+    /**
+     * The file's path in the area, e.g. `notes/a.txt`.
      */
     path: string;
   };
   query?: never;
-  url: '/v1/sessions/{session_id}/volume/files/{path}';
+  url: '/v1/sessions/{session_id}/volume/{area}/{path}';
 };
 
 export type DeleteVolumeFileErrors = {
   /**
-   * Malformed path parameter, or a /data path the root agent does not enable.
+   * Malformed path parameter, or the data area where the root agent does not enable it.
    */
   400: ErrorBody;
   /**
@@ -5344,17 +5567,21 @@ export type GetVolumeFileData = {
      */
     session_id: string;
     /**
-     * The volume path without its leading slash, e.g. `tmp/notes.txt`.
+     * The area the file sits in.
+     */
+    area: VolumeAreaParam;
+    /**
+     * The file's path in the area, e.g. `notes/a.txt`.
      */
     path: string;
   };
   query?: never;
-  url: '/v1/sessions/{session_id}/volume/files/{path}';
+  url: '/v1/sessions/{session_id}/volume/{area}/{path}';
 };
 
 export type GetVolumeFileErrors = {
   /**
-   * Malformed path parameter, or a /data path the root agent does not enable.
+   * Malformed path parameter, or the data area where the root agent does not enable it.
    */
   400: ErrorBody;
   /**
@@ -5393,17 +5620,21 @@ export type PutVolumeFileData = {
      */
     session_id: string;
     /**
-     * The volume path without its leading slash, e.g. `tmp/notes.txt`.
+     * The area the file sits in.
+     */
+    area: VolumeAreaParam;
+    /**
+     * The file's path in the area, e.g. `notes/a.txt`.
      */
     path: string;
   };
   query?: never;
-  url: '/v1/sessions/{session_id}/volume/files/{path}';
+  url: '/v1/sessions/{session_id}/volume/{area}/{path}';
 };
 
 export type PutVolumeFileErrors = {
   /**
-   * Malformed path parameter, a /data path the root agent does not enable, a path the volume cannot hold, or a body over 1 GiB.
+   * Malformed path parameter, the data area where the root agent does not enable it, a path the volume cannot hold, or a body over 1 GiB.
    */
   400: ErrorBody;
   /**

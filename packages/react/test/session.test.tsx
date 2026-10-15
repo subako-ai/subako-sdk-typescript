@@ -3,7 +3,7 @@ import { act, cleanup, render } from "@testing-library/react";
 import { type ReactNode, StrictMode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { SubakoProvider, useSession, useSessionState } from "../src/index.js";
-import { type Backend, backend, SESSION_ID, settle } from "./support.js";
+import { type Backend, backend, redrawn, SESSION_ID, settle } from "./support.js";
 
 afterEach(cleanup);
 afterEach(() => {
@@ -243,6 +243,43 @@ describe("the provider and useSession", () => {
 			await settle();
 		});
 		expect(reading()).toBe("open/1/0/idle");
+	});
+
+	it("follows deltas when asked, rendering the message a call is still producing", async () => {
+		const back = backend();
+		function LiveReader(): ReactNode {
+			const state = useSessionState(useSession(SESSION_ID, { deltas: true }));
+			const block = state?.live[0]?.content[0];
+			return <span data-testid="reading">{block?.type === "text" ? block.text : "nothing"}</span>;
+		}
+		mount(back, <LiveReader />);
+		await act(async () => {
+			await settle();
+		});
+		const stream = back.sent("GET", "/events/stream")[0];
+		expect(new URL(stream!.url).searchParams.get("deltas")).toBe("true");
+		expect(reading()).toBe("nothing");
+
+		await act(async () => {
+			back.pushDelta({
+				run_id: "r1",
+				target: { type: "model_call", data: { model_call_id: "mc1" } },
+				n: 0,
+				delta: { type: "append", data: { parts: [{ type: "text", data: { index: 0, text: "Hel" } }] } },
+			});
+			await settle();
+			await redrawn();
+		});
+		expect(reading()).toBe("Hel");
+
+		await act(async () => {
+			back.push(1, {
+				type: "message_assistant",
+				message: { role: "assistant", content: [{ type: "text", data: { text: "Hello" } }], model_call_id: "mc1" },
+			});
+			await settle();
+		});
+		expect(reading()).toBe("nothing");
 	});
 
 	it("keeps the connection and its messages across renders", async () => {

@@ -24,6 +24,7 @@ session.state.transcript; // the messages of the log, each call joined to its re
 session.state.approvals; // the approvals no decision has settled
 session.state.isRunning; // a run queued or under way
 session.state.hasEarlier; // the log holds events before the first in `events`
+session.state.live; // with `deltas`: messages a model is still writing
 ```
 
 `state` is immutable. You get a new object on every event and every status change, and the same object for as long as nothing changes. `events` follows the same rule: a new array when an event arrives, the same one otherwise, and the events inside are never copied. That is what makes it safe to hand straight to a renderer:
@@ -92,10 +93,30 @@ Subscribers are called synchronously after every change, in seq order, with the 
       type: "number",
       description: "Consecutive failed reconnects tolerated. Defaults to 5.",
     },
+    deltas: {
+      type: "boolean",
+      description:
+        "Also follow what a model is still writing, which `state.live` holds until the log commits it. Off by default.",
+    },
   }}
 />
 
 A connection with neither `history` nor `afterSeq` starts at the live head: it carries what happens from now on, and nothing that happened before.
+
+## Output as it is written
+
+A message reaches the log once the model has finished it. A connection opened with `deltas: true` also carries what the model writes on the way, and folds it into `state.live`:
+
+```ts
+const session = subako.sessions.connect(sessionId, { history: true, deltas: true });
+
+session.state.live; // LiveMessage[], oldest first
+// { runId, target: { type: "model_call", data: { model_call_id } }, n, content: [{ type: "text", index: 0, text: "So far" }, ...] }
+```
+
+Each live message is a preview of one `target`, today always a model call, and `liveKey(target)` names it apart from every other. Its `content` holds `text`, `thinking`, and `tool_call` blocks at their places in the message, a tool call's `arguments` as the JSON text received so far. It leaves `live` when the `message_assistant` with the same `model_call_id` lands in `events`, when the call ends without a message, or when its run ends. The log never holds a live message, frames can be lost, and nothing in `transcript`, `approvals`, or `isRunning` depends on them, so a connection without `deltas` ends at the same state. A connection that opens mid-call first receives what that call has written so far. Frames gather for `LIVE_REDRAW_MS` before `live` moves, so a growing message is drawn at most that often; an event moves it at once.
+
+`foldDelta` and `settleLive` are the two steps the connection takes, exported for a client that reads the stream itself.
 
 ## Long sessions
 

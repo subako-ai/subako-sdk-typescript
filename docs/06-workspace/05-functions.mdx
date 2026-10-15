@@ -5,7 +5,7 @@ sidebar:
   order: 5
 ---
 
-A function package is a compiled WebAssembly module plus a manifest naming the functions it exposes. You upload it as an archive, and an agent version grants it by id.
+A function package is a compiled WebAssembly module plus a manifest naming the package. You upload it as an archive, and an agent version grants it by id.
 
 ## The archive
 
@@ -15,6 +15,14 @@ A package is a gzipped tar holding `subako-package.json` and `module.wasm` at it
 tar -czf package.tar.gz subako-package.json module.wasm assets
 ```
 
+`subako-package.json` holds the ABI the module speaks, `FUNCTION_ABI` (`1`, MCP over stdio), and the package's name and description:
+
+```json
+{ "abi": 1, "name": "csv-tools", "description": "CSV helpers." }
+```
+
+It does not list the functions. At upload, Core runs the module and asks it for its tools with MCP `tools/list`; those are the package's functions, and Core refuses an upload whose module lists none, lists one twice, or lists one whose description or schemas pass their limits. A version's `manifest` as Core serves it carries the package's name and description and that list as `functions`, each with its `input_schema` and `output_schema`.
+
 The files under `assets/` (regular files and directories only, at most `FUNCTION_ASSETS_MAX_FILES` of them) are what the module reads at `/package` while it runs: `assets/data/words.txt` is `/package/data/words.txt`. They are read-only, and a call sees only its own package's assets. Empty directories are not kept.
 
 The SDK takes the bytes in whatever form you have them:
@@ -23,30 +31,19 @@ The SDK takes the bytes in whatever form you have them:
 type FunctionArchive = Uint8Array | Blob | ReadableStream<Uint8Array>;
 ```
 
-A manifest and module you hold in memory pack into one with `packFunction`, which refuses a set that breaks a bundle rule before anything is uploaded: no functions, a repeated function name, a description over `FUNCTION_DESCRIPTION_MAX_CHARS` characters, a schema over `FUNCTION_SCHEMA_MAX_BYTES` as JSON, a manifest over `FUNCTION_MANIFEST_MAX_BYTES`, an asset path outside `assets/` or over `FUNCTION_ASSET_PATH_MAX_BYTES`, more than `FUNCTION_ASSETS_MAX_FILES` assets, or files over `FUNCTION_BUNDLE_MAX_BYTES` either together or packed:
+A manifest and module you hold in memory pack into one with `packFunction`, which refuses a set that breaks a bundle rule before anything is uploaded: a package description over `FUNCTION_DESCRIPTION_MAX_CHARS` characters, a manifest over `FUNCTION_MANIFEST_MAX_BYTES`, an asset path outside `assets/` or over `FUNCTION_ASSET_PATH_MAX_BYTES`, more than `FUNCTION_ASSETS_MAX_FILES` assets, or files over `FUNCTION_BUNDLE_MAX_BYTES` either together or packed:
 
 ```ts
-import { packFunction } from "@subako-ai/sdk";
+import { FUNCTION_ABI, packFunction } from "@subako-ai/sdk";
 
 const archive = await packFunction({
-	manifest: {
-		name: "csv-tools",
-		description: "CSV helpers.",
-		functions: [
-			{
-				name: "parse",
-				description: "Parse a CSV document.",
-				input_schema: { type: "object", properties: { text: { type: "string" } } },
-				output_schema: {},
-			},
-		],
-	},
+	manifest: { abi: FUNCTION_ABI, name: "csv-tools", description: "CSV helpers." },
 	module,
 	assets: { "data/words.txt": new TextEncoder().encode("alpha\nbeta\n") },
 });
 ```
 
-Whether the module is valid WebAssembly, and which imports it may name, is Core's to judge: an upload it cannot accept comes back as an `InvalidRequestError` naming the problem.
+Whether the module is valid WebAssembly, which imports it may name, and what tools it lists are Core's to judge: an upload it cannot accept comes back as an `InvalidRequestError` naming the problem.
 
 ## Uploading
 
@@ -54,7 +51,9 @@ Whether the module is valid WebAssembly, and which imports it may name, is Core'
 const pkg = await subako.functions.create(archive);
 ```
 
-That creates the package and its first version. Later versions go to the same package, each as a new numbered version; nothing is overwritten:
+That creates the package and its first version, and answers once Core has run the module and read its functions. That can take minutes for a large module on a busy deployment, so each attempt of `create` and `pushVersion` may take up to `FUNCTION_UPLOAD_TIMEOUT_MS` (five minutes) unless you pass a `timeout`, or the client's own timeout is longer.
+
+Later versions go to the same package, each as a new numbered version; nothing is overwritten:
 
 ```ts
 await subako.functions.pushVersion(pkg.function_id, archive);

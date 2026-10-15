@@ -1338,7 +1338,7 @@
           }
         ],
         "requestBody": {
-          "description": "A gzipped tar holding subako-package.json and module.wasm at its root.",
+          "description": "A gzipped tar holding subako-package.json and module.wasm at its root. Core asks the module its tools through MCP's tools/list.",
           "content": {
             "application/gzip": {
               "schema": {
@@ -1369,7 +1369,7 @@
             }
           },
           "400": {
-            "description": "Malformed archive, a bundle validation failure, a malformed workspace header, or a user caller with no workspace header.",
+            "description": "Malformed archive, a bundle validation failure, a module that does not list valid tools, a deployment that runs no functions, a malformed workspace header, or a user caller with no workspace header.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1864,7 +1864,7 @@
           }
         ],
         "requestBody": {
-          "description": "A gzipped tar holding subako-package.json and module.wasm at its root.",
+          "description": "A gzipped tar holding subako-package.json and module.wasm at its root. Core asks the module its tools through MCP's tools/list.",
           "content": {
             "application/gzip": {
               "schema": {
@@ -1895,7 +1895,7 @@
             }
           },
           "400": {
-            "description": "Malformed archive, a bundle validation failure, or a malformed path parameter.",
+            "description": "Malformed archive, a bundle validation failure, a module that does not list valid tools, a deployment that runs no functions, or a malformed path parameter.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5133,7 +5133,7 @@
           "sessions"
         ],
         "summary": "Stream session events",
-        "description": "The same log as a live tail, framed as server-sent events: one event per row, `id` the seq, `event` the wire `type`, and `data` the same `SessionEventBody` the paged read renders.\n\nThe stream stays open across idle stretches -- a keep-alive comment holds the connection while nothing happens -- so one connection spans a session's whole life rather than a single run. With no position named it starts at the live head, fixed before the response begins; a client that wants history pages the events route newest-first and deduplicates on seq against what the tail delivers.",
+        "description": "The same log as a live tail, framed as server-sent events: one event per row, `id` the seq, `event` the wire `type`, and `data` the same `SessionEventBody` the paged read renders.\n\nThe stream stays open across idle stretches -- a keep-alive comment holds the connection while nothing happens -- so one connection spans a session's whole life rather than a single run. With no position named it starts at the live head, fixed before the response begins; a client that wants history pages the events route newest-first and deduplicates on seq against what the tail delivers.\n\nWith `deltas=true` the stream also carries `delta` frames: a model's output as it is produced, one `SessionDeltaBody` each, with no `id`. Deltas are never stored and may be lost; each previews one target until the event that ends it lands -- for a model call, the `message_assistant` with the same `model_call_id` -- or a `discard` frame says it never will. A reader joining mid-target first receives the frames that target sent so far.",
         "operationId": "stream_session_events",
         "parameters": [
           {
@@ -5168,15 +5168,24 @@
               "type": "integer",
               "format": "int64"
             }
+          },
+          {
+            "name": "deltas",
+            "in": "query",
+            "description": "Also send `delta` frames: output still being produced, before the log\ncommits it. Off when omitted.",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
           "200": {
-            "description": "The event stream from after_seq, then live. The start position is fixed before the response begins, so a client that opens the stream, then pages /events newest-first and deduplicates on seq, misses nothing on that connection. An initial id-only frame establishes the reconnect cursor without dispatching a message. Continuity before that frame is received requires an explicit after_seq. Subsequent events carry the seq as their id, the wire type as their event name, and one SessionEventBody as their data. Stored rows the wire cannot render are skipped, and the cursor still advances over them.",
+            "description": "The event stream from after_seq, then live. The start position is fixed before the response begins, so a client that opens the stream, then pages /events newest-first and deduplicates on seq, misses nothing on that connection. An initial id-only frame establishes the reconnect cursor without dispatching a message. Continuity before that frame is received requires an explicit after_seq. Subsequent events carry the seq as their id, the wire type as their event name, and one SessionEventBody as their data. Stored rows the wire cannot render are skipped, and the cursor still advances over them. With deltas=true, `delta` frames carry one SessionDeltaBody and no id.",
             "content": {
               "text/event-stream": {
                 "schema": {
-                  "$ref": "#/components/schemas/SessionEventBody"
+                  "$ref": "#/components/schemas/SessionStreamData"
                 }
               }
             }
@@ -5213,6 +5222,95 @@
           },
           "404": {
             "description": "No such session, or the caller cannot see it -- including a session token presented against any session but its own.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/sessions/{session_id}/images/{sha256}": {
+      "get": {
+        "tags": [
+          "sessions"
+        ],
+        "summary": "Download a session image",
+        "description": "The bytes of an image the session's events name by `sha256`, in the format the event gives as its `media_type`. An image never changes under its digest, so a client may keep it for as long as it likes.",
+        "operationId": "get_session_image",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "description": "Session id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "sha256",
+            "in": "path",
+            "description": "The image's lowercase hex SHA-256, as an `image` content block names it.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The image's bytes.",
+            "content": {
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed path parameter.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, malformed, or invalid bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "A workspace credential lacking session.read. A session token carries no permissions and never lands here.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such session or image, or the caller cannot see it.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5672,13 +5770,13 @@
         ]
       }
     },
-    "/v1/sessions/{session_id}/volume/files": {
+    "/v1/sessions/{session_id}/volume/{area}": {
       "get": {
         "tags": [
           "sessions"
         ],
         "summary": "List a session tree's volume files",
-        "description": "Every session of a tree shares its root's volume, so any of them names it.",
+        "description": "Every session of a tree shares its root's volume, so any of them names it. Entries come in the order a depth-first walk visits them, siblings by name, one page at a time: a page ends at `limit` entries or at 5 MB of entries, whichever comes first. List with `depth=children` to browse one directory at a time.",
         "operationId": "list_volume_files",
         "parameters": [
           {
@@ -5692,18 +5790,56 @@
             }
           },
           {
+            "name": "area",
+            "in": "path",
+            "description": "The area to list in.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/VolumeAreaParam"
+            }
+          },
+          {
             "name": "prefix",
             "in": "query",
-            "description": "The volume path to list beneath, `/tmp` when omitted.",
+            "description": "The path in the area to list beneath, segments joined by `/`; the area\nitself when omitted.",
             "required": false,
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "depth",
+            "in": "query",
+            "description": "`all` when omitted.",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/VolumeListDepthParam"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "description": "Entries past this path in the listing's order: a page's `next_cursor`.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "10000 when omitted.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 10000,
+              "minimum": 1
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "Every entry beneath the prefix. Empty for a tree whose functions have written nothing yet.",
+            "description": "One page of the entries beneath the prefix. Empty for a tree whose functions have written nothing yet.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5713,7 +5849,7 @@
             }
           },
           "400": {
-            "description": "Malformed path parameter or prefix, or a /data prefix the root agent does not enable.",
+            "description": "Malformed path parameter, prefix, depth, or limit, a cursor not beneath the prefix, or the data area where the root agent does not enable it.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5760,7 +5896,7 @@
         ]
       }
     },
-    "/v1/sessions/{session_id}/volume/files/{path}": {
+    "/v1/sessions/{session_id}/volume/{area}/{path}": {
       "get": {
         "tags": [
           "sessions"
@@ -5779,9 +5915,18 @@
             }
           },
           {
+            "name": "area",
+            "in": "path",
+            "description": "The area the file sits in.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/VolumeAreaParam"
+            }
+          },
+          {
             "name": "path",
             "in": "path",
-            "description": "The volume path without its leading slash, e.g. `tmp/notes.txt`.",
+            "description": "The file's path in the area, e.g. `notes/a.txt`.",
             "required": true,
             "schema": {
               "type": "string"
@@ -5801,7 +5946,7 @@
             }
           },
           "400": {
-            "description": "Malformed path parameter, or a /data path the root agent does not enable.",
+            "description": "Malformed path parameter, or the data area where the root agent does not enable it.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5866,9 +6011,18 @@
             }
           },
           {
+            "name": "area",
+            "in": "path",
+            "description": "The area the file sits in.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/VolumeAreaParam"
+            }
+          },
+          {
             "name": "path",
             "in": "path",
-            "description": "The volume path without its leading slash, e.g. `tmp/notes.txt`.",
+            "description": "The file's path in the area, e.g. `notes/a.txt`.",
             "required": true,
             "schema": {
               "type": "string"
@@ -5899,7 +6053,7 @@
             }
           },
           "400": {
-            "description": "Malformed path parameter, a /data path the root agent does not enable, a path the volume cannot hold, or a body over 1 GiB.",
+            "description": "Malformed path parameter, the data area where the root agent does not enable it, a path the volume cannot hold, or a body over 1 GiB.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5964,9 +6118,18 @@
             }
           },
           {
+            "name": "area",
+            "in": "path",
+            "description": "The area the file sits in.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/VolumeAreaParam"
+            }
+          },
+          {
             "name": "path",
             "in": "path",
-            "description": "The volume path without its leading slash, e.g. `tmp/notes.txt`.",
+            "description": "The file's path in the area, e.g. `notes/a.txt`.",
             "required": true,
             "schema": {
               "type": "string"
@@ -5978,7 +6141,7 @@
             "description": "The entry was removed."
           },
           "400": {
-            "description": "Malformed path parameter, or a /data path the root agent does not enable.",
+            "description": "Malformed path parameter, or the data area where the root agent does not enable it.",
             "content": {
               "application/json": {
                 "schema": {
@@ -9491,6 +9654,16 @@
               }
             ]
           },
+          "image_input": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ImageInputBody"
+              }
+            ]
+          },
           "max_tokens": {
             "type": "integer",
             "format": "int32",
@@ -10123,6 +10296,38 @@
                 ]
               }
             }
+          },
+          {
+            "type": "object",
+            "description": "An image the model was shown. Its bytes are read from the session's\nimages by `sha256`.",
+            "required": [
+              "data",
+              "type"
+            ],
+            "properties": {
+              "data": {
+                "type": "object",
+                "description": "An image the model was shown. Its bytes are read from the session's\nimages by `sha256`.",
+                "required": [
+                  "media_type",
+                  "sha256"
+                ],
+                "properties": {
+                  "media_type": {
+                    "$ref": "#/components/schemas/ImageMediaTypeBody"
+                  },
+                  "sha256": {
+                    "type": "string"
+                  }
+                }
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "image"
+                ]
+              }
+            }
           }
         ],
         "description": "One block of a message's content; `type` names the shape."
@@ -10593,6 +10798,201 @@
           }
         }
       },
+      "DeltaBody": {
+        "oneOf": [
+          {
+            "type": "object",
+            "description": "The output grew by `parts`, in order.",
+            "required": [
+              "data",
+              "type"
+            ],
+            "properties": {
+              "data": {
+                "type": "object",
+                "description": "The output grew by `parts`, in order.",
+                "required": [
+                  "parts"
+                ],
+                "properties": {
+                  "parts": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/DeltaPartBody"
+                    }
+                  }
+                }
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "append"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "The target ended with nothing to commit; drop what was built from it.",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "discard"
+                ]
+              }
+            }
+          }
+        ],
+        "description": "What one delta frame says about its target."
+      },
+      "DeltaPartBody": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "data",
+              "type"
+            ],
+            "properties": {
+              "data": {
+                "type": "object",
+                "required": [
+                  "index",
+                  "text"
+                ],
+                "properties": {
+                  "index": {
+                    "type": "integer",
+                    "format": "int32",
+                    "minimum": 0
+                  },
+                  "text": {
+                    "type": "string"
+                  }
+                }
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "text"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "data",
+              "type"
+            ],
+            "properties": {
+              "data": {
+                "type": "object",
+                "required": [
+                  "index",
+                  "thinking"
+                ],
+                "properties": {
+                  "index": {
+                    "type": "integer",
+                    "format": "int32",
+                    "minimum": 0
+                  },
+                  "thinking": {
+                    "type": "string"
+                  }
+                }
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "thinking"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "A fragment of the call's JSON arguments, which parse once joined.",
+            "required": [
+              "data",
+              "type"
+            ],
+            "properties": {
+              "data": {
+                "type": "object",
+                "description": "A fragment of the call's JSON arguments, which parse once joined.",
+                "required": [
+                  "index",
+                  "id",
+                  "name",
+                  "arguments"
+                ],
+                "properties": {
+                  "arguments": {
+                    "type": "string"
+                  },
+                  "id": {
+                    "type": "string"
+                  },
+                  "index": {
+                    "type": "integer",
+                    "format": "int32",
+                    "minimum": 0
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                }
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "tool_call"
+                ]
+              }
+            }
+          }
+        ],
+        "description": "Text appended to one content block of the message being built. `index`\nis the block's position in the message the target commits."
+      },
+      "DeltaTargetBody": {
+        "oneOf": [
+          {
+            "type": "object",
+            "description": "Ends at the `message_assistant` whose `model_call_id` is this one.",
+            "required": [
+              "data",
+              "type"
+            ],
+            "properties": {
+              "data": {
+                "type": "object",
+                "description": "Ends at the `message_assistant` whose `model_call_id` is this one.",
+                "required": [
+                  "model_call_id"
+                ],
+                "properties": {
+                  "model_call_id": {
+                    "type": "string"
+                  }
+                }
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "model_call"
+                ]
+              }
+            }
+          }
+        ],
+        "description": "What a run of delta frames previews, and so which event ends it."
+      },
       "DisplayNameAuthorBody": {
         "type": "string",
         "description": "Who wrote a session's display name.",
@@ -10790,7 +11190,7 @@
       },
       "FunctionManifestBody": {
         "type": "object",
-        "description": "A version's `subako-package.json`.",
+        "description": "What a version serves: the name and description its `subako-package.json`\ngives, and each tool its module lists.",
         "required": [
           "name",
           "description",
@@ -11018,6 +11418,24 @@
           "header"
         ]
       },
+      "ImageInputBody": {
+        "type": "string",
+        "description": "Whether the model reads images. Left out, it does. A model that does not\nis shown a note in place of each image a tool returns, since it would\nrefuse a request carrying one.",
+        "enum": [
+          "supported",
+          "unsupported"
+        ]
+      },
+      "ImageMediaTypeBody": {
+        "type": "string",
+        "description": "An image's format.",
+        "enum": [
+          "image/png",
+          "image/jpeg",
+          "image/gif",
+          "image/webp"
+        ]
+      },
       "InputSourceBody": {
         "type": "string",
         "description": "How a user turn reached the session.",
@@ -11105,7 +11523,7 @@
             "type": "string"
           },
           "output_schema": {
-            "description": "JSON Schema for the tool's output."
+            "description": "JSON Schema for the tool's output; `{}` when the tool names none."
           }
         }
       },
@@ -11711,6 +12129,16 @@
             "type": "integer",
             "format": "int32",
             "minimum": 0
+          },
+          "image_input": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ImageInputBody"
+              }
+            ]
           },
           "max_tokens": {
             "type": "integer",
@@ -13046,6 +13474,32 @@
         ],
         "description": "Who created the session: the header-surface user or the API key a\nbackend presented."
       },
+      "SessionDeltaBody": {
+        "type": "object",
+        "description": "One delta frame on the stream: output still being produced, which the\ncommit ending `target` replaces. Never part of the log, so it carries no\n`seq`; `n` counts the target's frames from 0.",
+        "required": [
+          "run_id",
+          "target",
+          "n",
+          "delta"
+        ],
+        "properties": {
+          "delta": {
+            "$ref": "#/components/schemas/DeltaBody"
+          },
+          "n": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "run_id": {
+            "type": "string"
+          },
+          "target": {
+            "$ref": "#/components/schemas/DeltaTargetBody"
+          }
+        }
+      },
       "SessionDisplayNameGrantBody": {
         "type": "object",
         "description": "Whether the agent gets a `set` tool for the session's display name. A\nname a user wrote is never overwritten unless it is blank; `when` decides\nthe rest.",
@@ -13766,6 +14220,17 @@
           "active"
         ]
       },
+      "SessionStreamData": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/SessionEventBody"
+          },
+          {
+            "$ref": "#/components/schemas/SessionDeltaBody"
+          }
+        ],
+        "description": "One frame of the event stream, told apart by its SSE `event` name: a\n`SessionEventBody` under the wire `type`, or a `SessionDeltaBody` under\n`delta`."
+      },
       "SessionTokenBody": {
         "type": "object",
         "description": "An additional live token for the session.",
@@ -14460,9 +14925,17 @@
         ],
         "description": "The latest version at resolution time, or an exact one."
       },
+      "VolumeAreaParam": {
+        "type": "string",
+        "description": "One of a volume's two areas: `tmp`, always there and cleared a day after the\ntree's last activity, or `data`, kept until the root session is deleted where\nthe root agent enables it.",
+        "enum": [
+          "tmp",
+          "data"
+        ]
+      },
       "VolumeConfigBody": {
         "type": "object",
-        "description": "The roots the session tree's functions reach beyond `/tmp`.",
+        "description": "The roots the session tree's functions reach beyond `/volume/tmp`.",
         "properties": {
           "data": {
             "$ref": "#/components/schemas/VolumeDataBody",
@@ -14501,7 +14974,7 @@
             }
           }
         ],
-        "description": "Whether the volume offers a persistent `/data` root. `enabled`\nmounts it for the session tree's functions."
+        "description": "Whether the volume offers a persistent `/volume/data` root. `enabled`\nmounts it for the session tree's functions."
       },
       "VolumeFileBody": {
         "type": "object",
@@ -14522,7 +14995,7 @@
           },
           "path": {
             "type": "string",
-            "description": "The entry's absolute volume path, e.g. `/tmp/notes.txt`."
+            "description": "The entry's path in the area, e.g. `notes/a.txt`."
           },
           "size": {
             "type": "integer",
@@ -14544,7 +15017,8 @@
         "type": "object",
         "required": [
           "entries",
-          "truncated"
+          "truncated",
+          "next_cursor"
         ],
         "properties": {
           "entries": {
@@ -14553,9 +15027,16 @@
               "$ref": "#/components/schemas/VolumeFileBody"
             }
           },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Pass back as `after` for the next page; `null` on the last page."
+          },
           "truncated": {
             "type": "boolean",
-            "description": "True when the listing stopped before every entry beneath the prefix."
+            "description": "True when another page follows, which `next_cursor` then starts."
           }
         }
       },
@@ -14572,9 +15053,18 @@
             "minimum": 0
           },
           "path": {
-            "type": "string"
+            "type": "string",
+            "description": "The file's path in the area."
           }
         }
+      },
+      "VolumeListDepthParam": {
+        "type": "string",
+        "description": "How far beneath its prefix a listing reads: `all` for every entry beneath\nit, `children` for only those directly in it.",
+        "enum": [
+          "all",
+          "children"
+        ]
       },
       "WorkspaceBody": {
         "type": "object",

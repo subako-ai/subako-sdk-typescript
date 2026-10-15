@@ -115,6 +115,9 @@ export function liveSse(): LiveSse {
 export const frame = (seq: number, payload: Record<string, unknown>): string =>
 	`id: ${seq}\nevent: ${String(payload["type"])}\ndata: ${JSON.stringify({ seq, ...payload })}\n\n`;
 
+/** One delta frame in the shape the server sends: no `id`, the `delta` event name. */
+export const deltaFrame = (body: Record<string, unknown>): string => `event: delta\ndata: ${JSON.stringify(body)}\n\n`;
+
 export const userEvent = (seq: number): string =>
 	frame(seq, { type: "message_user", source: "client", message: { role: "user", content: [] } });
 

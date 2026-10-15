@@ -1,7 +1,7 @@
-import type { SessionEventBody, TranscriptMessage } from "@subako-ai/sdk";
+import type { LiveMessage, LiveTarget, SessionEventBody, TranscriptMessage } from "@subako-ai/sdk";
 import { transcript } from "@subako-ai/sdk";
 import { describe, expect, it } from "vitest";
-import { convertMessage } from "../src/convert.js";
+import { convertLiveMessage, convertMessage } from "../src/convert.js";
 
 /** When every event here was appended; nothing under test reads the time. */
 const AT = "2026-01-01T00:00:00Z";
@@ -144,5 +144,51 @@ describe("convertMessage", () => {
 		// Equal, not the same object: the caching is assistant-ui's, keyed on the message it was handed.
 		expect(convertMessage(message)).toEqual(convertMessage(message));
 		expect(convertMessage(message).id).toBe("2");
+	});
+});
+
+const call: LiveTarget = { type: "model_call", data: { model_call_id: "mc1" } };
+
+describe("convertLiveMessage", () => {
+	it("is a running assistant message under the model call's id, its blocks in order", () => {
+		const live: LiveMessage = {
+			runId: "r1",
+			target: call,
+			n: 3,
+			content: [
+				{ type: "thinking", index: 0, thinking: "hmm" },
+				{ type: "text", index: 1, text: "Looking" },
+				{ type: "tool_call", index: 2, id: "c1", name: "search", arguments: '{"query":"sub' },
+				{ type: "tool_call", index: 3, id: "c2", name: "search", arguments: '{"query":"x"}' },
+			],
+		};
+		expect(convertLiveMessage(live)).toEqual({
+			role: "assistant",
+			id: "live:model_call:mc1",
+			status: { type: "running" },
+			content: [
+				{ type: "reasoning", text: "hmm" },
+				{ type: "text", text: "Looking" },
+				// Arguments still arriving are text only; once they parse they are the args too.
+				{ type: "tool-call", toolCallId: "c1", toolName: "search", argsText: '{"query":"sub' },
+				{ type: "tool-call", toolCallId: "c2", toolName: "search", argsText: '{"query":"x"}', args: { query: "x" } },
+			],
+		});
+	});
+
+	it("reads arguments that are not yet a whole object as still partial", () => {
+		const live: LiveMessage = {
+			runId: "r1",
+			target: call,
+			n: 0,
+			content: [
+				{ type: "tool_call", index: 0, id: "c1", name: "search", arguments: "[1]" },
+				{ type: "tool_call", index: 1, id: "c2", name: "search", arguments: '{"q":"}' },
+			],
+		};
+		expect(convertLiveMessage(live).content).toEqual([
+			{ type: "tool-call", toolCallId: "c1", toolName: "search", argsText: "[1]" },
+			{ type: "tool-call", toolCallId: "c2", toolName: "search", argsText: '{"q":"}' },
+		]);
 	});
 });

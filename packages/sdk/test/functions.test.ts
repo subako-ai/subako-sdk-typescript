@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
-import { json, stubFetch, testClient } from "./support.js";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { FUNCTION_UPLOAD_TIMEOUT_MS, SubakoTimeoutError } from "../src/index.js";
+import { type Handler, json, stubFetch, testClient } from "./support.js";
 
 const bytes = new Uint8Array([0x1f, 0x8b, 0x08, 0x00]);
 const version = { id: "fv1", function_id: "fn1", version: 1 };
@@ -14,6 +15,58 @@ const streamOf = (chunk: Uint8Array): ReadableStream<Uint8Array> =>
 			controller.close();
 		},
 	});
+
+afterEach(() => {
+	vi.useRealTimers();
+});
+
+/** Answers `version` after `ms`, as Core does once it has read the module's functions. */
+const answeringAfter =
+	(ms: number): Handler =>
+	(request) =>
+		new Promise<Response>((resolve, reject) => {
+			const timer = setTimeout(() => resolve(json(version, 201)), ms);
+			request.signal.addEventListener("abort", () => {
+				clearTimeout(timer);
+				reject(request.signal.reason);
+			});
+		});
+
+/** `call`'s outcome once the fake clock has run `ms`. */
+async function after<T>(ms: number, call: Promise<T>): Promise<unknown> {
+	const settled = call.then(
+		(value: T) => value,
+		(error: unknown) => error,
+	);
+	await vi.advanceTimersByTimeAsync(ms);
+	return settled;
+}
+
+describe("function uploads", () => {
+	it("wait past the client's own timeout for Core to read the module's functions", async () => {
+		vi.useFakeTimers();
+		const http = stubFetch(answeringAfter(FUNCTION_UPLOAD_TIMEOUT_MS - 1_000));
+		const client = testClient({ fetch: http.fetch, timeout: 60_000, maxRetries: 0 });
+
+		await expect(after(FUNCTION_UPLOAD_TIMEOUT_MS, client.functions.create(bytes))).resolves.toEqual(version);
+		await expect(after(FUNCTION_UPLOAD_TIMEOUT_MS, client.functions.pushVersion("fn1", bytes))).resolves.toEqual(
+			version,
+		);
+		expect(http.calls).toHaveLength(2);
+	});
+
+	it("keep a timeout the caller gave, or a client's longer one", async () => {
+		vi.useFakeTimers();
+		const http = stubFetch(answeringAfter(2 * FUNCTION_UPLOAD_TIMEOUT_MS));
+		const client = testClient({ fetch: http.fetch, maxRetries: 0 });
+		await expect(after(5_000, client.functions.create(bytes, { timeout: 1_000 }))).resolves.toBeInstanceOf(
+			SubakoTimeoutError,
+		);
+
+		const patient = testClient({ fetch: http.fetch, timeout: 3 * FUNCTION_UPLOAD_TIMEOUT_MS, maxRetries: 0 });
+		await expect(after(2 * FUNCTION_UPLOAD_TIMEOUT_MS, patient.functions.create(bytes))).resolves.toEqual(version);
+	});
+});
 
 describe("function archives", () => {
 	it("sends a Uint8Array as gzip with an idempotency key", async () => {

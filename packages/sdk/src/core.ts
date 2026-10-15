@@ -291,6 +291,14 @@ export class Core {
 		return (result.response?.status === 204 ? undefined : result.data) as OperationSuccess<F>;
 	}
 
+	/**
+	 * `options`, for an operation the server takes long to answer: an attempt
+	 * the caller gave no timeout may take at least `floor` milliseconds.
+	 */
+	withTimeoutAtLeast(options: RequestOptions | undefined, floor: number): RequestOptions {
+		return { ...options, timeout: options?.timeout ?? Math.max(this.#timeout, floor) };
+	}
+
 	/** Sends one operation whose body is a binary archive rather than JSON. */
 	async upload<F extends Operation>(
 		fn: F,

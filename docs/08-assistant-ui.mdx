@@ -23,7 +23,8 @@ import { SubakoProvider, useSession } from "@subako-ai/react";
 
 function Assistant({ sessionId }: { sessionId: string }) {
 	// The app opens the session and hands it down, so the chat opens no second connection.
-	return <SubakoChat session={useSession(sessionId)} />;
+	// `deltas` shows the assistant's reply as it is written.
+	return <SubakoChat session={useSession(sessionId, { deltas: true })} />;
 }
 
 export function App({ sessionId }: { sessionId: string }) {
@@ -35,7 +36,7 @@ export function App({ sessionId }: { sessionId: string }) {
 }
 ```
 
-That is the transcript, the tool calls with their results, the approval prompt, a composer, and a stop button while a run is under way. The assistant's text is drawn as markdown, tables and all, with links that open in a new tab; what the person typed is shown as typed.
+That is the transcript, the tool calls with their results, the approval prompt, a composer, and a stop button while a run is under way. With `deltas`, a reply shows as it is written, as a running message the logged one replaces once it lands. The assistant's text is drawn as markdown, tables and all, with links that open in a new tab; what the person typed is shown as typed.
 
 The session is the one the app opened, so the tools the app declares and the thread share one connection. `useSession` hands back `null` until its effect has connected, which the chat renders as an empty thread with a disabled composer.
 
@@ -121,7 +122,7 @@ The runtime subscribes to the session itself, so the thread follows the log wher
 
 | assistant-ui | Subako |
 | ------------ | ------ |
-| `messages` | `state.transcript`, through `convertMessage` |
+| `messages` | `state.transcript`, through `convertMessage`, then `state.live`, through `convertLiveMessage` |
 | `isRunning` | `state.isRunning` |
 | `onNew` | `send(text)`, over the text parts of the appended message |
 | `onCancel` | `cancel()` |
@@ -129,4 +130,4 @@ The runtime subscribes to the session itself, so the thread follows the log wher
 
 The argument is anything carrying those members, or `null`.
 
-`convertMessage` is the pure half, exported so an app can convert a transcript without a runtime.
+`convertMessage` and `convertLiveMessage` are the pure half, exported so an app can convert a transcript without a runtime. A live message converts to a running assistant message whose tool calls carry `argsText` while their arguments are still arriving.

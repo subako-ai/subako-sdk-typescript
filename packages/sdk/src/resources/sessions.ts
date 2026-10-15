@@ -3,6 +3,7 @@ import { BY_ID } from "../core.js";
 import * as api from "../generated/index.js";
 import type { IdPaged } from "../pagination.js";
 import { type ConnectOptions, SessionConnection } from "../session.js";
+import type { VolumePath } from "../volume.js";
 
 export type ListSessionsParams = IdPaged<NonNullable<api.ListSessionsData["query"]>>;
 export type ListVolumeFilesParams = NonNullable<api.ListVolumeFilesData["query"]>;
@@ -10,11 +11,8 @@ export type ListVolumeFilesParams = NonNullable<api.ListVolumeFilesData["query"]
 /** The bytes of a volume file; text goes up as UTF-8. */
 export type VolumeFileContent = Blob | ArrayBuffer | Uint8Array | string;
 
-/** The route's path parameter: the volume path without its leading slash, which the client encodes whole. */
-const volumeRoute = (sessionId: string, path: string) => ({
-	session_id: sessionId,
-	path: path.replace(/^\/+/, ""),
-});
+/** The route's path parameters: the area, and the path in it, which the client encodes whole. */
+const volumeRoute = (sessionId: string, { area, path }: VolumePath) => ({ session_id: sessionId, area, path });
 
 const volumeBytes = (content: VolumeFileContent): Blob | Uint8Array =>
 	content instanceof Blob || content instanceof Uint8Array ? content : new Blob([content]);
@@ -91,24 +89,39 @@ export class SessionApi {
 		return this.core.call(api.deleteSessionSandboxArchive, { path: { session_id: sessionId, name } }, options);
 	}
 
-	/** Lists the session tree's volume files beneath `prefix`, `/tmp` when omitted. */
-	listVolumeFiles(sessionId: string, params?: ListVolumeFilesParams, options?: RequestOptions) {
-		return this.core.call(api.listVolumeFiles, { path: { session_id: sessionId }, query: params }, options);
+	/** Downloads an image the session's events name: an `image` content block's `sha256`. Its bytes never change, so a caller may keep them. */
+	readImage(sessionId: string, sha256: string, options?: RequestOptions) {
+		return this.core.download(api.getSessionImage, { path: { session_id: sessionId, sha256 } }, options);
 	}
 
-	/** Downloads a volume file by its absolute path, such as `/tmp/a.txt`. */
-	readVolumeFile(sessionId: string, path: string, options?: RequestOptions) {
-		return this.core.download(api.getVolumeFile, { path: volumeRoute(sessionId, path) }, options);
+	/**
+	 * Lists one page of the files in one area of the session tree's volume, beneath `prefix`,
+	 * the area itself when omitted: every entry beneath it, or with `depth: "children"` only
+	 * those directly in it. Each entry's `path` is its path in the area. Pass a page's
+	 * `next_cursor` back as `after` for the page that follows.
+	 */
+	listVolumeFiles(
+		sessionId: string,
+		area: api.VolumeAreaParam,
+		params?: ListVolumeFilesParams,
+		options?: RequestOptions,
+	) {
+		return this.core.call(api.listVolumeFiles, { path: { session_id: sessionId, area }, query: params }, options);
 	}
 
-	/** Creates or replaces a volume file, and its parent directories, at an absolute path such as `/tmp/a.txt`. */
-	writeVolumeFile(sessionId: string, path: string, content: VolumeFileContent, options?: RequestOptions) {
-		return this.core.upload(api.putVolumeFile, { path: volumeRoute(sessionId, path) }, volumeBytes(content), options);
+	/** Downloads a volume file, such as `{ area: "tmp", path: "notes/a.txt" }`. */
+	readVolumeFile(sessionId: string, file: VolumePath, options?: RequestOptions) {
+		return this.core.download(api.getVolumeFile, { path: volumeRoute(sessionId, file) }, options);
+	}
+
+	/** Creates or replaces a volume file, and its parent directories. */
+	writeVolumeFile(sessionId: string, file: VolumePath, content: VolumeFileContent, options?: RequestOptions) {
+		return this.core.upload(api.putVolumeFile, { path: volumeRoute(sessionId, file) }, volumeBytes(content), options);
 	}
 
 	/** Removes a volume file, or a directory and everything beneath it. */
-	deleteVolumeFile(sessionId: string, path: string, options?: RequestOptions) {
-		return this.core.call(api.deleteVolumeFile, { path: volumeRoute(sessionId, path) }, options);
+	deleteVolumeFile(sessionId: string, file: VolumePath, options?: RequestOptions) {
+		return this.core.call(api.deleteVolumeFile, { path: volumeRoute(sessionId, file) }, options);
 	}
 
 	/** Removes every file in the session tree's volume. */

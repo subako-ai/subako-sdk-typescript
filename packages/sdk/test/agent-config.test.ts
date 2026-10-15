@@ -33,6 +33,7 @@ describe("readAgentConfig", () => {
 				model: "claude-sonnet-5",
 				max_tokens: 8192,
 				context_window: 200_000,
+				image_input: null,
 				thinking: null,
 				effort: null,
 			},
@@ -211,6 +212,7 @@ describe("readAgentConfig", () => {
 			model: "claude-haiku-4-5",
 			max_tokens: 32000,
 			context_window: 200_000,
+			image_input: null,
 			thinking: { type: "enabled", budget_tokens: 16000 },
 			effort: "high",
 		});
@@ -249,7 +251,13 @@ describe("readAgentConfig", () => {
 			stored({
 				model: {
 					format: "openai_responses",
-					config: { model: "gpt-5", max_tokens: 8192, context_window: 200000, reasoning_effort: "medium" },
+					config: {
+						model: "gpt-5",
+						max_tokens: 8192,
+						context_window: 200000,
+						image_input: "unsupported",
+						reasoning_effort: "medium",
+					},
 				},
 			}),
 		);
@@ -258,6 +266,7 @@ describe("readAgentConfig", () => {
 			model: "gpt-5",
 			max_tokens: 8192,
 			context_window: 200000,
+			image_input: "unsupported",
 			reasoning_effort: "medium",
 		});
 	});
@@ -298,6 +307,7 @@ describe("readAgentConfig", () => {
 				model: "claude-sonnet-5",
 				max_tokens: 8192,
 				context_window: 200_000,
+				image_input: null,
 				thinking: null,
 				effort: null,
 			},

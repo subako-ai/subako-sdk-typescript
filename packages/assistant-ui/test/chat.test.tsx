@@ -5,7 +5,7 @@ import { act, cleanup, fireEvent, render, screen, within } from "@testing-librar
 import { memo, type ReactNode } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 import { SubakoChat, type SubakoChatProps, SubakoToolApproval } from "../src/index.js";
-import { type Backend, backend, SESSION_ID, settle } from "../../react/test/support.js";
+import { type Backend, backend, redrawn, SESSION_ID, settle } from "../../react/test/support.js";
 
 afterEach(cleanup);
 
@@ -247,6 +247,45 @@ describe("SubakoChat", () => {
 
 		await push(back, [[3, { type: "run_completed", run_id: "r1" }]]);
 		expect(bubble?.textContent).not.toContain("●");
+	});
+
+	it("shows what a model is writing while it writes it, until the log's message replaces it", async () => {
+		const back = backend();
+		function Following(): ReactNode {
+			return <SubakoChat session={useSession(SESSION_ID, { deltas: true })} />;
+		}
+		render(
+			<SubakoProvider client={back.client}>
+				<Following />
+			</SubakoProvider>,
+		);
+		await act(async () => {
+			await settle();
+		});
+		await push(back, [[1, { type: "run_started", run_id: "r1" }]]);
+		await act(async () => {
+			back.pushDelta({
+				run_id: "r1",
+				target: { type: "model_call", data: { model_call_id: "mc1" } },
+				n: 0,
+				delta: { type: "append", data: { parts: [{ type: "text", data: { index: 0, text: "Writ" } }] } },
+			});
+			await settle();
+			await redrawn();
+		});
+		expect(screen.getByText("Writ")).toBeDefined();
+
+		await push(back, [
+			[
+				2,
+				{
+					type: "message_assistant",
+					message: { role: "assistant", content: [{ type: "text", data: { text: "Written" } }], model_call_id: "mc1" },
+				},
+			],
+		]);
+		expect(screen.queryByText("Writ")).toBeNull();
+		expect(screen.getAllByText("Written")).toHaveLength(1);
 	});
 
 	it("leaves what the person typed as it was", async () => {

@@ -3,8 +3,9 @@
 import type { AppendMessage, AssistantRuntime } from "@assistant-ui/react";
 import { useExternalStoreRuntime } from "@assistant-ui/react";
 import { useSessionState } from "@subako-ai/react";
-import type { SessionState, TranscriptMessage } from "@subako-ai/sdk";
-import { convertMessage } from "./convert.js";
+import type { LiveMessage, SessionState, TranscriptMessage } from "@subako-ai/sdk";
+import { useMemo } from "react";
+import { convertLiveMessage, convertMessage } from "./convert.js";
 
 /**
  * What the runtime reads off a session: the SDK's `SessionConnection`, or
@@ -23,8 +24,13 @@ export interface SubakoSession {
 	resolveApproval(callId: string, decision: "allow" | "deny", message?: string): Promise<void>;
 }
 
+/** One message of the thread: one the log holds, or one a model call is still producing. */
+type ThreadEntry = TranscriptMessage | LiveMessage;
+
 /** The thread before the connection is open: no messages, and the same array on every render. */
-const NOTHING: readonly TranscriptMessage[] = [];
+const NOTHING: readonly ThreadEntry[] = [];
+
+const convertEntry = (entry: ThreadEntry) => ("target" in entry ? convertLiveMessage(entry) : convertMessage(entry));
 
 /** assistant-ui hands the composer's parts; a session takes one string. */
 function appendedText(message: AppendMessage): string {
@@ -43,7 +49,7 @@ function appendedText(message: AppendMessage): string {
  *
  * | assistant-ui              | Subako                                        |
  * | ------------------------- | --------------------------------------------- |
- * | `messages`                | `state.transcript`, through `convertMessage`  |
+ * | `messages`                | `state.transcript`, then `state.live`         |
  * | `isRunning`               | `state.isRunning`                             |
  * | `onNew`                   | `send(text)`                                  |
  * | `onCancel`                | `cancel()`                                    |
@@ -57,15 +63,31 @@ function appendedText(message: AppendMessage): string {
  * The session is a value, not something React re-renders for, so the runtime
  * subscribes to it here: a chat handed the session by a parent that does not
  * re-render still follows the log.
+ *
+ * A session opened with `deltas` also shows what a model is writing while it
+ * writes it: each of `state.live` follows the log as a running assistant
+ * message, which the logged message replaces once it lands.
  */
 export function useSubakoRuntime(session: SubakoSession | null): AssistantRuntime {
 	// The snapshot this render was woken for, which is what the thread is built from.
 	const state = useSessionState(session);
-	return useExternalStoreRuntime<TranscriptMessage>({
-		messages: state?.transcript ?? NOTHING,
+	const transcript = state?.transcript;
+	const live = state?.live;
+	// Rebuilt only when either part changes, so assistant-ui's per-message cache stays warm.
+	const messages = useMemo(
+		(): readonly ThreadEntry[] =>
+			transcript === undefined
+				? NOTHING
+				: live === undefined || live.length === 0
+					? transcript
+					: [...transcript, ...live],
+		[transcript, live],
+	);
+	return useExternalStoreRuntime<ThreadEntry>({
+		messages,
 		isRunning: state?.isRunning ?? false,
 		isDisabled: session === null,
-		convertMessage,
+		convertMessage: convertEntry,
 		onNew: async (message) => {
 			await session?.send(appendedText(message));
 		},

@@ -1,9 +1,10 @@
 /**
- * A function package as its manifest, its module, and the assets its module
- * reads at `/package`: packing them into the gzipped tar the push routes take. Core decodes every upload itself, so what it makes of the
- * module (valid WebAssembly, the imports it may name) is its to judge.
+ * A function package as its manifest file, its module, and the assets its
+ * module reads at `/package`: packing them into the gzipped tar the push routes
+ * take. Core decodes every upload itself and runs the module to learn its
+ * tools, so what it makes of the module (valid WebAssembly, the imports it may
+ * name, the tools it lists) is its to judge.
  */
-import type { FunctionManifestBody } from "./generated/index.js";
 import { ancestors, isBundlePath, packTar } from "./skill-bundle.js";
 
 /**
@@ -21,13 +22,9 @@ export const FUNCTION_ASSETS_MAX_FILES = 10_000;
 // CODESYNC(function-asset-path-max-bytes)
 export const FUNCTION_ASSET_PATH_MAX_BYTES = 1024;
 
-/** The longest description a package or one of its functions may carry, in characters. */
+/** The longest description a package may carry, in characters. */
 // CODESYNC(function-description-len)
 export const FUNCTION_DESCRIPTION_MAX_CHARS = 1024;
-
-/** The most one input or output schema may hold as JSON, in bytes. */
-// CODESYNC(function-schema-max-bytes)
-export const FUNCTION_SCHEMA_MAX_BYTES = 64 * 1024;
 
 /** The most `subako-package.json` may hold, in bytes. */
 // CODESYNC(function-manifest-max-bytes)
@@ -40,29 +37,34 @@ export const FUNCTION_MODULE_FILE = "module.wasm";
 /** The directory at a bundle's root holding its assets. */
 export const FUNCTION_ASSETS_DIR = "assets";
 
+/** The function ABI a module speaks: MCP 2026-07-28 over stdio. */
+// CODESYNC(function-abi)
+export const FUNCTION_ABI = 1;
+
 /**
- * What {@link packFunction} packs: the manifest to write, the compiled module,
+ * What `subako-package.json` holds. The module lists its own tools through
+ * MCP `tools/list`, which Core asks it at upload.
+ */
+export interface FunctionManifestFile {
+	readonly abi: typeof FUNCTION_ABI;
+	readonly name: string;
+	readonly description: string;
+}
+
+/**
+ * What {@link packFunction} packs: the manifest file to write, the compiled module,
  * and the files its module reads, read-only, under `/package`, keyed by their
  * path there (`data/words.txt` is `/package/data/words.txt`).
  */
 export interface FunctionFiles {
-	readonly manifest: FunctionManifestBody;
+	readonly manifest: FunctionManifestFile;
 	readonly module: Uint8Array;
 	readonly assets?: Readonly<Record<string, Uint8Array>>;
 }
 
 /** Why a manifest and module cannot be packed as a bundle. */
 export type FunctionBundleProblem =
-	| { readonly kind: "noFunctions" }
-	| { readonly kind: "duplicateFunction"; readonly name: string }
-	/** `function` is null for the package's own description. */
-	| { readonly kind: "descriptionTooLong"; readonly function: string | null; readonly chars: number }
-	| {
-			readonly kind: "schemaTooLarge";
-			readonly function: string;
-			readonly schema: "input_schema" | "output_schema";
-			readonly bytes: number;
-	  }
+	| { readonly kind: "descriptionTooLong"; readonly chars: number }
 	| { readonly kind: "manifestTooLarge"; readonly bytes: number }
 	/** Empty, absolute, or carrying an empty, `.` or `..` segment. */
 	| { readonly kind: "invalidAssetPath"; readonly path: string }
@@ -90,30 +92,9 @@ export class FunctionBundleError extends Error {
  */
 export function checkFunctionFiles(files: FunctionFiles, manifestBytes: number): FunctionBundleProblem[] {
 	const problems: FunctionBundleProblem[] = [];
-	const { manifest } = files;
-	if (manifest.functions.length === 0) {
-		problems.push({ kind: "noFunctions" });
-	}
-	const packageChars = chars(manifest.description);
-	if (packageChars > FUNCTION_DESCRIPTION_MAX_CHARS) {
-		problems.push({ kind: "descriptionTooLong", function: null, chars: packageChars });
-	}
-	const names = new Set<string>();
-	for (const fn of manifest.functions) {
-		if (names.has(fn.name)) {
-			problems.push({ kind: "duplicateFunction", name: fn.name });
-		}
-		names.add(fn.name);
-		const fnChars = chars(fn.description);
-		if (fnChars > FUNCTION_DESCRIPTION_MAX_CHARS) {
-			problems.push({ kind: "descriptionTooLong", function: fn.name, chars: fnChars });
-		}
-		for (const schema of ["input_schema", "output_schema"] as const) {
-			const bytes = jsonBytes(fn[schema]);
-			if (bytes > FUNCTION_SCHEMA_MAX_BYTES) {
-				problems.push({ kind: "schemaTooLarge", function: fn.name, schema, bytes });
-			}
-		}
+	const descriptionChars = chars(files.manifest.description);
+	if (descriptionChars > FUNCTION_DESCRIPTION_MAX_CHARS) {
+		problems.push({ kind: "descriptionTooLong", chars: descriptionChars });
 	}
 	if (manifestBytes > FUNCTION_MANIFEST_MAX_BYTES) {
 		problems.push({ kind: "manifestTooLarge", bytes: manifestBytes });
@@ -173,20 +154,10 @@ function chars(text: string): number {
 	return Array.from(text).length;
 }
 
-function jsonBytes(value: unknown): number {
-	return new TextEncoder().encode(JSON.stringify(value)).byteLength;
-}
-
 function describeProblem(problem: FunctionBundleProblem): string {
 	switch (problem.kind) {
-		case "noFunctions":
-			return "the manifest lists no functions";
-		case "duplicateFunction":
-			return `the function ${problem.name} appears more than once`;
 		case "descriptionTooLong":
-			return `${problem.function === null ? "the package's description" : `the function ${problem.function}'s description`} holds ${problem.chars} characters, over the ${FUNCTION_DESCRIPTION_MAX_CHARS}-character limit`;
-		case "schemaTooLarge":
-			return `the function ${problem.function}'s ${problem.schema} holds ${problem.bytes} bytes, over the ${FUNCTION_SCHEMA_MAX_BYTES}-byte limit`;
+			return `the package's description holds ${problem.chars} characters, over the ${FUNCTION_DESCRIPTION_MAX_CHARS}-character limit`;
 		case "manifestTooLarge":
 			return `${FUNCTION_MANIFEST_FILE} holds ${problem.bytes} bytes, over the ${FUNCTION_MANIFEST_MAX_BYTES}-byte limit`;
 		case "invalidAssetPath":

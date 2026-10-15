@@ -1,4 +1,4 @@
-import { SubakoSessionClient } from "@subako-ai/sdk";
+import { LIVE_REDRAW_MS, SubakoSessionClient } from "@subako-ai/sdk";
 
 export type Handler = (request: Request) => Response | Promise<Response>;
 
@@ -53,6 +53,8 @@ export interface Backend {
 	readonly sent: (method: string, suffix: string) => readonly Request[];
 	/** How many event streams were opened, which is how many connections there are. */
 	readonly streams: () => number;
+	/** Sends a delta frame on every open stream. */
+	readonly pushDelta: (body: Record<string, unknown>) => void;
 }
 
 /** Every session route a connection, a tool client and the hooks touch, in one handler. */
@@ -124,6 +126,12 @@ export function backend(overrides: Readonly<Record<string, Handler>> = {}): Back
 				sink.enqueue(chunk);
 			}
 		},
+		pushDelta: (body) => {
+			const chunk = encoder.encode(`event: delta\ndata: ${JSON.stringify(body)}\n\n`);
+			for (const sink of sinks) {
+				sink.enqueue(chunk);
+			}
+		},
 		sent: (method, suffix) =>
 			http.calls.filter((call) => call.method === method && new URL(call.url).pathname.endsWith(suffix)),
 		streams: () => streams,
@@ -131,6 +139,9 @@ export function backend(overrides: Readonly<Record<string, Handler>> = {}): Back
 }
 
 /** Lets every pending microtask and answer settle; nothing here waits on a timer. */
+/** Long enough for delta frames to have moved `live`. */
+export const redrawn = (): Promise<void> => new Promise<void>((resolve) => setTimeout(resolve, LIVE_REDRAW_MS));
+
 export const settle = async (turns = 6): Promise<void> => {
 	for (let turn = 0; turn < turns; turn += 1) {
 		await Promise.resolve();

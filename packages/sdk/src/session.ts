@@ -1,11 +1,16 @@
 import { type Core, isFinalRefusal, type RequestOptions, sleep } from "./core.js";
 import { SubakoConnectionError, SubakoError } from "./errors.js";
 import {
+	EMPTY_LIVE,
 	EMPTY_TRANSCRIPT,
+	foldDelta,
 	foldTranscript,
 	isRunning,
+	type LiveMessage,
+	type LiveState,
 	type PendingApproval,
 	pendingApprovals,
+	settleLive,
 	type TranscriptFold,
 	type TranscriptMessage,
 } from "./events.js";
@@ -43,6 +48,12 @@ export interface ConnectOptions {
 	readonly headers?: Record<string, string>;
 	/** `Kikuvi-Workspace` for the connection and for the clients attached to it. */
 	readonly workspaceId?: string;
+	/**
+	 * Also follow output still being produced, which `state.live` holds until the
+	 * log commits it. A preview only: it may miss frames, and the transcript never
+	 * depends on it.
+	 */
+	readonly deltas?: boolean;
 }
 
 /** connecting -> open -> (reconnecting -> open)* -> closed | failed. */
@@ -50,6 +61,11 @@ export type ConnectionStatus = "connecting" | "open" | "reconnecting" | "closed"
 
 const STREAM_URL: api.StreamSessionEventsData["url"] = "/v1/sessions/{session_id}/events/stream";
 const DEFAULT_RECONNECT_MS = 3_000;
+/**
+ * How long delta frames gather before `live` moves, so a reader draws a
+ * growing message at most this often. An event moves it at once.
+ */
+export const LIVE_REDRAW_MS = 100;
 const MAX_RECONNECT_MS = 30_000;
 const DEFAULT_MAX_RECONNECTS = 5;
 /** How many earlier events `loadEarlier` reads when it is not told. */
@@ -58,9 +74,14 @@ const DEFAULT_EARLIER = 100;
 // CODESYNC(page-limit)
 const WINDOW_PAGE = 200;
 const LINE = /\r\n|\r|\n/;
+/** The SSE event name a delta frame carries. */
+// CODESYNC(delta-event-name)
+const DELTA_EVENT = "delta";
 
 type Frame =
 	| { readonly kind: "event"; readonly data: string }
+	/** Output still being produced, which no seq orders. */
+	| { readonly kind: "delta"; readonly data: string }
 	/** An `id` with no `data`: the stream's own cursor, which the server opens with. */
 	| { readonly kind: "cursor"; readonly seq: number }
 	| { readonly kind: "retry"; readonly ms: number };
@@ -72,6 +93,7 @@ async function* readFrames(body: ReadableStream<Uint8Array>): AsyncGenerator<Fra
 	let buffer = "";
 	let data: string[] = [];
 	let id: string | undefined;
+	let name: string | undefined;
 	try {
 		for (;;) {
 			const { done, value } = await reader.read();
@@ -89,12 +111,13 @@ async function* readFrames(body: ReadableStream<Uint8Array>): AsyncGenerator<Fra
 				buffer = buffer.slice(match.index + match[0].length);
 				if (line === "") {
 					if (data.length > 0) {
-						yield { kind: "event", data: data.join("\n") };
+						yield { kind: name === DELTA_EVENT ? "delta" : "event", data: data.join("\n") };
 					} else if (id !== undefined && /^\d+$/.test(id)) {
 						yield { kind: "cursor", seq: Number(id) };
 					}
 					data = [];
 					id = undefined;
+					name = undefined;
 					continue;
 				}
 				if (line.startsWith(":")) {
@@ -105,6 +128,8 @@ async function* readFrames(body: ReadableStream<Uint8Array>): AsyncGenerator<Fra
 				const value = colon === -1 ? "" : line.slice(colon + 1).replace(/^ /, "");
 				if (field === "data") {
 					data.push(value);
+				} else if (field === "event") {
+					name = value;
 				} else if (field === "id") {
 					id = value;
 				} else if (field === "retry" && /^\d+$/.test(value)) {
@@ -121,9 +146,9 @@ async function* readFrames(body: ReadableStream<Uint8Array>): AsyncGenerator<Fra
 }
 
 /** One frame's payload. A frame that is not JSON is the server's fault, and no reconnect mends it. */
-function parseEvent(data: string): api.SessionEventBody {
+function parseFrame<T extends api.SessionStreamData>(data: string): T {
 	try {
-		return JSON.parse(data) as api.SessionEventBody;
+		return JSON.parse(data) as T;
 	} catch (error) {
 		throw new SubakoError("the session event stream carried a frame that is not JSON", { cause: error });
 	}
@@ -139,6 +164,8 @@ interface Following {
 	readonly events: readonly api.SessionEventBody[];
 	/** Whether the log holds events before the first of `events`, which `loadEarlier` reads. */
 	readonly hasEarlier: boolean;
+	/** Messages still being produced, oldest first; empty unless the connection follows `deltas`. */
+	readonly live: readonly LiveMessage[];
 }
 
 /** The three readings of one events array, derived together because they change together. */
@@ -183,6 +210,10 @@ export class SessionConnection implements AsyncIterable<api.SessionEventBody> {
 	#foldedFirst: api.SessionEventBody | undefined;
 	/** The read of earlier events under way, which a second call joins. */
 	#earlier: Promise<void> | undefined;
+	/** What `live` is read from, with what the log settled under it; ahead of `live` while frames gather. */
+	#live: LiveState = EMPTY_LIVE;
+	/** Set while frames gather, until `live` catches up with `#live`. */
+	#redraw: ReturnType<typeof setTimeout> | undefined;
 	#open: (() => void) | undefined;
 	#give: ((error: unknown) => void) | undefined;
 	#release: (() => void) | undefined;
@@ -200,6 +231,7 @@ export class SessionConnection implements AsyncIterable<api.SessionEventBody> {
 			lastSeq: options.afterSeq,
 			events: [],
 			hasEarlier: (options.afterSeq ?? 0) > 0,
+			live: [],
 		});
 		this.#ready = this.#promise();
 		if (options.signal?.aborted === true) {
@@ -289,6 +321,11 @@ export class SessionConnection implements AsyncIterable<api.SessionEventBody> {
 	/** Whether a run is queued or under way. */
 	get isRunning(): boolean {
 		return this.#read().isRunning;
+	}
+
+	/** Messages still being produced; see `ConnectOptions.deltas`. */
+	get live(): readonly LiveMessage[] {
+		return this.#store.state.live;
 	}
 
 	/** Calls `listener` with the state after every change; returns an unsubscribe. */
@@ -484,18 +521,27 @@ export class SessionConnection implements AsyncIterable<api.SessionEventBody> {
 					if (this.#ended) {
 						return;
 					}
-					if (frame.kind === "retry") {
-						this.#reconnectMs = frame.ms;
-						continue;
+					switch (frame.kind) {
+						case "retry":
+							this.#reconnectMs = frame.ms;
+							break;
+						// The cursor frame opens every stream, so it says nothing about whether this
+						// one will deliver: it moves the reconnect position and leaves the budget alone.
+						case "cursor":
+							this.#mark(frame.seq);
+							break;
+						case "delta":
+							this.#reconnects = 0;
+							this.#preview(parseFrame<api.SessionDeltaBody>(frame.data));
+							break;
+						case "event":
+							this.#reconnects = 0;
+							this.#deliver(parseFrame<api.SessionEventBody>(frame.data));
+							break;
+						// COVERAGE(never): a frame has no other kind, which `satisfies never` proves.
+						default:
+							frame satisfies never;
 					}
-					// The cursor frame opens every stream, so it says nothing about whether this
-					// one will deliver: it moves the reconnect position and leaves the budget alone.
-					if (frame.kind === "cursor") {
-						this.#mark(frame.seq);
-						continue;
-					}
-					this.#reconnects = 0;
-					this.#deliver(parseEvent(frame.data));
 				}
 			} catch (error) {
 				// A frame that is not an event is a server bug; reconnecting would only meet it again.
@@ -596,7 +642,13 @@ export class SessionConnection implements AsyncIterable<api.SessionEventBody> {
 		};
 		return this.#core.stream(
 			STREAM_URL,
-			{ path: { session_id: this.sessionId }, query: lastSeq === undefined ? {} : { after_seq: lastSeq } },
+			{
+				path: { session_id: this.sessionId },
+				query: {
+					...(lastSeq === undefined ? {} : { after_seq: lastSeq }),
+					...(this.#options.deltas === true ? { deltas: true } : {}),
+				},
+			},
 			request,
 		);
 	}
@@ -670,13 +722,38 @@ export class SessionConnection implements AsyncIterable<api.SessionEventBody> {
 		if (lastSeq !== undefined && event.seq <= lastSeq) {
 			return;
 		}
+		this.#live = settleLive(this.#live, event);
+		// The event carries every frame gathered so far with it.
+		clearTimeout(this.#redraw);
+		this.#redraw = undefined;
 		this.#store.update({
 			lastSeq: event.seq,
 			events: [...events, event],
 			// The log starts at seq 1, so the first event held says whether any came before it.
 			hasEarlier: events.length === 0 ? event.seq > 1 : hasEarlier,
+			live: this.#live.messages,
 		});
 		notify(this.#events, event);
+	}
+
+	/**
+	 * Folds one delta frame into `#live`, unless the log already settled what it
+	 * previews, and moves `live` once frames have gathered for `LIVE_REDRAW_MS`.
+	 */
+	#preview(frame: api.SessionDeltaBody): void {
+		if (this.#ended) {
+			return;
+		}
+		const next = foldDelta(this.#live, frame);
+		if (next === this.#live) {
+			return;
+		}
+		this.#live = next;
+		// `#settle` clears a pending redraw, so none fires once the connection has ended.
+		this.#redraw ??= setTimeout(() => {
+			this.#redraw = undefined;
+			this.#store.update({ live: this.#live.messages });
+		}, LIVE_REDRAW_MS);
 	}
 
 	#enter(status: ConnectionStatus): void {
@@ -695,6 +772,8 @@ export class SessionConnection implements AsyncIterable<api.SessionEventBody> {
 			return;
 		}
 		this.#stop.abort();
+		clearTimeout(this.#redraw);
+		this.#redraw = undefined;
 		this.#release?.();
 		this.#release = undefined;
 		this.#give?.(status === "failed" ? error : new SubakoConnectionError("the session connection was closed"));

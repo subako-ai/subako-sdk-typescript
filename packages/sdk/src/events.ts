@@ -41,7 +41,9 @@ export interface TranscriptMessage {
 const isToolCall = (block: api.ContentBlockBody): block is ToolCallBlock => block.type === "tool_call";
 
 /** Whether `event` ends a run, which drops whatever approval it was waiting on. */
-const endsRun = (event: api.SessionEventBody): boolean =>
+const endsRun = (
+	event: api.SessionEventBody,
+): event is Extract<api.SessionEventBody, { type: "run_completed" | "run_failed" | "run_cancelled" }> =>
 	event.type === "run_completed" || event.type === "run_failed" || event.type === "run_cancelled";
 
 /**
@@ -221,4 +223,178 @@ export function foldTranscript(previous: TranscriptFold, events: readonly api.Se
 /** The log's conversation in seq order, each `tool_call` joined to its `tool_result` and its approval. */
 export function transcript(events: readonly api.SessionEventBody[]): readonly TranscriptMessage[] {
 	return foldTranscript(EMPTY_TRANSCRIPT, events).messages;
+}
+
+/** One block of a message still being produced: the text its deltas carried so far, at its place in the message. */
+export type LiveBlock =
+	| { readonly type: "text"; readonly index: number; readonly text: string }
+	| { readonly type: "thinking"; readonly index: number; readonly thinking: string }
+	/** `arguments` is the JSON text received so far, which parses only once the call is complete. */
+	| {
+			readonly type: "tool_call";
+			readonly index: number;
+			readonly id: string;
+			readonly name: string;
+			readonly arguments: string;
+	  };
+
+/** What a live message previews, and so which commit ends it: the target its delta frames name. */
+export type LiveTarget = api.DeltaTargetBody;
+
+/** A key for `target` that no other live target shares, for a list that renders them. */
+export function liveKey(target: LiveTarget): string {
+	switch (target.type) {
+		case "model_call":
+			return `model_call:${target.data.model_call_id}`;
+		// COVERAGE(never): a target has no other type, which `satisfies never` proves.
+		default:
+			return target.type satisfies never;
+	}
+}
+
+/** The key of the target `event` commits, when it commits one. */
+function committedBy(event: api.SessionEventBody): string | undefined {
+	switch (event.type) {
+		case "message_assistant": {
+			const call = event.message.model_call_id;
+			return call === undefined || call === null
+				? undefined
+				: liveKey({ type: "model_call", data: { model_call_id: call } });
+		}
+		default:
+			return undefined;
+	}
+}
+
+/**
+ * Output a model call is still producing, built from the stream's delta
+ * frames. It is a preview: the log never holds it, frames may be missing, and
+ * the event that commits its target replaces it.
+ */
+export interface LiveMessage {
+	readonly runId: string;
+	readonly target: LiveTarget;
+	/** The last frame applied, so one already held is dropped. */
+	readonly n: number;
+	/** In content order. A reader that joined mid-call holds a block from where it joined. */
+	readonly content: readonly LiveBlock[];
+}
+
+/**
+ * The live messages, and what the log has settled under them: a frame that
+ * arrives after the commit of its target, or after its run ended, previews
+ * nothing.
+ */
+export interface LiveState {
+	readonly messages: readonly LiveMessage[];
+	/**
+	 * The targets the log committed in the run under way, keyed by `liveKey`. A
+	 * session runs one run at a time, so the run's end clears them: `ended`
+	 * covers them from then on.
+	 */
+	readonly committed: ReadonlySet<string>;
+	/** The runs the log ended. */
+	readonly ended: ReadonlySet<string>;
+}
+
+/** No live message, and nothing settled. */
+export const EMPTY_LIVE: LiveState = { messages: [], committed: new Set(), ended: new Set() };
+
+type DeltaPart = api.DeltaPartBody;
+
+/** `part` appended to the block it grows, or as a new block in its place. */
+function grow(content: readonly LiveBlock[], part: DeltaPart): readonly LiveBlock[] {
+	const at = content.findIndex((block) => block.index === part.data.index);
+	const block = at === -1 ? undefined : content[at];
+	let next: LiveBlock;
+	switch (part.type) {
+		case "text":
+			next = {
+				type: "text",
+				index: part.data.index,
+				text: (block?.type === "text" ? block.text : "") + part.data.text,
+			};
+			break;
+		case "thinking":
+			next = {
+				type: "thinking",
+				index: part.data.index,
+				thinking: (block?.type === "thinking" ? block.thinking : "") + part.data.thinking,
+			};
+			break;
+		case "tool_call":
+			next = {
+				type: "tool_call",
+				index: part.data.index,
+				id: part.data.id,
+				name: part.data.name,
+				arguments: (block?.type === "tool_call" ? block.arguments : "") + part.data.arguments,
+			};
+			break;
+		// COVERAGE(never): a part has no other type, which `satisfies never` proves.
+		default:
+			return part satisfies never;
+	}
+	if (at === -1) {
+		return [...content, next].sort((a, b) => a.index - b.index);
+	}
+	return content.map((existing, i) => (i === at ? next : existing));
+}
+
+/**
+ * The live state after one delta frame: its message grown by an `append`, gone
+ * after a `discard`, and unchanged by a frame already held or one whose
+ * target or run the log settled. Only the message the frame names is
+ * replaced, so every other keeps its identity.
+ */
+export function foldDelta(live: LiveState, frame: api.SessionDeltaBody): LiveState {
+	const key = liveKey(frame.target);
+	if (live.committed.has(key) || live.ended.has(frame.run_id)) {
+		return live;
+	}
+	const at = live.messages.findIndex((message) => liveKey(message.target) === key);
+	const message = at === -1 ? undefined : live.messages[at];
+	if (message !== undefined && frame.n <= message.n) {
+		return live;
+	}
+	switch (frame.delta.type) {
+		case "discard":
+			return message === undefined ? live : { ...live, messages: live.messages.filter((_, i) => i !== at) };
+		case "append": {
+			const content = frame.delta.data.parts.reduce(grow, message?.content ?? []);
+			const next: LiveMessage = { runId: frame.run_id, target: frame.target, n: frame.n, content };
+			return {
+				...live,
+				messages: message === undefined ? [...live.messages, next] : live.messages.map((m, i) => (i === at ? next : m)),
+			};
+		}
+		// COVERAGE(never): a delta has no other type, which `satisfies never` proves.
+		default:
+			return frame.delta satisfies never;
+	}
+}
+
+/**
+ * The live state once `event` is in the log: the message it commits leaves,
+ * and a run that ended takes every message it was still producing with it.
+ * Either way, a later frame for what it settled is dropped.
+ */
+export function settleLive(live: LiveState, event: api.SessionEventBody): LiveState {
+	if (endsRun(event)) {
+		const run = event.run_id;
+		return {
+			messages: live.messages.filter((message) => message.runId !== run),
+			committed: new Set(),
+			ended: new Set([...live.ended, run]),
+		};
+	}
+	const key = committedBy(event);
+	if (key === undefined) {
+		return live;
+	}
+	return {
+		...live,
+		messages: live.messages.filter((message) => liveKey(message.target) !== key),
+		committed: new Set([...live.committed, key]),
+	};
 }

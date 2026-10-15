@@ -7,7 +7,13 @@
  * answers publishes the same config again.
  */
 import type * as api from "./generated/index.js";
-import { AnthropicEffortBody, DisplayNameWhenBody, PolicyActionBody, ReasoningEffortBody } from "./generated/index.js";
+import {
+	AnthropicEffortBody,
+	DisplayNameWhenBody,
+	ImageInputBody,
+	PolicyActionBody,
+	ReasoningEffortBody,
+} from "./generated/index.js";
 
 /** `T` with every field present: a list left out is empty, a setting left out `null`. */
 type Present<T> = { [K in keyof T]-?: Exclude<T[K], undefined> };
@@ -67,6 +73,7 @@ export function readAgentConfig(version: Pick<api.AgentVersionBody, "config">): 
 const POLICIES = Object.values(PolicyActionBody);
 const REASONING_EFFORTS = Object.values(ReasoningEffortBody);
 const ANTHROPIC_EFFORTS = Object.values(AnthropicEffortBody);
+const IMAGE_INPUTS = Object.values(ImageInputBody);
 const DISPLAY_NAME_WHENS = Object.values(DisplayNameWhenBody);
 
 const at = (path: string, key: string | number): string =>
@@ -134,6 +141,7 @@ function readModel(value: unknown, path: string): Present<api.ModelConfigBody> {
 				"model",
 				"max_tokens",
 				"context_window",
+				"image_input",
 				"thinking",
 				"effort",
 			]);
@@ -142,6 +150,7 @@ function readModel(value: unknown, path: string): Present<api.ModelConfigBody> {
 				model: string(settings["model"], at(settingsPath, "model")),
 				max_tokens: count(settings["max_tokens"], at(settingsPath, "max_tokens")),
 				context_window: count(settings["context_window"], at(settingsPath, "context_window")),
+				image_input: readImageInput(settings["image_input"], at(settingsPath, "image_input")),
 				thinking: optional(settings["thinking"], (thinking) => readThinking(thinking, at(settingsPath, "thinking"))),
 				effort: optional(settings["effort"], (effort) => oneOf(effort, at(settingsPath, "effort"), ANTHROPIC_EFFORTS)),
 			};
@@ -151,6 +160,7 @@ function readModel(value: unknown, path: string): Present<api.ModelConfigBody> {
 				"model",
 				"max_tokens",
 				"context_window",
+				"image_input",
 				"reasoning_effort",
 			]);
 			return {
@@ -158,6 +168,7 @@ function readModel(value: unknown, path: string): Present<api.ModelConfigBody> {
 				model: string(settings["model"], at(settingsPath, "model")),
 				max_tokens: count(settings["max_tokens"], at(settingsPath, "max_tokens")),
 				context_window: count(settings["context_window"], at(settingsPath, "context_window")),
+				image_input: readImageInput(settings["image_input"], at(settingsPath, "image_input")),
 				reasoning_effort: optional(settings["reasoning_effort"], (effort) =>
 					oneOf(effort, at(settingsPath, "reasoning_effort"), REASONING_EFFORTS),
 				),
@@ -166,6 +177,11 @@ function readModel(value: unknown, path: string): Present<api.ModelConfigBody> {
 		default:
 			return format satisfies never;
 	}
+}
+
+/** Core stores only an `unsupported` model, leaving the setting out for one that reads images. */
+function readImageInput(value: unknown, path: string): api.ImageInputBody | null {
+	return optional(value, (setting) => oneOf(setting, path, IMAGE_INPUTS));
 }
 
 /** Core stores a thinking mode as `{ type, config }`, where publishing spells its budget beside `type`. */
@@ -338,7 +354,7 @@ function readFunction(value: unknown, path: string): Present<api.FunctionGrantBo
 
 const VOLUME_DATA = ["disabled", "enabled"] as const;
 
-/** A config published before the volume existed leaves it out, and it reads as its default: no `/data`. */
+/** A config published before the volume existed leaves it out, and it reads as its default: no `/volume/data`. */
 function readVolume(value: unknown, path: string): Present<api.VolumeConfigBody> {
 	const volume = value === undefined ? {} : record(value, path, ["data"]);
 	const data = volume["data"];

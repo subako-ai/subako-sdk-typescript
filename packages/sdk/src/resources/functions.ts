@@ -3,6 +3,15 @@ import { BY_ID } from "../core.js";
 import * as api from "../generated/index.js";
 import type { IdPaged } from "../pagination.js";
 
+/**
+ * How long one attempt to upload a package may take, unless the call says
+ * otherwise: Core runs the module to read its functions before it answers,
+ * which can take minutes for a large module on a busy deployment. No longer
+ * than the load balancer keeps an idle connection open.
+ */
+// CODESYNC(alb-idle-timeout)
+export const FUNCTION_UPLOAD_TIMEOUT_MS = 300_000;
+
 export type ListFunctionsParams = IdPaged<NonNullable<api.ListFunctionsData["query"]>>;
 export type ListFunctionVersionsParams = IdPaged<NonNullable<api.ListFunctionVersionsData["query"]>>;
 
@@ -23,9 +32,18 @@ export class Functions {
 		return this.core.call(api.listPlatformFunctions, {}, options);
 	}
 
-	/** Creates a package from an archive and returns its first version. */
+	/**
+	 * Creates a package from an archive and returns its first version, with
+	 * the functions its module lists. An attempt may take up to
+	 * {@link FUNCTION_UPLOAD_TIMEOUT_MS} unless `options` gives a timeout.
+	 */
 	create(archive: FunctionArchive, options?: RequestOptions) {
-		return this.core.upload(api.createFunction, {}, archive, options);
+		return this.core.upload(
+			api.createFunction,
+			{},
+			archive,
+			this.core.withTimeoutAtLeast(options, FUNCTION_UPLOAD_TIMEOUT_MS),
+		);
 	}
 
 	/** Reads one package. */
@@ -53,9 +71,17 @@ export class Functions {
 		);
 	}
 
-	/** Pushes a new version from an archive. */
+	/**
+	 * Pushes a new version from an archive, as {@link Functions.create}
+	 * uploads its first.
+	 */
 	pushVersion(functionId: string, archive: FunctionArchive, options?: RequestOptions) {
-		return this.core.upload(api.pushFunctionVersion, { path: { function_id: functionId } }, archive, options);
+		return this.core.upload(
+			api.pushFunctionVersion,
+			{ path: { function_id: functionId } },
+			archive,
+			this.core.withTimeoutAtLeast(options, FUNCTION_UPLOAD_TIMEOUT_MS),
+		);
 	}
 
 	/** Reads one version by its number, counting from 1. */
