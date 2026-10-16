@@ -244,6 +244,24 @@ export type ApprovalDecisionForm = {
 };
 
 /**
+ * How finely a report cuts its span, in UTC.
+ *
+ * Stable vocabulary for v1: adding a value requires a new API version.
+ */
+export const BucketWidthParam = {
+  ALL: 'all',
+  '1D': '1d',
+  '1H': '1h'
+} as const;
+
+/**
+ * How finely a report cuts its span, in UTC.
+ *
+ * Stable vocabulary for v1: adding a value requires a new API version.
+ */
+export type BucketWidthParam = typeof BucketWidthParam[keyof typeof BucketWidthParam];
+
+/**
  * The servers the platform serves itself, each at `builtin:{key}`.
  */
 export type BuiltinGrantsBody = {
@@ -252,6 +270,10 @@ export type BuiltinGrantsBody = {
    * `builtin:session_display_name` server. `never` when left out.
    */
   session_display_name?: SessionDisplayNameGrantBody;
+};
+
+export type BytesBody = {
+  bytes: number;
 };
 
 /**
@@ -428,6 +450,18 @@ export type CreateSessionBody = {
    */
   display_name?: string;
   /**
+   * Labels for the session, fixed at creation and inherited by every
+   * session it spawns. Each usage row the session produces carries a copy,
+   * so usage can be filtered and grouped by them. At most 50 keys, each 1
+   * to 64 lowercase letters, digits, or underscores and not starting with
+   * `subako_`; each value a string of at most 500 characters. Usage keeps
+   * them after the session is deleted, so put opaque identifiers here,
+   * never personal or secret information.
+   */
+  metadata?: {
+    [key: string]: string;
+  };
+  /**
    * Vaults this session may draw tool-source credentials from; each must
    * be a live vault in the session's workspace.
    */
@@ -466,6 +500,9 @@ export type CreatedSessionBody = {
   created_at: string;
   display_name: string;
   id: string;
+  metadata: {
+    [key: string]: string;
+  };
   /**
    * Shown once. Store it now; it cannot be retrieved again.
    */
@@ -484,6 +521,9 @@ export type CreatedSessionReceiptBody = {
   created_at: string;
   display_name: string;
   id: string;
+  metadata: {
+    [key: string]: string;
+  };
   session_token_expires_at: string;
   session_token_id: string;
   status: SessionStatusBody;
@@ -713,6 +753,10 @@ export const DisplayNameWhenBody = {
  * Which session display names the agent may overwrite.
  */
 export type DisplayNameWhenBody = typeof DisplayNameWhenBody[keyof typeof DisplayNameWhenBody];
+
+export type DurationBody = {
+  duration_ms: number;
+};
 
 /**
  * The deployment's current image for a named platform release line.
@@ -992,13 +1036,30 @@ export const KeyPermissionSchema = {
   FUNCTION_READ: 'function.read',
   FUNCTION_MANAGE: 'function.manage',
   MODEL_PROVIDER_READ: 'model_provider.read',
-  MODEL_PROVIDER_MANAGE: 'model_provider.manage'
+  MODEL_PROVIDER_MANAGE: 'model_provider.manage',
+  USAGE_READ: 'usage.read'
 } as const;
 
 /**
  * One thing a key may do. A key holds a set of these, and a route refuses a caller whose key lacks the permission it names.
  */
 export type KeyPermissionSchema = typeof KeyPermissionSchema[keyof typeof KeyPermissionSchema];
+
+/**
+ * Model calls by how they were priced. A class with no calls is absent.
+ */
+export type LlmTokensSummaryBody = {
+  /**
+   * Calls through the workspace's own model provider, which is never
+   * charged: count their tokens to price them yourself.
+   */
+  byok?: TokensBody;
+  rated?: RatedTokensBody;
+  /**
+   * Calls a charge was due for but no rate priced.
+   */
+  unrated?: TokensBody;
+};
 
 /**
  * One function a package serves as a tool.
@@ -1652,6 +1713,44 @@ export type PutAgentSecurityBody = {
   allowed_origins?: Array<string>;
 };
 
+export type RatedBytesBody = {
+  bytes: number;
+  /**
+   * Hundred-millionths of a credit.
+   */
+  cost: number;
+};
+
+export type RatedDurationBody = {
+  /**
+   * Hundred-millionths of a credit.
+   */
+  cost: number;
+  duration_ms: number;
+};
+
+export type RatedStorageBody = {
+  /**
+   * Bytes held times hours held, rounded down.
+   */
+  byte_hours: number;
+  /**
+   * Hundred-millionths of a credit.
+   */
+  cost: number;
+};
+
+/**
+ * Calls a charge landed with.
+ */
+export type RatedTokensBody = {
+  /**
+   * Hundred-millionths of a credit, across formats.
+   */
+  cost: number;
+  tokens: TokenTotalsBody;
+};
+
 /**
  * How much thinking the model is asked for before it answers. Not every
  * model honours every level.
@@ -1782,6 +1881,17 @@ export const RoleBody = {
 export type RoleBody = typeof RoleBody[keyof typeof RoleBody];
 
 /**
+ * Run time by how it was priced. A class with none is absent.
+ */
+export type RuntimeSummaryBody = {
+  rated?: RatedDurationBody;
+  /**
+   * Time a charge was due for but no rate priced.
+   */
+  unrated?: DurationBody;
+};
+
+/**
  * A time-limited download for the last published `/workspace` snapshot,
  * which can predate the latest exec. Automatic backup replacement preserves
  * the URL through `expires_at`; explicit deletion of the session or its
@@ -1847,6 +1957,13 @@ export type SessionBody = {
    */
   display_name_author: DisplayNameAuthorBody;
   id: string;
+  /**
+   * The labels the session was created with, or its root's for a session
+   * an agent spawned.
+   */
+  metadata: {
+    [key: string]: string;
+  };
   status: SessionStatusBody;
   workspace_id: string;
 };
@@ -2236,6 +2353,13 @@ export type StartOAuthBody = {
   target: string;
 };
 
+export type StorageBody = {
+  /**
+   * Bytes held times hours held, rounded down.
+   */
+  byte_hours: number;
+};
+
 /**
  * What a storage event held.
  */
@@ -2245,6 +2369,18 @@ export const StorageSubjectBody = { ARCHIVE: 'archive', VOLUME: 'volume' } as co
  * What a storage event held.
  */
 export type StorageSubjectBody = typeof StorageSubjectBody[keyof typeof StorageSubjectBody];
+
+/**
+ * Storage held, archives and volumes together, by how it was priced. A
+ * class with none is absent.
+ */
+export type StorageSummaryBody = {
+  rated?: RatedStorageBody;
+  /**
+   * Storage a charge was due for but no rate priced.
+   */
+  unrated?: StorageBody;
+};
 
 /**
  * What the input did to the session.
@@ -2262,6 +2398,23 @@ export type SubmitKindBody = typeof SubmitKindBody[keyof typeof SubmitKindBody];
 export type SubmitOutcomeBody = {
   outcome: SubmitKindBody;
   run_id: string;
+};
+
+/**
+ * Token counts summed per format, each field on its own: the formats count
+ * different things, so they are never added together. A format with no
+ * calls is absent.
+ */
+export type TokenTotalsBody = {
+  anthropic?: AnthropicUsageBody;
+  openai_responses?: OpenaiResponsesUsageBody;
+};
+
+/**
+ * Calls no charge landed with.
+ */
+export type TokensBody = {
+  tokens: TokenTotalsBody;
 };
 
 /**
@@ -2311,21 +2464,106 @@ export type UpdateVaultBody = {
   } | null;
 };
 
+/**
+ * How a row was priced. `rated`: a charge landed with it, which `cost` names.
+ * `byok`: a call through the workspace's own model provider, which is never
+ * charged. `unrated`: a charge was due but no rate priced it.
+ *
+ * Stable vocabulary for v1: adding a value requires a new API version.
+ */
+export const UsageBillingBody = {
+  RATED: 'rated',
+  BYOK: 'byok',
+  UNRATED: 'unrated'
+} as const;
+
+/**
+ * How a row was priced. `rated`: a charge landed with it, which `cost` names.
+ * `byok`: a call through the workspace's own model provider, which is never
+ * charged. `unrated`: a charge was due but no rate priced it.
+ *
+ * Stable vocabulary for v1: adding a value requires a new API version.
+ */
+export type UsageBillingBody = typeof UsageBillingBody[keyof typeof UsageBillingBody];
+
 export type UsageEventBody = {
+  /**
+   * The instant the row counts toward, which `starting_at` and `ending_at`
+   * filter on: `occurred_at`, unless the row was recorded after the usage
+   * report had already finalized that instant.
+   */
+  accounted_at: string;
   /**
    * The event this one corrects.
    */
   adjusts: string | null;
+  billing: UsageBillingBody;
   /**
    * Hundred-millionths of a credit, as `balance`. Absent for a byok call
    * or a platform one nothing priced.
    */
   cost: number | null;
   id: string;
+  /**
+   * The metadata of the session the row was spent in, copied when it was
+   * recorded.
+   */
+  metadata: {
+    [key: string]: string;
+  };
   occurred_at: string;
   recorded_at: string;
   resource: UsageResourceBody;
   workspace_id: string;
+};
+
+/**
+ * One page of a usage report.
+ */
+export type UsageReportBody = {
+  /**
+   * A row whose `ending_at` is at or before this instant is final and
+   * never changes again; a later one may still grow. Null until any usage
+   * is final.
+   */
+  finalized_before: string | null;
+  /**
+   * Ordered by `starting_at`, then by each `group_by` value in turn,
+   * bytewise, with no value last. A combination with no usage has no row.
+   */
+  items: Array<UsageReportRowBody>;
+  /**
+   * Pass as `after`, with the same other parameters, for the next page;
+   * null on the last.
+   */
+  next_cursor: string | null;
+};
+
+/**
+ * The usage in one bucket for one combination of `group_by` values. Only
+ * the dimensions grouped by appear; one with no value for the row, such as
+ * the model of a sandbox's run time, is null.
+ */
+export type UsageReportRowBody = {
+  ending_at: string;
+  /**
+   * The usage kind, such as `llm_tokens` or `storage`. An open
+   * vocabulary: a kind Subako starts measuring later arrives under its
+   * own name, so a client keeps a value it does not know rather than
+   * rejecting the row.
+   */
+  kind?: string;
+  /**
+   * One entry per `metadata.<key>` grouped by.
+   */
+  metadata?: {
+    [key: string]: string | null;
+  };
+  model?: string | null;
+  model_provider_id?: string | null;
+  session_id?: string | null;
+  starting_at: string;
+  usage: UsageSummaryBody;
 };
 
 /**
@@ -2374,6 +2612,27 @@ export type UsageResourceBody = {
   run_id?: string | null;
   session_id: string;
   tool?: string | null;
+};
+
+/**
+ * What a row's usage came to, kind by kind. A kind with no usage is absent,
+ * and a kind added later arrives as a field of its own, which a client that
+ * does not know it ignores.
+ */
+export type UsageSummaryBody = {
+  /**
+   * Hundred-millionths of a credit: every `rated` cost below, summed.
+   */
+  cost: number;
+  /**
+   * Time function calls ran.
+   */
+  function_runtime?: RuntimeSummaryBody;
+  harness_runtime?: RuntimeSummaryBody;
+  llm_tokens?: LlmTokensSummaryBody;
+  sandbox_runtime?: RuntimeSummaryBody;
+  storage?: StorageSummaryBody;
+  volume_write?: VolumeWriteSummaryBody;
 };
 
 /**
@@ -2499,6 +2758,18 @@ export const VolumeListDepthParam = { ALL: 'all', CHILDREN: 'children' } as cons
  * it, `children` for only those directly in it.
  */
 export type VolumeListDepthParam = typeof VolumeListDepthParam[keyof typeof VolumeListDepthParam];
+
+/**
+ * Bytes written to volumes by how they were priced. A class with none is
+ * absent.
+ */
+export type VolumeWriteSummaryBody = {
+  rated?: RatedBytesBody;
+  /**
+   * Bytes a charge was due for but no rate priced.
+   */
+  unrated?: BytesBody;
+};
 
 /**
  * A workspace: the scope agents, sessions, vaults, skills, and keys
@@ -4271,13 +4542,28 @@ export type ListUsageData = {
      * Newest first when omitted.
      */
     order?: OrderParam;
+    /**
+     * Only rows accounted at or after this instant.
+     */
+    starting_at?: string;
+    /**
+     * Only rows accounted before this instant.
+     */
+    ending_at?: string;
+    /**
+     * Only rows whose metadata holds each pair, matched exactly:
+     * `metadata[tenant_id]=t_123`. Several pairs must all hold.
+     */
+    metadata?: {
+      [key: string]: string;
+    };
   };
   url: '/v1/organization/usage';
 };
 
 export type ListUsageErrors = {
   /**
-   * Bad limit, cursor, or order.
+   * Bad limit, cursor, order, or filter.
    */
   400: ErrorBody;
   /**
@@ -4406,7 +4692,7 @@ export type CreateSessionData = {
 
 export type CreateSessionErrors = {
   /**
-   * Malformed body, a display_name over 200 characters, more than 10 vault_ids, an agent with no live version, a vault outside the workspace, a malformed workspace header, or a user caller with no workspace header.
+   * Malformed body, a display_name over 200 characters, more than 10 vault_ids, metadata outside its bounds or under a reserved key, an agent with no live version, a vault outside the workspace, a malformed workspace header, or a user caller with no workspace header.
    */
   400: ErrorBody;
   /**
@@ -7168,13 +7454,28 @@ export type ListWorkspaceUsageData = {
      * Newest first when omitted.
      */
     order?: OrderParam;
+    /**
+     * Only rows accounted at or after this instant.
+     */
+    starting_at?: string;
+    /**
+     * Only rows accounted before this instant.
+     */
+    ending_at?: string;
+    /**
+     * Only rows whose metadata holds each pair, matched exactly:
+     * `metadata[tenant_id]=t_123`. Several pairs must all hold.
+     */
+    metadata?: {
+      [key: string]: string;
+    };
   };
   url: '/v1/workspaces/{workspace_id}/usage';
 };
 
 export type ListWorkspaceUsageErrors = {
   /**
-   * Bad limit, cursor, order, or path parameter.
+   * Bad limit, cursor, order, filter, or path parameter.
    */
   400: ErrorBody;
   /**
@@ -7186,7 +7487,7 @@ export type ListWorkspaceUsageErrors = {
    */
   403: ErrorBody;
   /**
-   * No such workspace, or the caller cannot see it.
+   * No such workspace, or the caller cannot see it. An API key sees only its own workspace.
    */
   404: ErrorBody;
 };
@@ -7201,3 +7502,87 @@ export type ListWorkspaceUsageResponses = {
 };
 
 export type ListWorkspaceUsageResponse = ListWorkspaceUsageResponses[keyof ListWorkspaceUsageResponses];
+
+export type UsageReportData = {
+  body?: never;
+  path: {
+    /**
+     * Workspace id
+     */
+    workspace_id: string;
+  };
+  query: {
+    /**
+     * The span's start, inclusive: usage accounted at or after it.
+     */
+    starting_at: string;
+    /**
+     * The span's end, exclusive. A span covers at most 31 days at `all` or
+     * `1d` and at most 7 days at `1h`.
+     */
+    ending_at: string;
+    /**
+     * How finely to cut the span: `all`, the default, makes it one bucket;
+     * `1d` and `1h` cut it per UTC day or hour, and need `starting_at` and
+     * `ending_at` on those boundaries.
+     */
+    bucket_width?: BucketWidthParam;
+    /**
+     * What to sum separately for each value of, repeated in the order rows
+     * sort by: `kind`, `model_provider_id`, `model`, `session_id`, or
+     * `metadata.<key>`. At most 8. Omitted, each bucket is one row.
+     */
+    group_by?: Array<string>;
+    /**
+     * Rows on the page. Defaults to 100.
+     */
+    limit?: number;
+    /**
+     * The previous page's `next_cursor`. The other parameters must be the
+     * ones that page was read with.
+     */
+    after?: string;
+    /**
+     * Only rows whose metadata holds each pair, matched exactly:
+     * `metadata[tenant_id]=t_123`. Several pairs must all hold.
+     */
+    metadata?: {
+      [key: string]: string;
+    };
+  };
+  url: '/v1/workspaces/{workspace_id}/usage-report';
+};
+
+export type UsageReportErrors = {
+  /**
+   * A parameter missing, malformed, or out of bounds; a span longer than its bucket width allows or off its boundaries; a cursor from another query; or a report that ran too long, which a narrower span, grouping, or filter avoids.
+   */
+  400: ErrorBody;
+  /**
+   * Missing, malformed, or invalid bearer token.
+   */
+  401: ErrorBody;
+  /**
+   * Caller lacks usage.read.
+   */
+  403: ErrorBody;
+  /**
+   * No such workspace, or the caller cannot see it. An API key sees only its own workspace.
+   */
+  404: ErrorBody;
+  /**
+   * The organization is already running two reports, or this server's report connections are all busy.
+   */
+  429: ErrorBody;
+};
+
+export type UsageReportError = UsageReportErrors[keyof UsageReportErrors];
+
+export type UsageReportResponses = {
+  /**
+   * One page of the report.
+   */
+  200: UsageReportBody;
+};
+
+export type UsageReportResponse = UsageReportResponses[keyof UsageReportResponses];

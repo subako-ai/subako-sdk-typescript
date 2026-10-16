@@ -3364,6 +3364,7 @@
           "organization"
         ],
         "summary": "List organization usage",
+        "description": "Every usage row, one per measurement, joined with its cost. Rows are ordered by id, which is assigned before a row commits, so a row can appear behind a cursor already passed: walking this listing forward can miss rows. To account usage, read the usage report instead.",
         "operationId": "list_usage",
         "parameters": [
           {
@@ -3405,6 +3406,43 @@
             "schema": {
               "$ref": "#/components/schemas/OrderParam"
             }
+          },
+          {
+            "name": "starting_at",
+            "in": "query",
+            "description": "Only rows accounted at or after this instant.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "ending_at",
+            "in": "query",
+            "description": "Only rows accounted before this instant.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "metadata",
+            "in": "query",
+            "description": "Only rows whose metadata holds each pair, matched exactly:\n`metadata[tenant_id]=t_123`. Several pairs must all hold.",
+            "required": false,
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              },
+              "propertyNames": {
+                "type": "string"
+              }
+            },
+            "style": "deepObject",
+            "explode": true
           }
         ],
         "responses": {
@@ -3419,7 +3457,7 @@
             }
           },
           "400": {
-            "description": "Bad limit, cursor, or order.",
+            "description": "Bad limit, cursor, order, or filter.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3695,7 +3733,7 @@
             }
           },
           "400": {
-            "description": "Malformed body, a display_name over 200 characters, more than 10 vault_ids, an agent with no live version, a vault outside the workspace, a malformed workspace header, or a user caller with no workspace header.",
+            "description": "Malformed body, a display_name over 200 characters, more than 10 vault_ids, metadata outside its bounds or under a reserved key, an agent with no live version, a vault outside the workspace, a malformed workspace header, or a user caller with no workspace header.",
             "content": {
               "application/json": {
                 "schema": {
@@ -9240,6 +9278,7 @@
           "workspaces"
         ],
         "summary": "List workspace usage",
+        "description": "The workspace's usage rows, one per measurement, joined with their cost. Rows are ordered by id, which is assigned before a row commits, so a row can appear behind a cursor already passed: walking this listing forward can miss rows. To account usage, read the usage report instead.",
         "operationId": "list_workspace_usage",
         "parameters": [
           {
@@ -9291,6 +9330,43 @@
             "schema": {
               "$ref": "#/components/schemas/OrderParam"
             }
+          },
+          {
+            "name": "starting_at",
+            "in": "query",
+            "description": "Only rows accounted at or after this instant.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "ending_at",
+            "in": "query",
+            "description": "Only rows accounted before this instant.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "metadata",
+            "in": "query",
+            "description": "Only rows whose metadata holds each pair, matched exactly:\n`metadata[tenant_id]=t_123`. Several pairs must all hold.",
+            "required": false,
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              },
+              "propertyNames": {
+                "type": "string"
+              }
+            },
+            "style": "deepObject",
+            "explode": true
           }
         ],
         "responses": {
@@ -9305,7 +9381,7 @@
             }
           },
           "400": {
-            "description": "Bad limit, cursor, order, or path parameter.",
+            "description": "Bad limit, cursor, order, filter, or path parameter.",
             "content": {
               "application/json": {
                 "schema": {
@@ -9335,7 +9411,177 @@
             }
           },
           "404": {
-            "description": "No such workspace, or the caller cannot see it.",
+            "description": "No such workspace, or the caller cannot see it. An API key sees only its own workspace.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/workspaces/{workspace_id}/usage-report": {
+      "get": {
+        "tags": [
+          "workspaces"
+        ],
+        "summary": "Get the workspace's usage report",
+        "description": "Usage summed per bucket of the span and per value of each `group_by` dimension, split by kind and by how it was priced: `rated` usage a charge landed with, `byok` calls through the workspace's own model provider, and `unrated` usage no rate priced. Usage counts toward the instant it is accounted at, which is when it occurred unless it was recorded after that instant was final. A row whose `ending_at` is at or before `finalized_before` never changes again, so re-reading only the rows after it, and taking the difference from what was read before, accounts every row exactly once.",
+        "operationId": "usage_report",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "Workspace id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "starting_at",
+            "in": "query",
+            "description": "The span's start, inclusive: usage accounted at or after it.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "ending_at",
+            "in": "query",
+            "description": "The span's end, exclusive. A span covers at most 31 days at `all` or\n`1d` and at most 7 days at `1h`.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "bucket_width",
+            "in": "query",
+            "description": "How finely to cut the span: `all`, the default, makes it one bucket;\n`1d` and `1h` cut it per UTC day or hour, and need `starting_at` and\n`ending_at` on those boundaries.",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/BucketWidthParam"
+            }
+          },
+          {
+            "name": "group_by",
+            "in": "query",
+            "description": "What to sum separately for each value of, repeated in the order rows\nsort by: `kind`, `model_provider_id`, `model`, `session_id`, or\n`metadata.<key>`. At most 8. Omitted, each bucket is one row.",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "style": "form",
+            "explode": true
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Rows on the page. Defaults to 100.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "maximum": 1000,
+              "minimum": 1
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "description": "The previous page's `next_cursor`. The other parameters must be the\nones that page was read with.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "metadata",
+            "in": "query",
+            "description": "Only rows whose metadata holds each pair, matched exactly:\n`metadata[tenant_id]=t_123`. Several pairs must all hold.",
+            "required": false,
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              },
+              "propertyNames": {
+                "type": "string"
+              }
+            },
+            "style": "deepObject",
+            "explode": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of the report.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsageReportBody"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A parameter missing, malformed, or out of bounds; a span longer than its bucket width allows or off its boundaries; a cursor from another query; or a report that ran too long, which a narrower span, grouping, or filter avoids.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, malformed, or invalid bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks usage.read.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such workspace, or the caller cannot see it. An API key sees only its own workspace.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "The organization is already running two reports, or this server's report connections are all busy.",
             "content": {
               "application/json": {
                 "schema": {
@@ -9955,6 +10201,15 @@
         ],
         "description": "How to answer a held call. Only a denial carries a message, which reaches\nthe model in place of the tool's result."
       },
+      "BucketWidthParam": {
+        "type": "string",
+        "description": "How finely a report cuts its span, in UTC.\n\nStable vocabulary for v1: adding a value requires a new API version.",
+        "enum": [
+          "all",
+          "1d",
+          "1h"
+        ]
+      },
       "BuiltinGrantsBody": {
         "type": "object",
         "description": "The servers the platform serves itself, each at `builtin:{key}`.",
@@ -9962,6 +10217,18 @@
           "session_display_name": {
             "$ref": "#/components/schemas/SessionDisplayNameGrantBody",
             "description": "Whether the agent names the session it runs in, through the\n`builtin:session_display_name` server. `never` when left out."
+          }
+        }
+      },
+      "BytesBody": {
+        "type": "object",
+        "required": [
+          "bytes"
+        ],
+        "properties": {
+          "bytes": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },
@@ -10376,6 +10643,16 @@
             "description": "Human label for the session. Omitted reads as empty.",
             "maxLength": 200
           },
+          "metadata": {
+            "type": "object",
+            "description": "Labels for the session, fixed at creation and inherited by every\nsession it spawns. Each usage row the session produces carries a copy,\nso usage can be filtered and grouped by them. At most 50 keys, each 1\nto 64 lowercase letters, digits, or underscores and not starting with\n`subako_`; each value a string of at most 500 characters. Usage keeps\nthem after the session is deleted, so put opaque identifiers here,\nnever personal or secret information.",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
           "vault_ids": {
             "type": "array",
             "items": {
@@ -10459,7 +10736,8 @@
           "status",
           "session_token",
           "session_token_expires_at",
-          "created_at"
+          "created_at",
+          "metadata"
         ],
         "properties": {
           "agent_id": {
@@ -10480,6 +10758,15 @@
           "id": {
             "type": "string",
             "format": "uuid"
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
           },
           "session_token": {
             "type": "string",
@@ -10510,7 +10797,8 @@
           "status",
           "session_token_id",
           "session_token_expires_at",
-          "created_at"
+          "created_at",
+          "metadata"
         ],
         "properties": {
           "agent_id": {
@@ -10531,6 +10819,15 @@
           "id": {
             "type": "string",
             "format": "uuid"
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
           },
           "session_token_expires_at": {
             "type": "string",
@@ -11009,6 +11306,18 @@
           "empty",
           "until_user_edits"
         ]
+      },
+      "DurationBody": {
+        "type": "object",
+        "required": [
+          "duration_ms"
+        ],
+        "properties": {
+          "duration_ms": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
       },
       "EnvironmentRefBody": {
         "oneOf": [
@@ -11500,8 +11809,26 @@
           "function.read",
           "function.manage",
           "model_provider.read",
-          "model_provider.manage"
+          "model_provider.manage",
+          "usage.read"
         ]
+      },
+      "LlmTokensSummaryBody": {
+        "type": "object",
+        "description": "Model calls by how they were priced. A class with no calls is absent.",
+        "properties": {
+          "byok": {
+            "$ref": "#/components/schemas/TokensBody",
+            "description": "Calls through the workspace's own model provider, which is never\ncharged: count their tokens to price them yourself."
+          },
+          "rated": {
+            "$ref": "#/components/schemas/RatedTokensBody"
+          },
+          "unrated": {
+            "$ref": "#/components/schemas/TokensBody",
+            "description": "Calls a charge was due for but no rate priced."
+          }
+        }
       },
       "ManifestFunctionBody": {
         "type": "object",
@@ -13074,6 +13401,79 @@
           }
         }
       },
+      "RatedBytesBody": {
+        "type": "object",
+        "required": [
+          "cost",
+          "bytes"
+        ],
+        "properties": {
+          "bytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "cost": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Hundred-millionths of a credit."
+          }
+        }
+      },
+      "RatedDurationBody": {
+        "type": "object",
+        "required": [
+          "cost",
+          "duration_ms"
+        ],
+        "properties": {
+          "cost": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Hundred-millionths of a credit."
+          },
+          "duration_ms": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "RatedStorageBody": {
+        "type": "object",
+        "required": [
+          "cost",
+          "byte_hours"
+        ],
+        "properties": {
+          "byte_hours": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Bytes held times hours held, rounded down."
+          },
+          "cost": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Hundred-millionths of a credit."
+          }
+        }
+      },
+      "RatedTokensBody": {
+        "type": "object",
+        "description": "Calls a charge landed with.",
+        "required": [
+          "cost",
+          "tokens"
+        ],
+        "properties": {
+          "cost": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Hundred-millionths of a credit, across formats."
+          },
+          "tokens": {
+            "$ref": "#/components/schemas/TokenTotalsBody"
+          }
+        }
+      },
       "ReasoningEffortBody": {
         "type": "string",
         "description": "How much thinking the model is asked for before it answers. Not every\nmodel honours every level.",
@@ -13285,6 +13685,19 @@
           "tool_result"
         ]
       },
+      "RuntimeSummaryBody": {
+        "type": "object",
+        "description": "Run time by how it was priced. A class with none is absent.",
+        "properties": {
+          "rated": {
+            "$ref": "#/components/schemas/RatedDurationBody"
+          },
+          "unrated": {
+            "$ref": "#/components/schemas/DurationBody",
+            "description": "Time a charge was due for but no rate priced."
+          }
+        }
+      },
       "SandboxArchiveBody": {
         "type": "object",
         "description": "A time-limited download for the last published `/workspace` snapshot,\nwhich can predate the latest exec. Automatic backup replacement preserves\nthe URL through `expires_at`; explicit deletion of the session or its\nenclosing resources can revoke it sooner.",
@@ -13387,7 +13800,8 @@
           "display_name_author",
           "status",
           "created_by",
-          "created_at"
+          "created_at",
+          "metadata"
         ],
         "properties": {
           "agent_id": {
@@ -13415,6 +13829,16 @@
           "id": {
             "type": "string",
             "format": "uuid"
+          },
+          "metadata": {
+            "type": "object",
+            "description": "The labels the session was created with, or its root's for a session\nan agent spawned.",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
           },
           "status": {
             "$ref": "#/components/schemas/SessionStatusBody"
@@ -14420,6 +14844,19 @@
           }
         }
       },
+      "StorageBody": {
+        "type": "object",
+        "required": [
+          "byte_hours"
+        ],
+        "properties": {
+          "byte_hours": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Bytes held times hours held, rounded down."
+          }
+        }
+      },
       "StorageSubjectBody": {
         "type": "string",
         "description": "What a storage event held.",
@@ -14427,6 +14864,19 @@
           "archive",
           "volume"
         ]
+      },
+      "StorageSummaryBody": {
+        "type": "object",
+        "description": "Storage held, archives and volumes together, by how it was priced. A\nclass with none is absent.",
+        "properties": {
+          "rated": {
+            "$ref": "#/components/schemas/RatedStorageBody"
+          },
+          "unrated": {
+            "$ref": "#/components/schemas/StorageBody",
+            "description": "Storage a charge was due for but no rate priced."
+          }
+        }
       },
       "SubmitKindBody": {
         "type": "string",
@@ -14450,6 +14900,30 @@
           "run_id": {
             "type": "string",
             "format": "uuid"
+          }
+        }
+      },
+      "TokenTotalsBody": {
+        "type": "object",
+        "description": "Token counts summed per format, each field on its own: the formats count\ndifferent things, so they are never added together. A format with no\ncalls is absent.",
+        "properties": {
+          "anthropic": {
+            "$ref": "#/components/schemas/AnthropicUsageBody"
+          },
+          "openai_responses": {
+            "$ref": "#/components/schemas/OpenaiResponsesUsageBody"
+          }
+        }
+      },
+      "TokensBody": {
+        "type": "object",
+        "description": "Calls no charge landed with.",
+        "required": [
+          "tokens"
+        ],
+        "properties": {
+          "tokens": {
+            "$ref": "#/components/schemas/TokenTotalsBody"
           }
         }
       },
@@ -14561,6 +15035,15 @@
           }
         }
       },
+      "UsageBillingBody": {
+        "type": "string",
+        "description": "How a row was priced. `rated`: a charge landed with it, which `cost` names.\n`byok`: a call through the workspace's own model provider, which is never\ncharged. `unrated`: a charge was due but no rate priced it.\n\nStable vocabulary for v1: adding a value requires a new API version.",
+        "enum": [
+          "rated",
+          "byok",
+          "unrated"
+        ]
+      },
       "UsageEventBody": {
         "type": "object",
         "required": [
@@ -14569,10 +15052,18 @@
           "adjusts",
           "occurred_at",
           "recorded_at",
+          "accounted_at",
           "resource",
-          "cost"
+          "cost",
+          "billing",
+          "metadata"
         ],
         "properties": {
+          "accounted_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The instant the row counts toward, which `starting_at` and `ending_at`\nfilter on: `occurred_at`, unless the row was recorded after the usage\nreport had already finalized that instant."
+          },
           "adjusts": {
             "type": [
               "string",
@@ -14580,6 +15071,9 @@
             ],
             "format": "uuid",
             "description": "The event this one corrects."
+          },
+          "billing": {
+            "$ref": "#/components/schemas/UsageBillingBody"
           },
           "cost": {
             "type": [
@@ -14592,6 +15086,16 @@
           "id": {
             "type": "string",
             "format": "uuid"
+          },
+          "metadata": {
+            "type": "object",
+            "description": "The metadata of the session the row was spent in, copied when it was\nrecorded.",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
           },
           "occurred_at": {
             "type": "string",
@@ -14607,6 +15111,98 @@
           "workspace_id": {
             "type": "string",
             "format": "uuid"
+          }
+        }
+      },
+      "UsageReportBody": {
+        "type": "object",
+        "description": "One page of a usage report.",
+        "required": [
+          "items",
+          "finalized_before",
+          "next_cursor"
+        ],
+        "properties": {
+          "finalized_before": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "A row whose `ending_at` is at or before this instant is final and\nnever changes again; a later one may still grow. Null until any usage\nis final."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UsageReportRowBody"
+            },
+            "description": "Ordered by `starting_at`, then by each `group_by` value in turn,\nbytewise, with no value last. A combination with no usage has no row."
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Pass as `after`, with the same other parameters, for the next page;\nnull on the last."
+          }
+        }
+      },
+      "UsageReportRowBody": {
+        "type": "object",
+        "description": "The usage in one bucket for one combination of `group_by` values. Only\nthe dimensions grouped by appear; one with no value for the row, such as\nthe model of a sandbox's run time, is null.",
+        "required": [
+          "starting_at",
+          "ending_at",
+          "usage"
+        ],
+        "properties": {
+          "ending_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "kind": {
+            "type": "string",
+            "description": "The usage kind, such as `llm_tokens` or `storage`. An open\nvocabulary: a kind Subako starts measuring later arrives under its\nown name, so a client keeps a value it does not know rather than\nrejecting the row."
+          },
+          "metadata": {
+            "type": "object",
+            "description": "One entry per `metadata.<key>` grouped by.",
+            "additionalProperties": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "model": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "model_provider_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "session_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "starting_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "usage": {
+            "$ref": "#/components/schemas/UsageSummaryBody"
           }
         }
       },
@@ -14841,6 +15437,39 @@
         ],
         "description": "What an event measured; `kind` names the shape."
       },
+      "UsageSummaryBody": {
+        "type": "object",
+        "description": "What a row's usage came to, kind by kind. A kind with no usage is absent,\nand a kind added later arrives as a field of its own, which a client that\ndoes not know it ignores.",
+        "required": [
+          "cost"
+        ],
+        "properties": {
+          "cost": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Hundred-millionths of a credit: every `rated` cost below, summed."
+          },
+          "function_runtime": {
+            "$ref": "#/components/schemas/RuntimeSummaryBody",
+            "description": "Time function calls ran."
+          },
+          "harness_runtime": {
+            "$ref": "#/components/schemas/RuntimeSummaryBody"
+          },
+          "llm_tokens": {
+            "$ref": "#/components/schemas/LlmTokensSummaryBody"
+          },
+          "sandbox_runtime": {
+            "$ref": "#/components/schemas/RuntimeSummaryBody"
+          },
+          "storage": {
+            "$ref": "#/components/schemas/StorageSummaryBody"
+          },
+          "volume_write": {
+            "$ref": "#/components/schemas/VolumeWriteSummaryBody"
+          }
+        }
+      },
       "VaultBody": {
         "type": "object",
         "description": "A vault row. Carries no credential and no envelope: a vault is a\ncontainer, and what is in it is read through the credential route.",
@@ -15065,6 +15694,19 @@
           "all",
           "children"
         ]
+      },
+      "VolumeWriteSummaryBody": {
+        "type": "object",
+        "description": "Bytes written to volumes by how they were priced. A class with none is\nabsent.",
+        "properties": {
+          "rated": {
+            "$ref": "#/components/schemas/RatedBytesBody"
+          },
+          "unrated": {
+            "$ref": "#/components/schemas/BytesBody",
+            "description": "Bytes a charge was due for but no rate priced."
+          }
+        }
       },
       "WorkspaceBody": {
         "type": "object",

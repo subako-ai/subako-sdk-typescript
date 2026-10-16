@@ -6,6 +6,7 @@ import type { IdPaged } from "../pagination.js";
 export type ListWorkspacesParams = IdPaged<NonNullable<api.ListWorkspacesData["query"]>>;
 export type ListWorkspaceMembersParams = IdPaged<NonNullable<api.ListWorkspaceMembersData["query"]>>;
 export type ListWorkspaceUsageParams = IdPaged<NonNullable<api.ListWorkspaceUsageData["query"]>>;
+export type UsageReportParams = api.UsageReportData["query"];
 
 /** Workspaces in the caller's organization, and their members. */
 export class Workspaces {
@@ -25,7 +26,11 @@ export class Workspaces {
 		return this.core.call(api.createWorkspace, { body: params }, options);
 	}
 
-	/** Lists usage events in one workspace, newest first. */
+	/**
+	 * Lists usage events in one workspace, newest first. Walking it forward can
+	 * miss an event committed behind the cursor, so account usage with
+	 * `usageReport` instead.
+	 */
 	listUsage(workspaceId: string, params?: ListWorkspaceUsageParams, options?: RequestOptions) {
 		return this.core.page(
 			api.listWorkspaceUsage,
@@ -33,6 +38,17 @@ export class Workspaces {
 			BY_ID,
 			options,
 		);
+	}
+
+	/**
+	 * Reads one page of the workspace's usage report: usage summed per bucket
+	 * of the span and per value of each `group_by` dimension. A row whose
+	 * `ending_at` is at or before the page's `finalized_before` never changes
+	 * again. The next page is the same parameters with `after` set to the
+	 * page's `next_cursor`.
+	 */
+	usageReport(workspaceId: string, params: UsageReportParams, options?: RequestOptions) {
+		return this.core.call(api.usageReport, { path: { workspace_id: workspaceId }, query: params }, options);
 	}
 
 	/** Reads one workspace. */

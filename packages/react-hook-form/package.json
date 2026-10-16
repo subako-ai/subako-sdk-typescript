@@ -1,6 +1,6 @@
 {
 	"name": "@subako-ai/react-hook-form",
-	"version": "0.2.1",
+	"version": "0.2.2",
 	"description": "react-hook-form as a form tool for Subako sessions",
 	"homepage": "https://subako.ai",
 	"license": "Apache-2.0",

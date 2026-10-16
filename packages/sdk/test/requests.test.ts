@@ -56,6 +56,27 @@ describe("params", () => {
 		expect(new URL(http.calls[0]!.url).searchParams.get("after_seq")).toBe("41");
 	});
 
+	it("spell a usage report's grouping as repeated keys and its filter as a deep object", async () => {
+		const http = stubFetch(() => json({ items: [], finalized_before: null, next_cursor: null }));
+		const client = testClient({ fetch: http.fetch });
+
+		await client.workspaces.usageReport("w1", {
+			starting_at: "2026-10-01T00:00:00Z",
+			ending_at: "2026-10-02T00:00:00Z",
+			bucket_width: "1h",
+			group_by: ["metadata.tenant_id", "model"],
+			metadata: { env: "prod", region: "jp" },
+		});
+
+		const url = new URL(http.calls[0]!.url);
+		expect(url.pathname).toBe("/v1/workspaces/w1/usage-report");
+		expect(url.searchParams.getAll("group_by")).toEqual(["metadata.tenant_id", "model"]);
+		expect(url.searchParams.get("metadata[env]")).toBe("prod");
+		expect(url.searchParams.get("metadata[region]")).toBe("jp");
+		expect(url.searchParams.get("bucket_width")).toBe("1h");
+		expect(url.searchParams.get("starting_at")).toBe("2026-10-01T00:00:00Z");
+	});
+
 	it("carry a new API key in a provider update, the key alone", async () => {
 		const http = stubFetch(() => json({ id: "p1" }));
 		const client = testClient({ fetch: http.fetch });

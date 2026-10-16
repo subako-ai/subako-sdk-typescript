@@ -1,6 +1,6 @@
 {
 	"name": "@subako-ai/tools",
-	"version": "0.2.1",
+	"version": "0.2.2",
 	"description": "Tools that let a Subako agent drive the page: forms, navigation, and a reader for an existing form",
 	"homepage": "https://subako.ai",
 	"license": "Apache-2.0",
