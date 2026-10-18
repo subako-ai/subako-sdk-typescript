@@ -2,7 +2,7 @@
 
 import { client } from './client.gen.js';
 import type { Client, ClientMeta, Options as Options2, RequestResult, ServerSentEventsResult, TDataShape } from './client/index.js';
-import type { AckClientCallData, AckClientCallErrors, AckClientCallResponses, AddCredentialData, AddCredentialErrors, AddCredentialResponses, AddWorkspaceMemberData, AddWorkspaceMemberErrors, AddWorkspaceMemberResponses, AnswerClientCallData, AnswerClientCallErrors, AnswerClientCallResponses, CancelSessionRunData, CancelSessionRunErrors, CancelSessionRunResponses, ChangeMemberRoleData, ChangeMemberRoleErrors, ChangeMemberRoleResponses, ChangeWorkspaceMemberRoleData, ChangeWorkspaceMemberRoleErrors, ChangeWorkspaceMemberRoleResponses, CheckCredentialData, CheckCredentialErrors, CheckCredentialResponses, CompleteCredentialOauthData, CompleteCredentialOauthErrors, CompleteCredentialOauthResponses, CreateAgentData, CreateAgentErrors, CreateAgentResponses, CreateFunctionData, CreateFunctionErrors, CreateFunctionResponses, CreateInvitationData, CreateInvitationErrors, CreateInvitationResponses, CreateSessionData, CreateSessionErrors, CreateSessionResponses, CreateSkillData, CreateSkillErrors, CreateSkillResponses, CreateVaultData, CreateVaultErrors, CreateVaultResponses, CreateWorkspaceData, CreateWorkspaceErrors, CreateWorkspaceModelProviderData, CreateWorkspaceModelProviderErrors, CreateWorkspaceModelProviderResponses, CreateWorkspaceResponses, DeleteAgentData, DeleteAgentErrors, DeleteAgentResponses, DeleteCredentialData, DeleteCredentialErrors, DeleteCredentialResponses, DeleteFunctionData, DeleteFunctionErrors, DeleteFunctionResponses, DeleteModelProviderData, DeleteModelProviderErrors, DeleteModelProviderResponses, DeleteSessionData, DeleteSessionErrors, DeleteSessionResponses, DeleteSessionSandboxArchiveData, DeleteSessionSandboxArchiveErrors, DeleteSessionSandboxArchiveResponses, DeleteSkillData, DeleteSkillErrors, DeleteSkillResponses, DeleteVaultData, DeleteVaultErrors, DeleteVaultResponses, DeleteVolumeData, DeleteVolumeErrors, DeleteVolumeFileData, DeleteVolumeFileErrors, DeleteVolumeFileResponses, DeleteVolumeResponses, DeleteWorkspaceData, DeleteWorkspaceErrors, DeleteWorkspaceResponses, GetAgentData, GetAgentErrors, GetAgentResponses, GetAgentSecurityData, GetAgentSecurityErrors, GetAgentSecurityResponses, GetCreditsData, GetCreditsErrors, GetCreditsResponses, GetFunctionData, GetFunctionErrors, GetFunctionResponses, GetFunctionVersionData, GetFunctionVersionErrors, GetFunctionVersionResponses, GetMeData, GetMeErrors, GetMeResponses, GetModelProviderData, GetModelProviderErrors, GetModelProviderResponses, GetOrganizationData, GetOrganizationErrors, GetOrganizationPlanData, GetOrganizationPlanErrors, GetOrganizationPlanResponses, GetOrganizationResponses, GetSessionData, GetSessionErrors, GetSessionImageData, GetSessionImageErrors, GetSessionImageResponses, GetSessionResponses, GetSkillBundleData, GetSkillBundleErrors, GetSkillBundleResponses, GetSkillData, GetSkillErrors, GetSkillResponses, GetSkillVersionData, GetSkillVersionErrors, GetSkillVersionResponses, GetVaultData, GetVaultErrors, GetVaultResponses, GetVolumeFileData, GetVolumeFileErrors, GetVolumeFileResponses, GetWorkspaceData, GetWorkspaceErrors, GetWorkspaceResponses, LeaveClientData, LeaveClientErrors, LeaveClientResponses, ListAgentsData, ListAgentsErrors, ListAgentsResponses, ListAgentVersionsData, ListAgentVersionsErrors, ListAgentVersionsResponses, ListApiKeysData, ListApiKeysErrors, ListApiKeysResponses, ListCredentialsData, ListCredentialsErrors, ListCredentialsResponses, ListFunctionsData, ListFunctionsErrors, ListFunctionsResponses, ListFunctionVersionsData, ListFunctionVersionsErrors, ListFunctionVersionsResponses, ListInvitationsData, ListInvitationsErrors, ListInvitationsResponses, ListMembersData, ListMembersErrors, ListMembersResponses, ListModelProvidersData, ListModelProvidersErrors, ListModelProvidersResponses, ListPlansData, ListPlansErrors, ListPlansResponses, ListPlatformFunctionsData, ListPlatformFunctionsErrors, ListPlatformFunctionsResponses, ListSessionEventsData, ListSessionEventsErrors, ListSessionEventsResponses, ListSessionSandboxesData, ListSessionSandboxesErrors, ListSessionSandboxesResponses, ListSessionsData, ListSessionsErrors, ListSessionsResponses, ListSkillsData, ListSkillsErrors, ListSkillsResponses, ListSkillVersionsData, ListSkillVersionsErrors, ListSkillVersionsResponses, ListUsageData, ListUsageErrors, ListUsageResponses, ListVaultsData, ListVaultsErrors, ListVaultsResponses, ListVolumeFilesData, ListVolumeFilesErrors, ListVolumeFilesResponses, ListWorkspaceMembersData, ListWorkspaceMembersErrors, ListWorkspaceMembersResponses, ListWorkspacesData, ListWorkspacesErrors, ListWorkspacesResponses, ListWorkspaceUsageData, ListWorkspaceUsageErrors, ListWorkspaceUsageResponses, MintApiKeyData, MintApiKeyErrors, MintApiKeyResponses, MintSessionTokenData, MintSessionTokenErrors, MintSessionTokenResponses, PingClientData, PingClientErrors, PingClientResponses, PostSessionEventData, PostSessionEventErrors, PostSessionEventResponses, PublishVersionData, PublishVersionErrors, PublishVersionResponses, PushFunctionVersionData, PushFunctionVersionErrors, PushFunctionVersionResponses, PushSkillVersionData, PushSkillVersionErrors, PushSkillVersionResponses, PutVolumeFileData, PutVolumeFileErrors, PutVolumeFileResponses, ReconnectCredentialOauthData, ReconnectCredentialOauthErrors, ReconnectCredentialOauthResponses, RegisterClientData, RegisterClientErrors, RegisterClientResponses, RemoveMemberData, RemoveMemberErrors, RemoveMemberResponses, RemoveWorkspaceMemberData, RemoveWorkspaceMemberErrors, RemoveWorkspaceMemberResponses, RenameAgentData, RenameAgentErrors, RenameAgentResponses, RenameFunctionData, RenameFunctionErrors, RenameFunctionResponses, RenameMeData, RenameMeErrors, RenameMeResponses, RenameOrganizationData, RenameOrganizationErrors, RenameOrganizationResponses, RenameSessionData, RenameSessionErrors, RenameSessionResponses, RenameSkillData, RenameSkillErrors, RenameSkillResponses, RenameWorkspaceData, RenameWorkspaceErrors, RenameWorkspaceResponses, ResolveApprovalData, ResolveApprovalErrors, ResolveApprovalResponses, RevokeApiKeyData, RevokeApiKeyErrors, RevokeApiKeyResponses, RevokeInvitationData, RevokeInvitationErrors, RevokeInvitationResponses, SessionSandboxArchiveData, SessionSandboxArchiveErrors, SessionSandboxArchiveResponses, SetAgentSecurityData, SetAgentSecurityErrors, SetAgentSecurityResponses, StartCredentialOauthData, StartCredentialOauthErrors, StartCredentialOauthResponses, StreamSessionEventsData, StreamSessionEventsErrors, StreamSessionEventsResponse, StreamSessionEventsResponses, UpdateClientToolsData, UpdateClientToolsErrors, UpdateClientToolsResponses, UpdateModelProviderData, UpdateModelProviderErrors, UpdateModelProviderResponses, UpdateVaultData, UpdateVaultErrors, UpdateVaultResponses, UsageReportData, UsageReportErrors, UsageReportResponses } from './types.gen.js';
+import type { AckClientCallData, AckClientCallErrors, AckClientCallResponses, AddCredentialData, AddCredentialErrors, AddCredentialResponses, AddWorkspaceMemberData, AddWorkspaceMemberErrors, AddWorkspaceMemberResponses, AnswerClientCallData, AnswerClientCallErrors, AnswerClientCallResponses, CancelSessionRunData, CancelSessionRunErrors, CancelSessionRunResponses, ChangeMemberRoleData, ChangeMemberRoleErrors, ChangeMemberRoleResponses, ChangeWorkspaceMemberRoleData, ChangeWorkspaceMemberRoleErrors, ChangeWorkspaceMemberRoleResponses, CheckCredentialData, CheckCredentialErrors, CheckCredentialResponses, CompleteCredentialOauthData, CompleteCredentialOauthErrors, CompleteCredentialOauthResponses, CreateAgentData, CreateAgentErrors, CreateAgentResponses, CreateFunctionData, CreateFunctionErrors, CreateFunctionResponses, CreateInvitationData, CreateInvitationErrors, CreateInvitationResponses, CreateOauthClientData, CreateOauthClientErrors, CreateOauthClientResponses, CreateSessionData, CreateSessionErrors, CreateSessionResponses, CreateSkillData, CreateSkillErrors, CreateSkillResponses, CreateVaultData, CreateVaultErrors, CreateVaultResponses, CreateWorkspaceData, CreateWorkspaceErrors, CreateWorkspaceModelProviderData, CreateWorkspaceModelProviderErrors, CreateWorkspaceModelProviderResponses, CreateWorkspaceResponses, DeleteAgentData, DeleteAgentErrors, DeleteAgentResponses, DeleteCredentialData, DeleteCredentialErrors, DeleteCredentialResponses, DeleteFunctionData, DeleteFunctionErrors, DeleteFunctionResponses, DeleteModelProviderData, DeleteModelProviderErrors, DeleteModelProviderResponses, DeleteOauthClientData, DeleteOauthClientErrors, DeleteOauthClientResponses, DeleteSessionData, DeleteSessionErrors, DeleteSessionResponses, DeleteSessionSandboxArchiveData, DeleteSessionSandboxArchiveErrors, DeleteSessionSandboxArchiveResponses, DeleteSkillData, DeleteSkillErrors, DeleteSkillResponses, DeleteVaultData, DeleteVaultErrors, DeleteVaultResponses, DeleteVolumeData, DeleteVolumeErrors, DeleteVolumeFileData, DeleteVolumeFileErrors, DeleteVolumeFileResponses, DeleteVolumeResponses, DeleteWorkspaceData, DeleteWorkspaceErrors, DeleteWorkspaceResponses, GetAgentData, GetAgentErrors, GetAgentResponses, GetAgentSecurityData, GetAgentSecurityErrors, GetAgentSecurityResponses, GetCreditsData, GetCreditsErrors, GetCreditsResponses, GetFunctionData, GetFunctionErrors, GetFunctionResponses, GetFunctionVersionData, GetFunctionVersionErrors, GetFunctionVersionResponses, GetMeData, GetMeErrors, GetMeResponses, GetModelProviderData, GetModelProviderErrors, GetModelProviderResponses, GetOauthClientData, GetOauthClientErrors, GetOauthClientResponses, GetOrganizationData, GetOrganizationErrors, GetOrganizationPlanData, GetOrganizationPlanErrors, GetOrganizationPlanResponses, GetOrganizationResponses, GetSessionData, GetSessionErrors, GetSessionImageData, GetSessionImageErrors, GetSessionImageResponses, GetSessionResponses, GetSkillBundleData, GetSkillBundleErrors, GetSkillBundleResponses, GetSkillData, GetSkillErrors, GetSkillResponses, GetSkillVersionData, GetSkillVersionErrors, GetSkillVersionResponses, GetVaultData, GetVaultErrors, GetVaultResponses, GetVolumeFileData, GetVolumeFileErrors, GetVolumeFileResponses, GetWorkspaceData, GetWorkspaceErrors, GetWorkspaceResponses, LeaveClientData, LeaveClientErrors, LeaveClientResponses, ListAgentsData, ListAgentsErrors, ListAgentsResponses, ListAgentVersionsData, ListAgentVersionsErrors, ListAgentVersionsResponses, ListApiKeysData, ListApiKeysErrors, ListApiKeysResponses, ListCredentialsData, ListCredentialsErrors, ListCredentialsResponses, ListFunctionsData, ListFunctionsErrors, ListFunctionsResponses, ListFunctionVersionsData, ListFunctionVersionsErrors, ListFunctionVersionsResponses, ListInvitationsData, ListInvitationsErrors, ListInvitationsResponses, ListMembersData, ListMembersErrors, ListMembersResponses, ListModelProvidersData, ListModelProvidersErrors, ListModelProvidersResponses, ListOauthClientsData, ListOauthClientsErrors, ListOauthClientsResponses, ListPlansData, ListPlansErrors, ListPlansResponses, ListPlatformFunctionsData, ListPlatformFunctionsErrors, ListPlatformFunctionsResponses, ListSessionEventsData, ListSessionEventsErrors, ListSessionEventsResponses, ListSessionSandboxesData, ListSessionSandboxesErrors, ListSessionSandboxesResponses, ListSessionsData, ListSessionsErrors, ListSessionsResponses, ListSkillsData, ListSkillsErrors, ListSkillsResponses, ListSkillVersionsData, ListSkillVersionsErrors, ListSkillVersionsResponses, ListUsageData, ListUsageErrors, ListUsageResponses, ListVaultsData, ListVaultsErrors, ListVaultsResponses, ListVolumeFilesData, ListVolumeFilesErrors, ListVolumeFilesResponses, ListWorkspaceMembersData, ListWorkspaceMembersErrors, ListWorkspaceMembersResponses, ListWorkspacesData, ListWorkspacesErrors, ListWorkspacesResponses, ListWorkspaceUsageData, ListWorkspaceUsageErrors, ListWorkspaceUsageResponses, MintApiKeyData, MintApiKeyErrors, MintApiKeyResponses, MintSessionTokenData, MintSessionTokenErrors, MintSessionTokenResponses, PingClientData, PingClientErrors, PingClientResponses, PostSessionEventData, PostSessionEventErrors, PostSessionEventResponses, PublishVersionData, PublishVersionErrors, PublishVersionResponses, PushFunctionVersionData, PushFunctionVersionErrors, PushFunctionVersionResponses, PushSkillVersionData, PushSkillVersionErrors, PushSkillVersionResponses, PutVolumeFileData, PutVolumeFileErrors, PutVolumeFileResponses, ReconnectCredentialOauthData, ReconnectCredentialOauthErrors, ReconnectCredentialOauthResponses, RegisterClientData, RegisterClientErrors, RegisterClientResponses, RemoveMemberData, RemoveMemberErrors, RemoveMemberResponses, RemoveWorkspaceMemberData, RemoveWorkspaceMemberErrors, RemoveWorkspaceMemberResponses, RenameAgentData, RenameAgentErrors, RenameAgentResponses, RenameFunctionData, RenameFunctionErrors, RenameFunctionResponses, RenameMeData, RenameMeErrors, RenameMeResponses, RenameOrganizationData, RenameOrganizationErrors, RenameOrganizationResponses, RenameSessionData, RenameSessionErrors, RenameSessionResponses, RenameSkillData, RenameSkillErrors, RenameSkillResponses, RenameWorkspaceData, RenameWorkspaceErrors, RenameWorkspaceResponses, ResolveApprovalData, ResolveApprovalErrors, ResolveApprovalResponses, ResolveInputData, ResolveInputErrors, ResolveInputResponses, RevokeApiKeyData, RevokeApiKeyErrors, RevokeApiKeyResponses, RevokeInvitationData, RevokeInvitationErrors, RevokeInvitationResponses, SessionSandboxArchiveData, SessionSandboxArchiveErrors, SessionSandboxArchiveResponses, SetAgentSecurityData, SetAgentSecurityErrors, SetAgentSecurityResponses, StartCredentialOauthData, StartCredentialOauthErrors, StartCredentialOauthResponses, StreamSessionEventsData, StreamSessionEventsErrors, StreamSessionEventsResponse, StreamSessionEventsResponses, UpdateClientToolsData, UpdateClientToolsErrors, UpdateClientToolsResponses, UpdateModelProviderData, UpdateModelProviderErrors, UpdateModelProviderResponses, UpdateOauthClientData, UpdateOauthClientErrors, UpdateOauthClientResponses, UpdateVaultData, UpdateVaultErrors, UpdateVaultResponses, UsageReportData, UsageReportErrors, UsageReportResponses } from './types.gen.js';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
   /**
@@ -327,6 +327,63 @@ export const getModelProvider = <ThrowOnError extends boolean = false>(options: 
 export const updateModelProvider = <ThrowOnError extends boolean = false>(options: Options<UpdateModelProviderData, ThrowOnError>): RequestResult<UpdateModelProviderResponses, UpdateModelProviderErrors, ThrowOnError> => (options.client ?? client).patch<UpdateModelProviderResponses, UpdateModelProviderErrors, ThrowOnError>({
   security: [{ scheme: 'bearer', type: 'http' }],
   url: '/v1/model-providers/{model_provider_id}',
+  ...options,
+  headers: {
+    'Content-Type': 'application/json',
+    ...options.headers
+  }
+});
+
+/**
+ * List OAuth clients
+ */
+export const listOauthClients = <ThrowOnError extends boolean = false>(options?: Options<ListOauthClientsData, ThrowOnError>): RequestResult<ListOauthClientsResponses, ListOauthClientsErrors, ThrowOnError> => (options?.client ?? client).get<ListOauthClientsResponses, ListOauthClientsErrors, ThrowOnError>({
+  security: [{ scheme: 'bearer', type: 'http' }],
+  url: '/v1/oauth-clients',
+  ...options
+});
+
+/**
+ * Create an OAuth client
+ *
+ * Registers a client you created at a provider, for connecting vault credentials through it: an `http` credential always, and an `mcp` one whose server registers no client on the spot. The provider must send the browser back to the page that starts each connection, so register that page's URL with the provider as a redirect URI. The secret is sealed on the way in and is never returned by any route.
+ */
+export const createOauthClient = <ThrowOnError extends boolean = false>(options: Options<CreateOauthClientData, ThrowOnError>): RequestResult<CreateOauthClientResponses, CreateOauthClientErrors, ThrowOnError> => (options.client ?? client).post<CreateOauthClientResponses, CreateOauthClientErrors, ThrowOnError>({
+  security: [{ scheme: 'bearer', type: 'http' }],
+  url: '/v1/oauth-clients',
+  ...options,
+  headers: {
+    'Content-Type': 'application/json',
+    ...options.headers
+  }
+});
+
+/**
+ * Delete an OAuth client
+ */
+export const deleteOauthClient = <ThrowOnError extends boolean = false>(options: Options<DeleteOauthClientData, ThrowOnError>): RequestResult<DeleteOauthClientResponses, DeleteOauthClientErrors, ThrowOnError> => (options.client ?? client).delete<DeleteOauthClientResponses, DeleteOauthClientErrors, ThrowOnError>({
+  security: [{ scheme: 'bearer', type: 'http' }],
+  url: '/v1/oauth-clients/{oauth_client_id}',
+  ...options
+});
+
+/**
+ * Get an OAuth client
+ */
+export const getOauthClient = <ThrowOnError extends boolean = false>(options: Options<GetOauthClientData, ThrowOnError>): RequestResult<GetOauthClientResponses, GetOauthClientErrors, ThrowOnError> => (options.client ?? client).get<GetOauthClientResponses, GetOauthClientErrors, ThrowOnError>({
+  security: [{ scheme: 'bearer', type: 'http' }],
+  url: '/v1/oauth-clients/{oauth_client_id}',
+  ...options
+});
+
+/**
+ * Update an OAuth client
+ *
+ * Changes a client in place. An omitted field is left as it stands, including `token_endpoint_auth`: send one only to change the method or rotate the secret. The client keeps its id, so every credential connected through it refreshes with what it holds now. The endpoints and `client_id` cannot change, since the credentials connected through the client present their refresh tokens there: create another client for another provider.
+ */
+export const updateOauthClient = <ThrowOnError extends boolean = false>(options: Options<UpdateOauthClientData, ThrowOnError>): RequestResult<UpdateOauthClientResponses, UpdateOauthClientErrors, ThrowOnError> => (options.client ?? client).patch<UpdateOauthClientResponses, UpdateOauthClientErrors, ThrowOnError>({
+  security: [{ scheme: 'bearer', type: 'http' }],
+  url: '/v1/oauth-clients/{oauth_client_id}',
   ...options,
   headers: {
     'Content-Type': 'application/json',
@@ -664,6 +721,21 @@ export const getSessionImage = <ThrowOnError extends boolean = false>(options: O
 });
 
 /**
+ * Answer a form
+ *
+ * Answers a form the agent put through `builtin:ask_user`: submit it with one outcome per question, or dismiss it. A question the client cannot draw is answered `unsupported`, so the agent can ask it another way.
+ */
+export const resolveInput = <ThrowOnError extends boolean = false>(options: Options<ResolveInputData, ThrowOnError>): RequestResult<ResolveInputResponses, ResolveInputErrors, ThrowOnError> => (options.client ?? client).post<ResolveInputResponses, ResolveInputErrors, ThrowOnError>({
+  security: [{ scheme: 'bearer', type: 'http' }],
+  url: '/v1/sessions/{session_id}/inputs/{call_id}',
+  ...options,
+  headers: {
+    'Content-Type': 'application/json',
+    ...options.headers
+  }
+});
+
+/**
  * List a session's sandboxes
  */
 export const listSessionSandboxes = <ThrowOnError extends boolean = false>(options: Options<ListSessionSandboxesData, ThrowOnError>): RequestResult<ListSessionSandboxesResponses, ListSessionSandboxesErrors, ThrowOnError> => (options.client ?? client).get<ListSessionSandboxesResponses, ListSessionSandboxesErrors, ThrowOnError>({
@@ -921,7 +993,7 @@ export const listCredentials = <ThrowOnError extends boolean = false>(options: O
 /**
  * Add a credential
  *
- * The payload is sealed on the way in and is never returned by any route. An `mcp` credential targets its server's URL and is `oauth` or `static_bearer`; an `http` one targets an origin (`https://host[:port]`, nothing past it) and is `header`, a list of headers sent with every request to it.
+ * The payload is sealed on the way in and is never returned by any route. An `mcp` credential targets its server's URL and is `oauth` or `static_bearer`; an `http` one is sent to one or more origins (`https://host[:port]`, nothing past it) and is `header` here, a list of headers sent with every request to them. An `oauth` `http` credential is connected through the OAuth route instead.
  */
 export const addCredential = <ThrowOnError extends boolean = false>(options: Options<AddCredentialData, ThrowOnError>): RequestResult<AddCredentialResponses, AddCredentialErrors, ThrowOnError> => (options.client ?? client).post<AddCredentialResponses, AddCredentialErrors, ThrowOnError>({
   security: [{ scheme: 'bearer', type: 'http' }],
@@ -934,9 +1006,9 @@ export const addCredential = <ThrowOnError extends boolean = false>(options: Opt
 });
 
 /**
- * Start connecting an OAuth-protected MCP server
+ * Start connecting a credential through OAuth
  *
- * Discovers the MCP server's authorization server, registers a client with it for `redirect_uri`, and answers the URL to send the browser to. The provider sends the browser back to `redirect_uri` with `code` and `state`, and the same caller completes the connection with them, once, within ten minutes.
+ * Takes the client Subako presents to the provider and answers the URL to send the browser to. An `mcp` credential connects through the workspace OAuth client `oauth_client_id` names, or else Subako discovers the MCP server's authorization server and registers a client with it for `redirect_uri`. An `http` credential always connects through a workspace OAuth client, and is sent to its origins as `authorization: Bearer`. The provider sends the browser back to `redirect_uri` with `code` and `state`, and the same caller completes the connection with them, once, within ten minutes.
  */
 export const startCredentialOauth = <ThrowOnError extends boolean = false>(options: Options<StartCredentialOauthData, ThrowOnError>): RequestResult<StartCredentialOauthResponses, StartCredentialOauthErrors, ThrowOnError> => (options.client ?? client).post<StartCredentialOauthResponses, StartCredentialOauthErrors, ThrowOnError>({
   security: [{ scheme: 'bearer', type: 'http' }],
@@ -949,9 +1021,9 @@ export const startCredentialOauth = <ThrowOnError extends boolean = false>(optio
 });
 
 /**
- * Complete connecting an OAuth-protected MCP server
+ * Complete connecting a credential through OAuth
  *
- * Redeems the code the browser came back with, and stores what the provider issued as an `oauth` credential for the target. A reconnect's connection replaces its credential's payload in place and answers that credential's id. Only the caller that started the connection can complete it.
+ * Redeems the code the browser came back with, and stores what the provider issued as an `oauth` credential for the target or origins. A reconnect's connection replaces its credential's payload in place and answers that credential's id. Only the caller that started the connection can complete it.
  */
 export const completeCredentialOauth = <ThrowOnError extends boolean = false>(options: Options<CompleteCredentialOauthData, ThrowOnError>): RequestResult<CompleteCredentialOauthResponses, CompleteCredentialOauthErrors, ThrowOnError> => (options.client ?? client).post<CompleteCredentialOauthResponses, CompleteCredentialOauthErrors, ThrowOnError>({
   security: [{ scheme: 'bearer', type: 'http' }],
@@ -986,7 +1058,7 @@ export const checkCredential = <ThrowOnError extends boolean = false>(options: O
 /**
  * Start reconnecting an OAuth credential
  *
- * Starts a new OAuth connection for an `oauth` credential, with a fresh discovery and client registration, for the credential's own target and name. Completing it through the complete route replaces the credential's payload in place, keeping its id, and clears `reconnect_required`.
+ * Starts a new OAuth connection for an `oauth` credential, for the credential's own target or origins and name, through the workspace OAuth client it was connected through, or else with a fresh discovery and client registration. Completing it through the complete route replaces the credential's payload in place, keeping its id, and clears `reconnect_required`.
  */
 export const reconnectCredentialOauth = <ThrowOnError extends boolean = false>(options: Options<ReconnectCredentialOauthData, ThrowOnError>): RequestResult<ReconnectCredentialOauthResponses, ReconnectCredentialOauthErrors, ThrowOnError> => (options.client ?? client).post<ReconnectCredentialOauthResponses, ReconnectCredentialOauthErrors, ThrowOnError>({
   security: [{ scheme: 'bearer', type: 'http' }],

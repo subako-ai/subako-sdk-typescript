@@ -13,6 +13,7 @@ import { useSessionState } from "@subako-ai/react";
 import type { ComponentProps, ReactNode } from "react";
 import { createContext, useContext } from "react";
 import remarkGfm from "remark-gfm";
+import { SubakoInputForm, type WidgetRenderers } from "./input-form.js";
 import type { SubakoSession } from "./runtime.js";
 import { useSubakoRuntime } from "./runtime.js";
 
@@ -99,6 +100,23 @@ const STYLE = `
 	border-radius: 6px; background: var(--subako-surface); color: var(--subako-fg); }
 .subako-approval button { padding: 2px 10px; border: 1px solid var(--subako-border); border-radius: 6px;
 	background: var(--subako-bg); color: var(--subako-fg); font: inherit; cursor: pointer; }
+.subako-inputs { display: flex; flex-direction: column; gap: 8px; padding: 0 8px; }
+.subako-input-form { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 8px 10px;
+	border: 1px solid var(--subako-border); border-radius: 8px; background: var(--subako-surface);
+	color: var(--subako-fg); }
+.subako-input-question { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0; border: 0;
+	min-width: 0; }
+.subako-input-prompt { padding: 0; font-weight: 600; }
+.subako-input-options { display: flex; flex-direction: column; gap: 2px; }
+.subako-input-option { display: flex; align-items: baseline; gap: 6px; }
+.subako-input-hint { color: var(--subako-muted); font-size: 12px; }
+.subako-input-text { padding: 4px 6px; border: 1px solid var(--subako-border); border-radius: 6px;
+	background: var(--subako-bg); color: var(--subako-fg); font: inherit; }
+.subako-input-actions { display: flex; gap: 8px; }
+.subako-input-actions button { padding: 2px 12px; border: 1px solid var(--subako-border); border-radius: 6px;
+	background: var(--subako-bg); color: var(--subako-fg); font: inherit; cursor: pointer; }
+.subako-input-actions button:disabled { opacity: 0.5; cursor: default; }
+.subako-input-error { color: var(--subako-error); font-size: 12px; }
 .subako-composer { display: flex; gap: 8px; padding: 8px; border-top: 1px solid var(--subako-border);
 	background: var(--subako-bg); color: var(--subako-fg); }
 .subako-input { flex: 1 1 auto; resize: none; padding: 6px 8px; border: 1px solid var(--subako-border);
@@ -121,7 +139,14 @@ div:where(.subako-chat) details:where(.subako-tool-fold),
 div:where(.subako-chat) summary:where(.subako-tool-summary),
 div:where(.subako-chat) span:where(.subako-tool-name, .subako-tool-status, .subako-writing),
 div:where(.subako-chat) pre:where(.subako-tool-args, .subako-tool-result),
-div:where(.subako-chat) :where(.subako-approval, .subako-composer) > button,
+div:where(.subako-chat) :where(.subako-approval, .subako-composer, .subako-input-actions) > button,
+div:where(.subako-chat) div:where(.subako-inputs, .subako-input-options, .subako-input-hint, .subako-input-actions,
+	.subako-input-error),
+div:where(.subako-chat) :where(.subako-input-form):is(form, div),
+div:where(.subako-chat) fieldset:where(.subako-input-question),
+div:where(.subako-chat) legend:where(.subako-input-prompt),
+div:where(.subako-chat) label:where(.subako-input-option),
+div:where(.subako-chat) :where(.subako-input-text):is(input, textarea),
 div:where(.subako-chat) form:where(.subako-composer),
 div:where(.subako-chat) textarea:where(.subako-input),
 div:where(.subako-chat) textarea:where(.subako-input)::placeholder { all: revert-layer; }
@@ -315,19 +340,25 @@ export interface SubakoChatProps {
 	 * unstyled; a page with no such policy needs nothing here.
 	 */
 	readonly nonce?: string;
+	/**
+	 * The custom widgets this app draws in a form the agent puts through
+	 * `builtin:ask_user`, by widget id. A widget with no renderer here lets the
+	 * person tell the agent the app cannot show it.
+	 */
+	readonly widgets?: WidgetRenderers;
 	/** Rendered inside the runtime, which is where a tool UI registers itself. */
 	readonly children?: ReactNode;
 }
 
 /**
  * One session as a working chat: the transcript, the tool calls with their
- * approvals, a composer, and a stop button while a run is under way. The
+ * approvals, the forms the agent puts to the person, a composer, and a stop button while a run is under way. The
  * session is the app's own, so the chat opens no second connection; until it
  * has one the thread is empty and the composer is disabled. It exists for the
  * first ten minutes; an app that wants its own thread keeps `useSubakoRuntime`
  * and builds the rest from assistant-ui's primitives.
  */
-export function SubakoChat({ session, className, components, nonce, children }: SubakoChatProps): ReactNode {
+export function SubakoChat({ session, className, components, nonce, widgets, children }: SubakoChatProps): ReactNode {
 	const runtime = useSubakoRuntime(session);
 	const state = useSessionState(session);
 	return (
@@ -339,6 +370,18 @@ export function SubakoChat({ session, className, components, nonce, children }: 
 					<ThreadPrimitive.Viewport className="subako-viewport">
 						<ThreadPrimitive.Messages components={{ UserMessage, AssistantMessage }} />
 					</ThreadPrimitive.Viewport>
+					{session === null || state === null || state.inputs.length === 0 ? null : (
+						<div className="subako-inputs">
+							{state.inputs.map((input) => (
+								<SubakoInputForm
+									key={`${input.call_id}:${input.seq}`}
+									input={input}
+									widgets={widgets}
+									onAnswer={(answer) => session.answerInput(input.call_id, answer)}
+								/>
+							))}
+						</div>
+					)}
 					<ComposerPrimitive.Root className="subako-composer">
 						<ComposerPrimitive.Input className="subako-input" rows={1} placeholder="Message the agent" />
 						<ComposerPrimitive.Send>Send</ComposerPrimitive.Send>

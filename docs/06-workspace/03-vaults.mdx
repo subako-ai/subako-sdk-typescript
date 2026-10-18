@@ -44,8 +44,11 @@ await subako.vaults.addCredential(vault.id, {
     },
     target: {
       type: "string",
-      required: true,
-      description: "What the credential is matched by. For `mcp`, the server's exact URL; for `http`, an origin.",
+      description: "For `mcp`: the server's exact URL, which the credential is matched by.",
+    },
+    origins: {
+      type: "string[]",
+      description: "For `http`: the origins the credential is sent to, 1 to 16, each at most once.",
     },
     display_name: { type: "string", required: true, description: "For people reading the list, not for matching." },
     payload: {
@@ -58,14 +61,14 @@ await subako.vaults.addCredential(vault.id, {
 
 **`target` has to match the `url` in the agent's MCP grant exactly.** That is how the broker finds the credential for a call. A mismatch is not an error you get at publish time — it is a tool call that fails at runtime, which is a slower thing to debug.
 
-| `protocol` | `target` | `auth_scheme` |
-| ---------- | -------- | ------------- |
-| `mcp` | The MCP server's exact URL. | `static_bearer` or `oauth` |
-| `http` | An origin: `https://host` or `https://host:port`, with no path, query, fragment, or user name. | `header` |
+| `protocol` | Sent to | `auth_scheme` |
+| ---------- | ------- | ------------- |
+| `mcp` | `target`: the MCP server's exact URL. | `static_bearer` or `oauth` |
+| `http` | `origins`: each `https://host` or `https://host:port`, with no path, query, fragment, or user name. | `header`, or `oauth` through [OAuth](#connecting-with-oauth) |
 
 The body's type is a union on `protocol`, so TypeScript takes only the payloads a protocol does; a pairing outside the table is a `400`.
 
-An `http` target is stored as its origin's one spelling — the host in lowercase, the default port dropped, a trailing `/` removed — so `https://API.example.com:443/` and `https://api.example.com` are the same credential. Plain `http://` is refused unless the deployment lets Core reach the host that way, as a local development stack does for `localhost`.
+An origin is stored in its one spelling — the host in lowercase, the default port dropped, a trailing `/` removed — so `https://API.example.com:443/` and `https://api.example.com` are the same origin. Plain `http://` is refused unless the deployment lets Core reach the host that way, as a local development stack does for `localhost`. A vault sends at most one credential to an origin: adding a second that names it is a `409`.
 
 ## The payload shapes
 
@@ -86,11 +89,12 @@ An `http` target is stored as its origin's one spelling — the host in lowercas
 
 ## Connecting with OAuth
 
-An MCP server that signs people in with OAuth does not need you to hold a token at all. Core finds the server's authorization server, registers itself there as a client, and hands you a URL to send the browser to — a "Sign in with ..." button. The provider sends the browser back to a page of yours, and that page finishes the connection:
+A credential connected with OAuth does not need you to hold a token at all. Core hands you a URL to send the browser to — a "Sign in with ..." button — and the provider sends the browser back to a page of yours, which finishes the connection:
 
 ```ts
 // On the button: start, then send the browser away.
 const started = await subako.vaults.startOAuth(vault.id, {
+	protocol: "mcp",
 	target: "https://mcp.example.com/tickets",
 	display_name: "Tickets MCP",
 	redirect_uri: "https://app.example.com/vaults/oauth/callback",
@@ -107,12 +111,29 @@ const { id } = await subako.vaults.completeOAuth(vault.id, {
 });
 ```
 
+Core presents itself to the provider as an OAuth client. For an MCP server that names its authorization server, Core registers that client on the spot, and you need nothing more. For any other provider — an MCP server whose provider registers no client on the spot, or the API an `http` credential is sent to — the client is one you created at the provider and registered in the workspace as an [OAuth client](#oauth-clients); name it with `oauth_client_id`:
+
+```ts
+const started = await subako.vaults.startOAuth(vault.id, {
+	protocol: "http",
+	origins: ["https://www.googleapis.com", "https://gmail.googleapis.com"],
+	oauth_client_id: google.id,
+	display_name: "Drive and Gmail",
+	redirect_uri: "https://app.example.com/vaults/oauth/callback",
+});
+```
+
 <TypeTable
   type={{
+    protocol: { type: '"mcp" | "http"', required: true, description: "What the credential authenticates, as `addCredential` takes it." },
     target: {
       type: "string",
-      required: true,
-      description: "The MCP server's URL, which becomes the credential's target. It must be OAuth protected and its authorization server must support dynamic client registration.",
+      description: "For `mcp`: the MCP server's URL, which becomes the credential's target. Without `oauth_client_id`, it must be OAuth protected and its authorization server must support dynamic client registration.",
+    },
+    origins: { type: "string[]", description: "For `http`: the origins the credential is sent to, as `addCredential` takes them." },
+    oauth_client_id: {
+      type: "string",
+      description: "The workspace OAuth client to connect through. Optional for `mcp`, required for `http`.",
     },
     display_name: { type: "string", required: true, description: "The credential's name, as `addCredential` takes it." },
     redirect_uri: {
@@ -125,11 +146,50 @@ const { id } = await subako.vaults.completeOAuth(vault.id, {
 
 The URL carries the connection's `state`, which Core keeps only as a hash, so a retried start answers with a [receipt](/reference/timeouts-and-retries#receipts) instead — `expires_at` alone; start again to get a URL.
 
-The result is an `oauth` credential holding what the provider issued, refresh token included when it gave one. Only the caller that started a connection can complete it, once, within ten minutes; a `state` that names nothing of yours is a `404`. When the person declines at the provider, the browser comes back with `error=access_denied` instead of a code, and there is nothing to complete.
+The result is an `oauth` credential holding what the provider issued, refresh token included when it gave one. An `http` one is sent to each of its origins as `authorization: Bearer ...`, refreshed before a function call whenever it would lapse before the call could end. Only the caller that started a connection can complete it, once, within ten minutes; a `state` that names nothing of yours is a `404`. When the person declines at the provider, the browser comes back with `error=access_denied` instead of a code, and there is nothing to complete.
+
+### OAuth clients
+
+An OAuth client holds what a provider issued when you registered an application with it: its endpoints, the client id, and the client secret. Register `redirect_uri` with the provider too: it sends the browser back only to a URL it knows.
+
+```ts
+const google = await subako.oauthClients.create({
+	display_name: "Google",
+	authorization_endpoint: "https://accounts.google.com/o/oauth2/v2/auth",
+	token_endpoint: "https://oauth2.googleapis.com/token",
+	client_id: process.env["GOOGLE_CLIENT_ID"]!,
+	token_endpoint_auth: { method: "client_secret_post", client_secret: process.env["GOOGLE_CLIENT_SECRET"]! },
+	scopes: ["https://www.googleapis.com/auth/drive.readonly", "https://www.googleapis.com/auth/gmail.readonly"],
+	authorization_params: [
+		{ name: "access_type", value: "offline" },
+		{ name: "prompt", value: "consent" },
+	],
+});
+```
+
+<TypeTable
+  type={{
+    authorization_endpoint: { type: "string", required: true, description: "Where the browser is sent to sign in." },
+    token_endpoint: { type: "string", required: true, description: "Where Core redeems the code and refreshes the token." },
+    client_id: { type: "string", required: true, description: "The client identifier the provider issued." },
+    token_endpoint_auth: {
+      type: "TokenEndpointAuthBody",
+      required: true,
+      description: "`none` for a public client, or `client_secret_post` / `client_secret_basic` with its `client_secret`. Write-only.",
+    },
+    scopes: { type: "string[]", description: "Joined by spaces into the `scope` parameter. Empty asks for none." },
+    authorization_params: {
+      type: "{ name, value }[]",
+      description: "Extra parameters the authorization URL carries, such as `access_type=offline` for a refresh token from Google, or `offline_access` among the scopes for Microsoft.",
+    },
+  }}
+/>
+
+`update` changes a client in place, and a new `token_endpoint_auth` rotates its secret: every credential connected through it refreshes with the new one from then on. Its endpoints and `client_id` are fixed once it is created, since the credentials connected through it present their refresh tokens there; for another provider, create another client. A client that a credential was connected through cannot be deleted; delete the credential first. A configured client asks for no RFC 8707 `resource`, since some providers refuse the parameter.
 
 ### When the provider stops taking it
 
-Core refreshes an `oauth` credential on its own: a minute before its access token lapses, and once more whenever its server refuses it. When the provider refuses the refresh token too — the person revoked access, or the grant expired — the credential is listed with `status: "reconnect_required"`, and sessions stop sending it. Reconnecting takes the person through the provider again, for the same target and name, and puts the new grant in place under the same credential id:
+Core refreshes an `oauth` credential on its own: a minute before its access token lapses, and once more whenever its server refuses it; an `http` one, before any function call it would not outlast. When the provider refuses the refresh token too — the person revoked access, or the grant expired — the credential is listed with `status: "reconnect_required"`, and sessions stop sending it. Reconnecting takes the person through the provider again, for the same target or origins, name, and client, and puts the new grant in place under the same credential id:
 
 ```ts
 const started = await subako.vaults.reconnectOAuth(vault.id, credential.id, {
@@ -168,7 +228,7 @@ const credentials = await subako.vaults.listCredentials(vault.id, { limit: 50 })
 await subako.vaults.deleteCredential(vault.id, credentialId);
 ```
 
-The listing describes the credentials — each with its `status`, `active` or `reconnect_required`, and an `http` one with the names of its `headers` — and does not return the secrets: those went in and do not come back out. A header's value is a secret; its name is not.
+The listing describes the credentials — each with its `status`, `active` or `reconnect_required`, an `oauth` one with the `oauth_client_id` it was connected through, and an `http` one with its `origins` and the names of its `headers` — and does not return the secrets: those went in and do not come back out. A header's value is a secret; its name is not.
 
 ## Giving a session access
 

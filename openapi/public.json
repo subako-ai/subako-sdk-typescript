@@ -2637,6 +2637,490 @@
         ]
       }
     },
+    "/v1/oauth-clients": {
+      "get": {
+        "tags": [
+          "oauth-clients"
+        ],
+        "summary": "List OAuth clients",
+        "operationId": "list_oauth_clients",
+        "parameters": [
+          {
+            "name": "Kikuvi-Workspace",
+            "in": "header",
+            "description": "Workspace to list from. Required for a user caller; implied by the key for an API key caller.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "maximum": 200,
+              "minimum": 1
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "description": "Rows past this id in `order`'s direction: a page's `next_cursor`.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "description": "Rows just before this id, still in `order`'s direction: a page's `prev_cursor`.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "description": "Newest first when omitted.",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/OrderParam"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page, newest first unless order=asc; never a secret.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageOut_OAuthClientBody"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad limit, cursor, or order, a malformed workspace header, or a user caller with no workspace header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, malformed, or invalid bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks vault.read, or an API key's Kikuvi-Workspace header names another workspace.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such workspace, or the caller cannot see it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "oauth-clients"
+        ],
+        "summary": "Create an OAuth client",
+        "description": "Registers a client you created at a provider, for connecting vault credentials through it: an `http` credential always, and an `mcp` one whose server registers no client on the spot. The provider must send the browser back to the page that starts each connection, so register that page's URL with the provider as a redirect URI. The secret is sealed on the way in and is never returned by any route.",
+        "operationId": "create_oauth_client",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Retry the same operation with this key to return its saved receipt. Scoped by the operation's authenticated caller or resource. A different input under the same key returns 409. Receipts are retained for at least 7 days after completion, then removed by an hourly sweep. After removal the key can execute again. Fresh-only secrets are never included in a replay.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 255,
+              "minLength": 1
+            }
+          },
+          {
+            "name": "Kikuvi-Workspace",
+            "in": "header",
+            "description": "Workspace to create in. Required for a user caller; implied by the key for an API key caller.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOAuthClientBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created.",
+            "headers": {
+              "Idempotency-Replayed": {
+                "schema": {
+                  "type": "boolean"
+                },
+                "description": "True when returning a saved receipt."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthClientCreated"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed body, a field outside its bound, an endpoint the deployment's network policy does not reach, a malformed workspace header, or a user caller with no workspace header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, malformed, or invalid bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks vault.manage, the organization may not create, or an API key's Kikuvi-Workspace header names another workspace.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such workspace, or the caller cannot see it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Idempotency-Key was already used for a different request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/oauth-clients/{oauth_client_id}": {
+      "get": {
+        "tags": [
+          "oauth-clients"
+        ],
+        "summary": "Get an OAuth client",
+        "operationId": "get_oauth_client",
+        "parameters": [
+          {
+            "name": "oauth_client_id",
+            "in": "path",
+            "description": "OAuth client id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The client. Carries no secret.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthClientBody"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed path parameter.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, malformed, or invalid bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks vault.read.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such client, or the caller cannot see it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "oauth-clients"
+        ],
+        "summary": "Delete an OAuth client",
+        "operationId": "delete_oauth_client",
+        "parameters": [
+          {
+            "name": "oauth_client_id",
+            "in": "path",
+            "description": "OAuth client id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The client and its secret are gone. This cannot be undone."
+          },
+          "400": {
+            "description": "Malformed path parameter.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, malformed, or invalid bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks vault.manage.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such client, or the caller cannot see it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A credential was connected through the client: delete it first, since it could not refresh without the client.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "oauth-clients"
+        ],
+        "summary": "Update an OAuth client",
+        "description": "Changes a client in place. An omitted field is left as it stands, including `token_endpoint_auth`: send one only to change the method or rotate the secret. The client keeps its id, so every credential connected through it refreshes with what it holds now. The endpoints and `client_id` cannot change, since the credentials connected through the client present their refresh tokens there: create another client for another provider.",
+        "operationId": "update_oauth_client",
+        "parameters": [
+          {
+            "name": "oauth_client_id",
+            "in": "path",
+            "description": "OAuth client id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateOAuthClientBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The updated client. Carries no secret.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthClientBody"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed body, path parameter, a field outside its bound, or a field that cannot change.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, malformed, or invalid bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks vault.manage.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such client, or the caller cannot see it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/v1/organization": {
       "get": {
         "tags": [
@@ -5365,6 +5849,133 @@
         ]
       }
     },
+    "/v1/sessions/{session_id}/inputs/{call_id}": {
+      "post": {
+        "tags": [
+          "sessions"
+        ],
+        "summary": "Answer a form",
+        "description": "Answers a form the agent put through `builtin:ask_user`: submit it with one outcome per question, or dismiss it. A question the client cannot draw is answered `unsupported`, so the agent can ask it another way.",
+        "operationId": "resolve_input",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Retry the same operation with this key to return its saved receipt. Scoped by the operation's authenticated caller or resource. A different input under the same key returns 409. Receipts are retained for at least 7 days after completion, then removed by an hourly sweep. After removal the key can execute again. Fresh-only secrets are never included in a replay.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 255,
+              "minLength": 1
+            }
+          },
+          {
+            "name": "session_id",
+            "in": "path",
+            "description": "Session id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "call_id",
+            "in": "path",
+            "description": "The call_id the `input_requested` event named",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InputResponseForm"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Answered, and recorded in the log. The broker holding the call reads the answer on its next tick and answers the engine in line; past the hold, the run's requeue re-fires the call instead.",
+            "headers": {
+              "Idempotency-Replayed": {
+                "schema": {
+                  "type": "boolean"
+                },
+                "description": "True when returning a saved receipt."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionEventBody"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed body or path parameter, or an answer the form does not take: an outcome missing or repeated, a required question skipped, or a value its widget refuses.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, malformed, or invalid bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "A workspace credential lacking session.manage. A session token carries no permissions and never lands here.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such session, the caller cannot see it, or a session token authenticates for another one; or no form is pending for this call.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Idempotency-Key was already used for a different request. The form is already settled.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/v1/sessions/{session_id}/sandboxes": {
       "get": {
         "tags": [
@@ -7747,7 +8358,7 @@
           "vaults"
         ],
         "summary": "Add a credential",
-        "description": "The payload is sealed on the way in and is never returned by any route. An `mcp` credential targets its server's URL and is `oauth` or `static_bearer`; an `http` one targets an origin (`https://host[:port]`, nothing past it) and is `header`, a list of headers sent with every request to it.",
+        "description": "The payload is sealed on the way in and is never returned by any route. An `mcp` credential targets its server's URL and is `oauth` or `static_bearer`; an `http` one is sent to one or more origins (`https://host[:port]`, nothing past it) and is `header` here, a list of headers sent with every request to them. An `oauth` `http` credential is connected through the OAuth route instead.",
         "operationId": "add_credential",
         "parameters": [
           {
@@ -7802,7 +8413,7 @@
             }
           },
           "400": {
-            "description": "Malformed body, including an auth scheme the protocol does not take; a header named twice; or an `http` target that is not an origin, or one the deployment's network policy does not reach.",
+            "description": "Malformed body, including an auth scheme the protocol does not take; a header or an origin named twice; or an `http` origin that is not one, or one the deployment's network policy does not reach.",
             "content": {
               "application/json": {
                 "schema": {
@@ -7842,7 +8453,7 @@
             }
           },
           "409": {
-            "description": "Idempotency-Key was already used for a different request. Duplicate credential target.",
+            "description": "Idempotency-Key was already used for a different request. Duplicate credential target, or an origin another credential in the vault is already sent to.",
             "content": {
               "application/json": {
                 "schema": {
@@ -7864,8 +8475,8 @@
         "tags": [
           "vaults"
         ],
-        "summary": "Start connecting an OAuth-protected MCP server",
-        "description": "Discovers the MCP server's authorization server, registers a client with it for `redirect_uri`, and answers the URL to send the browser to. The provider sends the browser back to `redirect_uri` with `code` and `state`, and the same caller completes the connection with them, once, within ten minutes.",
+        "summary": "Start connecting a credential through OAuth",
+        "description": "Takes the client Subako presents to the provider and answers the URL to send the browser to. An `mcp` credential connects through the workspace OAuth client `oauth_client_id` names, or else Subako discovers the MCP server's authorization server and registers a client with it for `redirect_uri`. An `http` credential always connects through a workspace OAuth client, and is sent to its origins as `authorization: Bearer`. The provider sends the browser back to `redirect_uri` with `code` and `state`, and the same caller completes the connection with them, once, within ten minutes.",
         "operationId": "start_credential_oauth",
         "parameters": [
           {
@@ -7930,7 +8541,7 @@
             }
           },
           "400": {
-            "description": "Malformed body; a target that is not OAuth protected, whose authorization server cannot be discovered, does not support dynamic client registration, or refused the registration; or a target the deployment's network policy does not reach.",
+            "description": "Malformed body; an `mcp` target without an OAuth client that is not OAuth protected, whose authorization server cannot be discovered, does not support dynamic client registration, or refused the registration; or a target, origin, or endpoint the deployment's network policy does not reach.",
             "content": {
               "application/json": {
                 "schema": {
@@ -7960,7 +8571,7 @@
             }
           },
           "404": {
-            "description": "No such vault, or the caller cannot see it.",
+            "description": "No such vault, or the caller cannot see it; or no such OAuth client in the vault's workspace.",
             "content": {
               "application/json": {
                 "schema": {
@@ -7970,7 +8581,7 @@
             }
           },
           "409": {
-            "description": "Idempotency-Key was already used for a different request.",
+            "description": "Idempotency-Key was already used for a different request. Duplicate credential target, or an origin another credential in the vault is already sent to.",
             "content": {
               "application/json": {
                 "schema": {
@@ -7992,8 +8603,8 @@
         "tags": [
           "vaults"
         ],
-        "summary": "Complete connecting an OAuth-protected MCP server",
-        "description": "Redeems the code the browser came back with, and stores what the provider issued as an `oauth` credential for the target. A reconnect's connection replaces its credential's payload in place and answers that credential's id. Only the caller that started the connection can complete it.",
+        "summary": "Complete connecting a credential through OAuth",
+        "description": "Redeems the code the browser came back with, and stores what the provider issued as an `oauth` credential for the target or origins. A reconnect's connection replaces its credential's payload in place and answers that credential's id. Only the caller that started the connection can complete it.",
         "operationId": "complete_credential_oauth",
         "parameters": [
           {
@@ -8310,7 +8921,7 @@
           "vaults"
         ],
         "summary": "Start reconnecting an OAuth credential",
-        "description": "Starts a new OAuth connection for an `oauth` credential, with a fresh discovery and client registration, for the credential's own target and name. Completing it through the complete route replaces the credential's payload in place, keeping its id, and clears `reconnect_required`.",
+        "description": "Starts a new OAuth connection for an `oauth` credential, for the credential's own target or origins and name, through the workspace OAuth client it was connected through, or else with a fresh discovery and client registration. Completing it through the complete route replaces the credential's payload in place, keeping its id, and clears `reconnect_required`.",
         "operationId": "reconnect_credential_oauth",
         "parameters": [
           {
@@ -9663,7 +10274,7 @@
           {
             "type": "object",
             "required": [
-              "target",
+              "origins",
               "display_name",
               "payload",
               "protocol"
@@ -9673,6 +10284,15 @@
                 "type": "string",
                 "maxLength": 200
               },
+              "origins": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/HttpOriginBody"
+                },
+                "description": "Each at most once, and none another credential in the vault is\nalready sent to.",
+                "maxItems": 16,
+                "minItems": 1
+              },
               "payload": {
                 "$ref": "#/components/schemas/HttpPayloadBody"
               },
@@ -9681,9 +10301,6 @@
                 "enum": [
                   "http"
                 ]
-              },
-              "target": {
-                "$ref": "#/components/schemas/HttpOriginBody"
               }
             }
           }
@@ -9817,8 +10434,8 @@
             "format": "uuid"
           },
           "config": {
-            "type": "object",
-            "description": "The config this version was published with.\nSkill grants retain their requested `version` selectors, which resolve\nindependently when each session is created."
+            "$ref": "#/components/schemas/AgentConfigBody",
+            "description": "The config this version was published with, in the shape publishing\ntakes, every field written out. Skill and function grants retain their\nrequested `version` selectors, which resolve independently when each\nsession is created."
           },
           "created_at": {
             "type": "string",
@@ -10201,6 +10818,43 @@
         ],
         "description": "How to answer a held call. Only a denial carries a message, which reaches\nthe model in place of the tool's result."
       },
+      "AskUserGrantBody": {
+        "type": "object",
+        "description": "The widgets an agent's forms may be built from, each listed once.",
+        "required": [
+          "widgets"
+        ],
+        "properties": {
+          "widgets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WidgetGrantBody"
+            },
+            "maxItems": 32,
+            "minItems": 1
+          }
+        }
+      },
+      "AuthorizationParamBody": {
+        "type": "object",
+        "description": "A parameter the authorization URL carries beside the ones Subako sets,\nsuch as Google's `access_type=offline`. Its value is no secret: the\nbrowser carries it to the provider.",
+        "required": [
+          "name",
+          "value"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Letters, digits, and `-._~`; none Subako sets itself (`response_type`,\n`client_id`, `redirect_uri`, `state`, `code_challenge`,\n`code_challenge_method`, `scope`, `resource`).",
+            "maxLength": 64,
+            "minLength": 1
+          },
+          "value": {
+            "type": "string",
+            "maxLength": 512
+          }
+        }
+      },
       "BucketWidthParam": {
         "type": "string",
         "description": "How finely a report cuts its span, in UTC.\n\nStable vocabulary for v1: adding a value requires a new API version.",
@@ -10214,6 +10868,17 @@
         "type": "object",
         "description": "The servers the platform serves itself, each at `builtin:{key}`.",
         "properties": {
+          "ask_user": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AskUserGrantBody",
+                "description": "Whether the agent may put forms to a person through the\n`builtin:ask_user` server, and which widgets a form may use. Off when\nleft out. A child session never asks, whatever its version grants."
+              }
+            ]
+          },
           "session_display_name": {
             "$ref": "#/components/schemas/SessionDisplayNameGrantBody",
             "description": "Whether the agent names the session it runs in, through the\n`builtin:session_display_name` server. `never` when left out."
@@ -10628,6 +11293,59 @@
           }
         }
       },
+      "CreateOAuthClientBody": {
+        "type": "object",
+        "required": [
+          "display_name",
+          "authorization_endpoint",
+          "token_endpoint",
+          "client_id",
+          "token_endpoint_auth"
+        ],
+        "properties": {
+          "authorization_endpoint": {
+            "type": "string",
+            "description": "The provider's authorization endpoint (RFC 6749 §3.1), which the\nbrowser is sent to. A query is kept; a fragment is refused.",
+            "maxLength": 2048,
+            "minLength": 1
+          },
+          "authorization_params": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuthorizationParamBody"
+            },
+            "description": "Appended to the authorization URL in order, each name at most once.",
+            "maxItems": 16
+          },
+          "client_id": {
+            "type": "string",
+            "description": "The client identifier the provider issued.",
+            "maxLength": 512,
+            "minLength": 1
+          },
+          "display_name": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OAuthScopeBody"
+            },
+            "description": "Each at most once, joined by spaces into the `scope` parameter. Empty\nasks for none, leaving the provider's default.",
+            "maxItems": 64
+          },
+          "token_endpoint": {
+            "type": "string",
+            "description": "The provider's token endpoint (RFC 6749 §3.2), which Subako redeems\ncodes and refreshes tokens at.",
+            "maxLength": 2048,
+            "minLength": 1
+          },
+          "token_endpoint_auth": {
+            "$ref": "#/components/schemas/TokenEndpointAuthBody"
+          }
+        }
+      },
       "CreateSessionBody": {
         "type": "object",
         "required": [
@@ -10855,6 +11573,7 @@
               "vault_id",
               "auth_scheme",
               "target",
+              "oauth_client_id",
               "display_name",
               "status",
               "protocol"
@@ -10869,6 +11588,14 @@
               "id": {
                 "type": "string",
                 "format": "uuid"
+              },
+              "oauth_client_id": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "uuid",
+                "description": "The workspace OAuth client an `oauth` credential was connected\nthrough; null for one whose client Subako registered with the\nserver's provider itself, and for any other scheme."
               },
               "protocol": {
                 "type": "string",
@@ -10895,8 +11622,9 @@
               "id",
               "vault_id",
               "auth_scheme",
-              "target",
+              "origins",
               "headers",
+              "oauth_client_id",
               "display_name",
               "status",
               "protocol"
@@ -10913,11 +11641,26 @@
                 "items": {
                   "$ref": "#/components/schemas/CredentialHeaderNameBody"
                 },
-                "description": "Every header the credential is sent as, in the order it was added."
+                "description": "Every header the credential is sent as, in the order it was added:\n`authorization` alone for an `oauth` one."
               },
               "id": {
                 "type": "string",
                 "format": "uuid"
+              },
+              "oauth_client_id": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "uuid",
+                "description": "The workspace OAuth client an `oauth` credential was connected\nthrough; null for a `header` one."
+              },
+              "origins": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Every origin the credential is sent to, as the vault stores them,\nin the order they were given."
               },
               "protocol": {
                 "type": "string",
@@ -10927,10 +11670,6 @@
               },
               "status": {
                 "$ref": "#/components/schemas/CredentialStatusBody"
-              },
-              "target": {
-                "type": "string",
-                "description": "The origin, as the vault stores it."
               },
               "vault_id": {
                 "type": "string",
@@ -11388,17 +12127,49 @@
           }
         }
       },
+      "FunctionAssetFileBody": {
+        "type": "object",
+        "description": "One file under a bundle's `assets/`.",
+        "required": [
+          "path",
+          "size",
+          "sha256"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "The path under `assets/`, `/`-separated."
+          },
+          "sha256": {
+            "type": "string",
+            "description": "Hex SHA-256 of the file's bytes."
+          },
+          "size": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
       "FunctionAssetsBody": {
         "type": "object",
         "description": "The files under a bundle's `assets/`, which Core stores as one archive and\na call's module reads read-only at `/package`. `sha256` is the hex SHA-256\nof that archive and `bytes` its size.",
         "required": [
           "sha256",
-          "bytes"
+          "bytes",
+          "files"
         ],
         "properties": {
           "bytes": {
             "type": "integer",
             "format": "int64"
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FunctionAssetFileBody"
+            },
+            "description": "Each file the archive holds, in path order."
           },
           "sha256": {
             "type": "string"
@@ -11722,9 +12493,10 @@
       },
       "HttpSchemeBody": {
         "type": "string",
-        "description": "How an `http` credential authenticates against its origin.",
+        "description": "How an `http` credential authenticates against its origins: headers it\nwas given, or an OAuth token sent as `authorization: Bearer`.",
         "enum": [
-          "header"
+          "header",
+          "oauth"
         ]
       },
       "ImageInputBody": {
@@ -11744,6 +12516,160 @@
           "image/gif",
           "image/webp"
         ]
+      },
+      "InputRequestBody": {
+        "type": "object",
+        "description": "A form an agent put to a person: up to four questions answered at once.",
+        "required": [
+          "questions"
+        ],
+        "properties": {
+          "questions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QuestionBody"
+            }
+          }
+        }
+      },
+      "InputResolutionBody": {
+        "oneOf": [
+          {
+            "type": "object",
+            "description": "The person submitted the form, with one outcome per question.",
+            "required": [
+              "data",
+              "type"
+            ],
+            "properties": {
+              "data": {
+                "type": "object",
+                "description": "The person submitted the form, with one outcome per question.",
+                "required": [
+                  "answers"
+                ],
+                "properties": {
+                  "answers": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/QuestionAnswerBody"
+                    }
+                  }
+                }
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "submitted"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "The person dismissed the form.",
+            "required": [
+              "data",
+              "type"
+            ],
+            "properties": {
+              "data": {
+                "type": "object",
+                "description": "The person dismissed the form.",
+                "properties": {
+                  "message": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "declined"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Nobody answered before the deadline.",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "expired"
+                ]
+              }
+            }
+          }
+        ],
+        "description": "What settled a form."
+      },
+      "InputResponseForm": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "data",
+              "type"
+            ],
+            "properties": {
+              "data": {
+                "type": "object",
+                "required": [
+                  "answers"
+                ],
+                "properties": {
+                  "answers": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/QuestionAnswerBody"
+                    }
+                  }
+                }
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "submitted"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "data",
+              "type"
+            ],
+            "properties": {
+              "data": {
+                "type": "object",
+                "properties": {
+                  "message": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "declined"
+                ]
+              }
+            }
+          }
+        ],
+        "description": "How a person answers a form: submit it with one outcome per question, or\ndismiss it, optionally saying why."
       },
       "InputSourceBody": {
         "type": "string",
@@ -12414,6 +13340,87 @@
           }
         ]
       },
+      "OAuthClientBody": {
+        "type": "object",
+        "description": "An OAuth client as stored. Carries no secret: it only goes in.",
+        "required": [
+          "id",
+          "workspace_id",
+          "display_name",
+          "authorization_endpoint",
+          "token_endpoint",
+          "client_id",
+          "token_endpoint_auth_method",
+          "scopes",
+          "authorization_params",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "authorization_endpoint": {
+            "type": "string"
+          },
+          "authorization_params": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuthorizationParamBody"
+            }
+          },
+          "client_id": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OAuthScopeBody"
+            }
+          },
+          "token_endpoint": {
+            "type": "string"
+          },
+          "token_endpoint_auth_method": {
+            "$ref": "#/components/schemas/TokenEndpointAuthMethodBody"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "workspace_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "OAuthClientCreated": {
+        "type": "object",
+        "description": "The id of the OAuth client just created. Read it back for the rest of its\nrow; the secret is never returned.",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "OAuthScopeBody": {
+        "type": "string",
+        "description": "One scope the client asks for: printable ASCII without spaces, quotes, or backslashes.",
+        "maxLength": 256,
+        "minLength": 1
+      },
       "OAuthStartReceiptBody": {
         "type": "object",
         "description": "A replay confirms the start without the URL: it carries the `state`,\nwhich Core keeps only as a hash.",
@@ -12429,7 +13436,7 @@
       },
       "OAuthStarted": {
         "type": "object",
-        "description": "Where to send the browser to sign in at the MCP server's provider, and\nuntil when the connection waits for it to come back.",
+        "description": "Where to send the browser to sign in at the provider, and\nuntil when the connection waits for it to come back.",
         "required": [
           "authorization_url",
           "expires_at"
@@ -12945,6 +13952,38 @@
           }
         }
       },
+      "PageOut_OAuthClientBody": {
+        "type": "object",
+        "required": [
+          "items",
+          "next_cursor",
+          "prev_cursor"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OAuthClientBody"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Pass back as `after` for the next page; `null` on the last page."
+          },
+          "prev_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Pass back as `before` for the previous page; `null` on the first page."
+          }
+        }
+      },
       "PageOut_OrgMemberBody": {
         "type": "object",
         "required": [
@@ -13401,6 +14440,235 @@
           }
         }
       },
+      "QuestionAnswerBody": {
+        "type": "object",
+        "description": "One question's outcome, named by the question's id.",
+        "required": [
+          "question_id",
+          "outcome"
+        ],
+        "properties": {
+          "outcome": {
+            "$ref": "#/components/schemas/QuestionOutcomeBody"
+          },
+          "question_id": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "QuestionBody": {
+        "type": "object",
+        "description": "One question of a form.",
+        "required": [
+          "id",
+          "prompt",
+          "required",
+          "widget"
+        ],
+        "properties": {
+          "header": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A short label, where the prompt is too long to show."
+          },
+          "id": {
+            "type": "string",
+            "description": "Unique within the form; the answer goes back under it."
+          },
+          "prompt": {
+            "type": "string",
+            "description": "What the person is asked, in full."
+          },
+          "required": {
+            "type": "boolean",
+            "description": "Whether the form can be submitted without answering it."
+          },
+          "widget": {
+            "$ref": "#/components/schemas/QuestionWidgetBody"
+          }
+        }
+      },
+      "QuestionOutcomeBody": {
+        "oneOf": [
+          {
+            "type": "object",
+            "description": "Answered with `value`, which the question's widget must take.",
+            "required": [
+              "data",
+              "type"
+            ],
+            "properties": {
+              "data": {
+                "type": "object",
+                "description": "Answered with `value`, which the question's widget must take.",
+                "required": [
+                  "value"
+                ],
+                "properties": {
+                  "value": {}
+                }
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "answered"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Left blank. Only a question that is not required may be.",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "skipped"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "The client cannot draw the question's widget.",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "unsupported"
+                ]
+              }
+            }
+          }
+        ],
+        "description": "What became of one question."
+      },
+      "QuestionWidgetBody": {
+        "oneOf": [
+          {
+            "type": "object",
+            "description": "Answered with the list of labels picked: exactly one unless\n`multiple`, and with `allow_other` one may be the person's own text.",
+            "required": [
+              "data",
+              "type"
+            ],
+            "properties": {
+              "data": {
+                "type": "object",
+                "description": "Answered with the list of labels picked: exactly one unless\n`multiple`, and with `allow_other` one may be the person's own text.",
+                "required": [
+                  "options",
+                  "multiple",
+                  "allow_other"
+                ],
+                "properties": {
+                  "allow_other": {
+                    "type": "boolean"
+                  },
+                  "multiple": {
+                    "type": "boolean"
+                  },
+                  "options": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/SelectOptionBody"
+                    }
+                  }
+                }
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "select"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Answered with a string.",
+            "required": [
+              "data",
+              "type"
+            ],
+            "properties": {
+              "data": {
+                "type": "object",
+                "description": "Answered with a string.",
+                "required": [
+                  "multiline"
+                ],
+                "properties": {
+                  "multiline": {
+                    "type": "boolean"
+                  }
+                }
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "text"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Answered with `true` or `false`.",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "confirm"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "A widget the agent version declares, drawn by the client registered\nfor `id` from `props`, and answered with what its answer schema\ntakes. A client with no renderer for `id` answers `unsupported`.",
+            "required": [
+              "data",
+              "type"
+            ],
+            "properties": {
+              "data": {
+                "type": "object",
+                "description": "A widget the agent version declares, drawn by the client registered\nfor `id` from `props`, and answered with what its answer schema\ntakes. A client with no renderer for `id` answers `unsupported`.",
+                "required": [
+                  "id",
+                  "props"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "props": {}
+                }
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "custom"
+                ]
+              }
+            }
+          }
+        ],
+        "description": "How a question is answered; `type` names the widget."
+      },
       "RatedBytesBody": {
         "type": "object",
         "required": [
@@ -13787,6 +15055,25 @@
           }
         ],
         "description": "Where the sandbox may reach. `unrestricted` is the internet; `none` keeps\nit out while the sandbox still reaches the platform's own storage for\nits backups and skills."
+      },
+      "SelectOptionBody": {
+        "type": "object",
+        "description": "One option of a select.",
+        "required": [
+          "label"
+        ],
+        "properties": {
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "label": {
+            "type": "string",
+            "description": "What the person picks, and what the answer carries."
+          }
+        }
       },
       "SessionBody": {
         "type": "object",
@@ -14282,6 +15569,58 @@
                 "type": "string",
                 "enum": [
                   "approval_resolved"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "An `ask_user` call put a form to a person and waits for the answer\n`POST /v1/sessions/{session_id}/inputs/{call_id}` brings.",
+            "required": [
+              "call_id",
+              "request",
+              "type"
+            ],
+            "properties": {
+              "call_id": {
+                "type": "string"
+              },
+              "request": {
+                "$ref": "#/components/schemas/InputRequestBody"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "input_requested"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "The form `call_id` put settled.",
+            "required": [
+              "call_id",
+              "resolution",
+              "type"
+            ],
+            "properties": {
+              "call_id": {
+                "type": "string"
+              },
+              "resolution": {
+                "$ref": "#/components/schemas/InputResolutionBody"
+              },
+              "resolved_by": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "input_resolved"
                 ]
               }
             }
@@ -14819,30 +16158,92 @@
         }
       },
       "StartOAuthBody": {
-        "type": "object",
-        "required": [
-          "target",
-          "display_name",
-          "redirect_uri"
-        ],
-        "properties": {
-          "display_name": {
-            "type": "string",
-            "maxLength": 200
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "target",
+              "display_name",
+              "redirect_uri",
+              "protocol"
+            ],
+            "properties": {
+              "display_name": {
+                "type": "string",
+                "maxLength": 200
+              },
+              "oauth_client_id": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "uuid",
+                "description": "The workspace OAuth client to connect through, for a server whose\nprovider registers no client on the spot. Omitted, Subako\ndiscovers the provider and registers a client there itself."
+              },
+              "protocol": {
+                "type": "string",
+                "enum": [
+                  "mcp"
+                ]
+              },
+              "redirect_uri": {
+                "type": "string",
+                "description": "The client's own page the provider sends the browser back to, with\n`code` and `state` (or `error`) in its query: an absolute http(s)\nURL without a fragment.",
+                "maxLength": 2048,
+                "minLength": 1
+              },
+              "target": {
+                "type": "string",
+                "description": "The MCP server's URL. Without `oauth_client_id`, it must answer an\nunauthenticated request with a challenge naming its protected\nresource metadata, or publish that metadata at its well-known URL,\nand its authorization server must register clients on the spot.",
+                "maxLength": 2048,
+                "minLength": 1
+              }
+            }
           },
-          "redirect_uri": {
-            "type": "string",
-            "description": "The client's own page the provider sends the browser back to, with\n`code` and `state` (or `error`) in its query: an absolute http(s) URL\nwithout a fragment.",
-            "maxLength": 2048,
-            "minLength": 1
-          },
-          "target": {
-            "type": "string",
-            "description": "The MCP server's URL. It must answer an unauthenticated request with a\nchallenge naming its protected resource metadata, or publish that\nmetadata at its well-known URL.",
-            "maxLength": 2048,
-            "minLength": 1
+          {
+            "type": "object",
+            "required": [
+              "origins",
+              "oauth_client_id",
+              "display_name",
+              "redirect_uri",
+              "protocol"
+            ],
+            "properties": {
+              "display_name": {
+                "type": "string",
+                "maxLength": 200
+              },
+              "oauth_client_id": {
+                "type": "string",
+                "format": "uuid",
+                "description": "The workspace OAuth client to connect through."
+              },
+              "origins": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/HttpOriginBody"
+                },
+                "description": "The origins the credential is sent to, each at most once, and\nnone another credential in the vault is already sent to.",
+                "maxItems": 16,
+                "minItems": 1
+              },
+              "protocol": {
+                "type": "string",
+                "enum": [
+                  "http"
+                ]
+              },
+              "redirect_uri": {
+                "type": "string",
+                "description": "As for `mcp`.",
+                "maxLength": 2048,
+                "minLength": 1
+              }
+            }
           }
-        }
+        ],
+        "description": "A connection to start: what the credential it ends in is for, the client\nSubako presents to the provider, and where the provider sends the browser\nback."
       },
       "StorageBody": {
         "type": "object",
@@ -14902,6 +16303,76 @@
             "format": "uuid"
           }
         }
+      },
+      "TokenEndpointAuthBody": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "method"
+            ],
+            "properties": {
+              "method": {
+                "type": "string",
+                "enum": [
+                  "none"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "client_secret",
+              "method"
+            ],
+            "properties": {
+              "client_secret": {
+                "type": "string",
+                "writeOnly": true,
+                "maxLength": 1024,
+                "minLength": 1
+              },
+              "method": {
+                "type": "string",
+                "enum": [
+                  "client_secret_post"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "client_secret",
+              "method"
+            ],
+            "properties": {
+              "client_secret": {
+                "type": "string",
+                "writeOnly": true,
+                "maxLength": 1024,
+                "minLength": 1
+              },
+              "method": {
+                "type": "string",
+                "enum": [
+                  "client_secret_basic"
+                ]
+              }
+            }
+          }
+        ],
+        "description": "How Subako authenticates at the provider's token endpoint as this client\n(RFC 7591 §2): `none` for a public client, which PKCE alone proves, or the\nclient secret in the form or in a `Basic` header."
+      },
+      "TokenEndpointAuthMethodBody": {
+        "type": "string",
+        "description": "How the client authenticates at the token endpoint, without its secret.",
+        "enum": [
+          "none",
+          "client_secret_post",
+          "client_secret_basic"
+        ]
       },
       "TokenTotalsBody": {
         "type": "object",
@@ -15015,6 +16486,50 @@
             "maxLength": 200
           }
         }
+      },
+      "UpdateOAuthClientBody": {
+        "type": "object",
+        "description": "An absent field leaves that part of the client as it stands; a present\nlist replaces the stored one whole, so an empty one clears it. A present\n`token_endpoint_auth` replaces the method and the secret together. The\nendpoints and `client_id` are fixed at creation, so a body naming one is\nrefused rather than read past.",
+        "properties": {
+          "authorization_params": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/AuthorizationParamBody"
+            },
+            "maxItems": 16
+          },
+          "display_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 200
+          },
+          "scopes": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/OAuthScopeBody"
+            },
+            "maxItems": 64
+          },
+          "token_endpoint_auth": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TokenEndpointAuthBody"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
       },
       "UpdateVaultBody": {
         "type": "object",
@@ -15708,6 +17223,94 @@
           }
         }
       },
+      "WidgetGrantBody": {
+        "oneOf": [
+          {
+            "type": "object",
+            "description": "A pick among options the agent writes.",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "select"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Free text.",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "text"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Yes or no.",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "confirm"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "A widget the app declares. A client without a renderer for `id`\nlets the person tell the agent so.",
+            "required": [
+              "id",
+              "description",
+              "props",
+              "answer",
+              "type"
+            ],
+            "properties": {
+              "answer": {
+                "type": "object",
+                "description": "The JSON Schema an answer must match."
+              },
+              "description": {
+                "type": "string",
+                "description": "What the model reads to choose the widget.",
+                "maxLength": 1024
+              },
+              "id": {
+                "type": "string",
+                "description": "The renderer's key. A change to `props` or `answer` that would\nbreak a client takes a new id.",
+                "maxLength": 64,
+                "pattern": "^[a-z0-9_-]+$"
+              },
+              "props": {
+                "type": "object",
+                "description": "The JSON Schema of what the agent fills in."
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "custom"
+                ]
+              }
+            }
+          }
+        ],
+        "description": "One widget a form may use: a built-in every Subako surface draws, or a\n`custom` one the app's own clients draw from its id."
+      },
       "WorkspaceBody": {
         "type": "object",
         "description": "A workspace: the scope agents, sessions, vaults, skills, and keys\nbelong to.",
@@ -15815,6 +17418,10 @@
     {
       "name": "vaults",
       "description": "Credentials an agent presents to the services it reaches. A payload goes in and never comes back out."
+    },
+    {
+      "name": "oauth-clients",
+      "description": "Your own OAuth clients at providers, which a vault connects credentials through. A secret goes in and never comes back out."
     },
     {
       "name": "model-providers",

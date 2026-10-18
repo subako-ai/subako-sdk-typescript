@@ -46,12 +46,15 @@ export class Vaults {
 	}
 
 	/**
-	 * Starts connecting an OAuth-protected MCP server to a vault, as a "Sign in with ..." button
-	 * would: Core discovers the server's authorization server, registers itself there for
-	 * `redirect_uri`, and answers the `authorization_url` to send the browser to. The provider
-	 * sends the browser back to `redirect_uri` with `code` and `state` in its query (or `error`),
-	 * and the page there finishes with {@link Vaults.completeOAuth} under the same credentials. A
-	 * replay answers with the receipt alone: the URL carries the connection's `state`.
+	 * Starts connecting a credential through OAuth, as a "Sign in with ..." button would, and
+	 * answers the `authorization_url` to send the browser to. An `mcp` credential connects through
+	 * the workspace OAuth client `oauth_client_id` names, or else Core discovers the server's
+	 * authorization server and registers itself there for `redirect_uri`. An `http` credential
+	 * always connects through a workspace OAuth client, and is sent to its `origins` as
+	 * `authorization: Bearer`. The provider sends the browser back to `redirect_uri` with `code` and
+	 * `state` in its query (or `error`), and the page there finishes with
+	 * {@link Vaults.completeOAuth} under the same credentials. A replay answers with the receipt
+	 * alone: the URL carries the connection's `state`.
 	 */
 	startOAuth(vaultId: string, params: api.StartOAuthBody, options?: RequestOptions) {
 		return this.core.call(api.startCredentialOauth, { path: { vault_id: vaultId }, body: params }, options);
@@ -59,7 +62,8 @@ export class Vaults {
 
 	/**
 	 * Finishes a connection {@link Vaults.startOAuth} began, with the `state` and `code` the browser
-	 * came back with: Core redeems the code and stores an `oauth` credential for the target. Only
+	 * came back with: Core redeems the code and stores an `oauth` credential for the target or
+	 * origins. Only
 	 * the caller that started the connection can finish it, once, within ten minutes.
 	 */
 	completeOAuth(vaultId: string, params: api.CompleteOAuthBody, options?: RequestOptions) {
@@ -69,7 +73,8 @@ export class Vaults {
 	/**
 	 * Starts reconnecting an `oauth` credential whose provider no longer takes it — one listed with
 	 * `status: "reconnect_required"` — through the same browser round trip as
-	 * {@link Vaults.startOAuth}, for the credential's own target and name. Finishing it with
+	 * {@link Vaults.startOAuth}, for the credential's own target or origins, name, and client.
+	 * Finishing it with
 	 * {@link Vaults.completeOAuth} replaces the credential's payload in place: the answer carries
 	 * the same id, and the credential is `active` again. A bearer credential cannot be reconnected.
 	 */

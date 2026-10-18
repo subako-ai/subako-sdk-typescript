@@ -1,6 +1,6 @@
 {
 	"name": "@subako-ai/react",
-	"version": "0.2.3",
+	"version": "0.2.4",
 	"description": "React bindings for Subako sessions and client tools",
 	"homepage": "https://subako.ai",
 	"license": "Apache-2.0",

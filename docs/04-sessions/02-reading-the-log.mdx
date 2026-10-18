@@ -109,3 +109,23 @@ await subako.sessions.resolveApproval(sessionId, callId, { decision: "allow" });
 ```
 
 The broker holding the call reads the decision on its next tick. Nothing is interpreted here either: `pendingApprovals` only tells you which requests no decision has settled, and what to show the person is yours to decide.
+
+## Forms
+
+An agent whose version grants `builtin.ask_user` can put a form to a person: up to four questions, each answered with a widget the grant lists. The log carries an `input_requested` event, and the run waits until someone with access to the session answers.
+
+```ts
+for (const input of session.inputs) {
+	// input.call_id, and input.request.questions
+}
+
+await session.answerInput(input.call_id, submittedAnswer(input, { day: { type: "answered", data: { value: ["Tue"] } } }));
+await session.answerInput(input.call_id, { type: "declined", data: { message: "not now" } });
+```
+
+`submittedAnswer` writes one outcome per question in the form's order, and a question it is not given is `skipped`. Core refuses a submission that skips a required question or answers one with a value its widget does not take, and the form stays open.
+
+A built-in widget is `select` (a list of labels; one unless `multiple`, and the person's own text when `allow_other`), `text` (a string) or `confirm` (`true` or `false`). A `custom` widget is the app's own: the version declares its id, its props and its answer as JSON Schemas, and an app draws it from the id. `readWidget` reads a widget kind this SDK was built without as `unsupported`, so a client that cannot draw a question answers it `{ type: "unsupported" }`, and `unsupportedAnswer(input)` answers every question that way. The agent reads which widgets the person's app could not show, and asks another way.
+
+`pendingInputs` gives you the `input_requested` events no `input_resolved` has settled. Like an approval, a form leaves the list when its run ends.
+

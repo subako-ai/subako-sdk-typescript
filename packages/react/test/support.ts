@@ -91,6 +91,9 @@ export function backend(overrides: Readonly<Record<string, Handler>> = {}): Back
 		if (pathname.includes("/approvals/")) {
 			return json({ seq: 0, type: "approval_resolved", call_id: "c1", decision: "allow" });
 		}
+		if (pathname.includes("/inputs/")) {
+			return json({ seq: 0, type: "input_resolved", call_id: "c1", resolution: { type: "expired" } });
+		}
 		if (pathname.endsWith("/ping")) {
 			return json({ expires_at: null });
 		}

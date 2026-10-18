@@ -995,6 +995,7 @@ describe("the session connection, as a session", () => {
 		await connection.cancel();
 		await connection.resolveApproval("c1", "allow");
 		await connection.resolveApproval("c2", "deny", "not this one");
+		await connection.answerInput("c3", { type: "declined", data: { message: "later" } });
 
 		const written = http.calls.slice(1);
 		expect(written.map((call) => new URL(call.url).pathname)).toEqual([
@@ -1002,11 +1003,13 @@ describe("the session connection, as a session", () => {
 			"/v1/sessions/s1/cancel",
 			"/v1/sessions/s1/approvals/c1",
 			"/v1/sessions/s1/approvals/c2",
+			"/v1/sessions/s1/inputs/c3",
 		]);
 		expect(await written[0]?.json()).toEqual({ type: "input", text: "hello" });
 		expect(await written[2]?.json()).toEqual({ decision: "allow" });
 		expect(await written[3]?.json()).toEqual({ decision: "deny", message: "not this one" });
-		expect(written.map((call) => call.headers.get("kikuvi-workspace"))).toEqual(["w2", "w2", "w2", "w2"]);
+		expect(await written[4]?.json()).toEqual({ type: "declined", data: { message: "later" } });
+		expect(written.map((call) => call.headers.get("kikuvi-workspace"))).toEqual(["w2", "w2", "w2", "w2", "w2"]);
 
 		connection.close();
 	});
@@ -1049,11 +1052,23 @@ describe("the session connection, as a session", () => {
 		expect(connection.isRunning).toBe(true);
 		expect(connection.transcript).not.toBe(read);
 
-		// The run ending takes the approval it was waiting on with it.
-		live.push(frame(4, { type: "run_completed", run_id: "r1" }));
+		live.push(
+			frame(4, {
+				type: "input_requested",
+				call_id: "c2",
+				request: { questions: [{ id: "ok", prompt: "Go?", required: true, widget: { type: "confirm" } }] },
+			}),
+		);
+		await vi.advanceTimersByTimeAsync(10);
+		expect(connection.inputs.map((input) => input.call_id)).toEqual(["c2"]);
+		expect(connection.state.inputs).toBe(connection.inputs);
+
+		// The run ending takes the approval and the form it was waiting on with it.
+		live.push(frame(5, { type: "run_completed", run_id: "r1" }));
 		await vi.advanceTimersByTimeAsync(10);
 
 		expect(connection.approvals).toEqual([]);
+		expect(connection.inputs).toEqual([]);
 		expect(connection.isRunning).toBe(false);
 
 		connection.close();

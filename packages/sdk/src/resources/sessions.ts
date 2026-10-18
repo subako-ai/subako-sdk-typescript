@@ -70,6 +70,15 @@ export class SessionApi {
 		);
 	}
 
+	/** Answers a form an agent put through `builtin:ask_user`. */
+	resolveInput(sessionId: string, callId: string, params: api.InputResponseForm, options?: RequestOptions) {
+		return this.core.call(
+			api.resolveInput,
+			{ path: { session_id: sessionId, call_id: callId }, body: params },
+			options,
+		);
+	}
+
 	/**
 	 * Lists the sandboxes the session's agent grants, in name order. A grant list is
 	 * bounded, so the whole set travels at once: this answers with `items` and offers

@@ -1,4 +1,4 @@
-export { AgentConfigError, type AgentVersionConfig, readAgentConfig } from "./agent-config.js";
+export { type AgentVersionConfig, readAgentConfig } from "./agent-config.js";
 export { SubakoClient } from "./client.js";
 export type {
 	ClientOptions,
@@ -37,12 +37,22 @@ export {
 	liveKey,
 	type PendingApproval,
 	pendingApprovals,
+	pendingInputs,
 	settleLive,
 	type ToolCallResult,
 	transcript,
 	type TranscriptMessage,
 	type TranscriptToolCall,
 } from "./events.js";
+export {
+	type InputAnswer,
+	type PendingInput,
+	readWidget,
+	type ReadWidget,
+	submittedAnswer,
+	unsupportedAnswer,
+	widgetName,
+} from "./input.js";
 export { Page } from "./pagination.js";
 export type { IdCursor, IdPaged, PreviousPage } from "./pagination.js";
 export { SubakoSessionClient, type SubakoSessionClientOptions } from "./session-client.js";
@@ -113,6 +123,7 @@ export { FUNCTION_UPLOAD_TIMEOUT_MS } from "./resources/functions.js";
 export type { Functions, ListFunctionsParams, ListFunctionVersionsParams } from "./resources/functions.js";
 export type { Me } from "./resources/me.js";
 export type { ListModelProvidersParams, ModelProviders } from "./resources/model-providers.js";
+export type { ListOAuthClientsParams, OAuthClients } from "./resources/oauth-clients.js";
 export type {
 	ListInvitationsParams,
 	ListMembersParams,
@@ -149,6 +160,8 @@ export type {
 	ApiKeyBody,
 	ApiKeyReceiptBody,
 	ApprovalDecisionForm,
+	AskUserGrantBody,
+	AuthorizationParamBody,
 	BuiltinGrantsBody,
 	BytesBody,
 	CancelOutcomeBody,
@@ -158,6 +171,7 @@ export type {
 	ClientLifetimeForm,
 	ClientPingBody,
 	ClientToolBody,
+	CompleteOAuthBody,
 	ContentBlockBody,
 	CreateAgentBody,
 	CreatedSessionBody,
@@ -165,6 +179,7 @@ export type {
 	CreditLotBody,
 	CreditsBody,
 	CreateInvitationBody,
+	CreateOAuthClientBodyWritable,
 	CreateSessionBody,
 	CreateVaultBody,
 	CreateWorkspaceBody,
@@ -176,6 +191,7 @@ export type {
 	EnvironmentRefBody,
 	ErrorBody,
 	ErrorDetail,
+	FunctionAssetFileBody,
 	FunctionAssetsBody,
 	FunctionBody,
 	FunctionGrantBody,
@@ -183,6 +199,9 @@ export type {
 	FunctionNetworkBody,
 	FunctionSourceBody,
 	FunctionVersionBody,
+	InputRequestBody,
+	InputResolutionBody,
+	InputResponseForm,
 	InvitationBody,
 	LlmTokensSummaryBody,
 	ManifestFunctionBody,
@@ -197,6 +216,11 @@ export type {
 	ModelProviderBody,
 	ModelProviderDetailsBody,
 	ModelUsageBody,
+	OAuthClientBody,
+	OAuthClientCreated,
+	OAuthScopeBody,
+	OAuthStarted,
+	OAuthStartReceiptBody,
 	OpenaiResponsesModelBody,
 	OpenaiResponsesPriceBody,
 	OpenaiResponsesUsageBody,
@@ -211,11 +235,16 @@ export type {
 	PlatformModelBody,
 	PostSessionEventBody,
 	PublishAgentVersionBody,
+	QuestionAnswerBody,
+	QuestionBody,
+	QuestionOutcomeBody,
+	QuestionWidgetBody,
 	PutAgentSecurityBody,
 	RatedBytesBody,
 	RatedDurationBody,
 	RatedStorageBody,
 	RatedTokensBody,
+	ReconnectOAuthBody,
 	RegisterClientBody,
 	RegisteredClientBody,
 	RenameAgentBody,
@@ -228,6 +257,7 @@ export type {
 	SandboxArchiveBody,
 	SandboxGrantBody,
 	SandboxNetworkBody,
+	SelectOptionBody,
 	SessionBody,
 	SessionDeltaBody,
 	SessionEventBody,
@@ -239,15 +269,18 @@ export type {
 	SkillBody,
 	SkillGrantBody,
 	SkillVersionBody,
+	StartOAuthBody,
 	StorageBody,
 	StorageSummaryBody,
 	SubmitOutcomeBody,
+	TokenEndpointAuthBodyWritable,
 	TokensBody,
 	TokenTotalsBody,
 	ToolRuleBody,
 	UpdateClientToolsBody,
 	UpdateModelProviderBody,
 	UpdateModelProviderBodyWritable,
+	UpdateOAuthClientBodyWritable,
 	UpdateVaultBody,
 	UsageEventBody,
 	UsageReportBody,
@@ -263,6 +296,7 @@ export type {
 	VolumeFileWrittenBody,
 	VolumeDataBody,
 	VolumeWriteSummaryBody,
+	WidgetGrantBody,
 	WorkspaceBody,
 	WorkspaceMemberBody,
 } from "./generated/index.js";
@@ -302,6 +336,7 @@ export {
 	SessionStatusBody,
 	StorageSubjectBody,
 	SubmitKindBody,
+	TokenEndpointAuthMethodBody,
 	UsageBillingBody,
 	VolumeAreaParam,
 	VolumeFileKindBody,

@@ -1,4 +1,5 @@
 import type * as api from "./generated/index.js";
+import type { PendingInput } from "./input.js";
 
 type EventOf<T extends api.SessionEventBody["type"]> = Extract<api.SessionEventBody, { type: T }>;
 
@@ -58,6 +59,25 @@ export function pendingApprovals(events: readonly api.SessionEventBody[]): reado
 		if (event.type === "approval_requested") {
 			waiting.set(event.call_id, event);
 		} else if (event.type === "approval_resolved") {
+			waiting.delete(event.call_id);
+		} else if (endsRun(event)) {
+			waiting.clear();
+		}
+	}
+	return [...waiting.values()];
+}
+
+/**
+ * The forms with no `input_resolved` after them, in seq order, as the events
+ * themselves. A run that ends takes its forms with it, as it does its
+ * approvals.
+ */
+export function pendingInputs(events: readonly api.SessionEventBody[]): readonly PendingInput[] {
+	const waiting = new Map<string, PendingInput>();
+	for (const event of events) {
+		if (event.type === "input_requested") {
+			waiting.set(event.call_id, event);
+		} else if (event.type === "input_resolved") {
 			waiting.delete(event.call_id);
 		} else if (endsRun(event)) {
 			waiting.clear();

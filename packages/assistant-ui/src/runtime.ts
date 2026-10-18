@@ -3,7 +3,7 @@
 import type { AppendMessage, AssistantRuntime } from "@assistant-ui/react";
 import { useExternalStoreRuntime } from "@assistant-ui/react";
 import { useSessionState } from "@subako-ai/react";
-import type { LiveMessage, SessionState, TranscriptMessage } from "@subako-ai/sdk";
+import type { InputAnswer, LiveMessage, SessionState, TranscriptMessage } from "@subako-ai/sdk";
 import { useMemo } from "react";
 import { convertLiveMessage, convertMessage } from "./convert.js";
 
@@ -22,6 +22,8 @@ export interface SubakoSession {
 	/** Cancels the active run. */
 	cancel(): Promise<void>;
 	resolveApproval(callId: string, decision: "allow" | "deny", message?: string): Promise<void>;
+	/** Answers a form the agent put through `builtin:ask_user`. */
+	answerInput(callId: string, answer: InputAnswer): Promise<void>;
 }
 
 /** One message of the thread: one the log holds, or one a model call is still producing. */

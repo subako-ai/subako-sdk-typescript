@@ -28,9 +28,13 @@ export type AddCredentialBody = {
   target: string;
 } | {
   display_name: string;
+  /**
+   * Each at most once, and none another credential in the vault is
+   * already sent to.
+   */
+  origins: Array<HttpOriginBody>;
   payload: HttpPayloadBody;
   protocol: 'http';
-  target: HttpOriginBody;
 };
 
 export type AddWorkspaceMemberBody = {
@@ -92,13 +96,12 @@ export type AgentSecurityBody = {
 export type AgentVersionBody = {
   agent_id: string;
   /**
-   * The config this version was published with.
-   * Skill grants retain their requested `version` selectors, which resolve
-   * independently when each session is created.
+   * The config this version was published with, in the shape publishing
+   * takes, every field written out. Skill and function grants retain their
+   * requested `version` selectors, which resolve independently when each
+   * session is created.
    */
-  config: {
-    [key: string]: unknown;
-  };
+  config: AgentConfigBody;
   created_at: string;
   id: string;
   model_provider_id: string;
@@ -244,6 +247,28 @@ export type ApprovalDecisionForm = {
 };
 
 /**
+ * The widgets an agent's forms may be built from, each listed once.
+ */
+export type AskUserGrantBody = {
+  widgets: Array<WidgetGrantBody>;
+};
+
+/**
+ * A parameter the authorization URL carries beside the ones Subako sets,
+ * such as Google's `access_type=offline`. Its value is no secret: the
+ * browser carries it to the provider.
+ */
+export type AuthorizationParamBody = {
+  /**
+   * Letters, digits, and `-._~`; none Subako sets itself (`response_type`,
+   * `client_id`, `redirect_uri`, `state`, `code_challenge`,
+   * `code_challenge_method`, `scope`, `resource`).
+   */
+  name: string;
+  value: string;
+};
+
+/**
  * How finely a report cuts its span, in UTC.
  *
  * Stable vocabulary for v1: adding a value requires a new API version.
@@ -265,6 +290,7 @@ export type BucketWidthParam = typeof BucketWidthParam[keyof typeof BucketWidthP
  * The servers the platform serves itself, each at `builtin:{key}`.
  */
 export type BuiltinGrantsBody = {
+  ask_user?: null | AskUserGrantBody;
   /**
    * Whether the agent names the session it runs in, through the
    * `builtin:session_display_name` server. `never` when left out.
@@ -443,6 +469,34 @@ export type CreateInvitationBody = {
   role: OrgRoleBody;
 };
 
+export type CreateOAuthClientBody = {
+  /**
+   * The provider's authorization endpoint (RFC 6749 §3.1), which the
+   * browser is sent to. A query is kept; a fragment is refused.
+   */
+  authorization_endpoint: string;
+  /**
+   * Appended to the authorization URL in order, each name at most once.
+   */
+  authorization_params?: Array<AuthorizationParamBody>;
+  /**
+   * The client identifier the provider issued.
+   */
+  client_id: string;
+  display_name: string;
+  /**
+   * Each at most once, joined by spaces into the `scope` parameter. Empty
+   * asks for none, leaving the provider's default.
+   */
+  scopes?: Array<OAuthScopeBody>;
+  /**
+   * The provider's token endpoint (RFC 6749 §3.2), which Subako redeems
+   * codes and refreshes tokens at.
+   */
+  token_endpoint: string;
+  token_endpoint_auth: TokenEndpointAuthBody;
+};
+
 export type CreateSessionBody = {
   agent_id: string;
   /**
@@ -538,6 +592,12 @@ export type CredentialBody = {
   auth_scheme: McpSchemeBody;
   display_name: string;
   id: string;
+  /**
+   * The workspace OAuth client an `oauth` credential was connected
+   * through; null for one whose client Subako registered with the
+   * server's provider itself, and for any other scheme.
+   */
+  oauth_client_id: string | null;
   protocol: 'mcp';
   status: CredentialStatusBody;
   /**
@@ -549,16 +609,23 @@ export type CredentialBody = {
   auth_scheme: HttpSchemeBody;
   display_name: string;
   /**
-   * Every header the credential is sent as, in the order it was added.
+   * Every header the credential is sent as, in the order it was added:
+   * `authorization` alone for an `oauth` one.
    */
   headers: Array<CredentialHeaderNameBody>;
   id: string;
+  /**
+   * The workspace OAuth client an `oauth` credential was connected
+   * through; null for a `header` one.
+   */
+  oauth_client_id: string | null;
+  /**
+   * Every origin the credential is sent to, as the vault stores them,
+   * in the order they were given.
+   */
+  origins: Array<string>;
   protocol: 'http';
   status: CredentialStatusBody;
-  /**
-   * The origin, as the vault stores it.
-   */
-  target: string;
   vault_id: string;
 };
 
@@ -809,12 +876,31 @@ export type ErrorDetail = {
 };
 
 /**
+ * One file under a bundle's `assets/`.
+ */
+export type FunctionAssetFileBody = {
+  /**
+   * The path under `assets/`, `/`-separated.
+   */
+  path: string;
+  /**
+   * Hex SHA-256 of the file's bytes.
+   */
+  sha256: string;
+  size: number;
+};
+
+/**
  * The files under a bundle's `assets/`, which Core stores as one archive and
  * a call's module reads read-only at `/package`. `sha256` is the hex SHA-256
  * of that archive and `bytes` its size.
  */
 export type FunctionAssetsBody = {
   bytes: number;
+  /**
+   * Each file the archive holds, in path order.
+   */
+  files: Array<FunctionAssetFileBody>;
   sha256: string;
 };
 
@@ -949,12 +1035,14 @@ export type HttpPayloadBody = {
 };
 
 /**
- * How an `http` credential authenticates against its origin.
+ * How an `http` credential authenticates against its origins: headers it
+ * was given, or an OAuth token sent as `authorization: Bearer`.
  */
-export const HttpSchemeBody = { HEADER: 'header' } as const;
+export const HttpSchemeBody = { HEADER: 'header', OAUTH: 'oauth' } as const;
 
 /**
- * How an `http` credential authenticates against its origin.
+ * How an `http` credential authenticates against its origins: headers it
+ * was given, or an OAuth token sent as `authorization: Bearer`.
  */
 export type HttpSchemeBody = typeof HttpSchemeBody[keyof typeof HttpSchemeBody];
 
@@ -986,6 +1074,52 @@ export const ImageMediaTypeBody = {
  * An image's format.
  */
 export type ImageMediaTypeBody = typeof ImageMediaTypeBody[keyof typeof ImageMediaTypeBody];
+
+/**
+ * A form an agent put to a person: up to four questions answered at once.
+ */
+export type InputRequestBody = {
+  questions: Array<QuestionBody>;
+};
+
+/**
+ * What settled a form.
+ */
+export type InputResolutionBody = {
+  /**
+   * The person submitted the form, with one outcome per question.
+   */
+  data: {
+    answers: Array<QuestionAnswerBody>;
+  };
+  type: 'submitted';
+} | {
+  /**
+   * The person dismissed the form.
+   */
+  data: {
+    message?: string | null;
+  };
+  type: 'declined';
+} | {
+  type: 'expired';
+};
+
+/**
+ * How a person answers a form: submit it with one outcome per question, or
+ * dismiss it, optionally saying why.
+ */
+export type InputResponseForm = {
+  data: {
+    answers: Array<QuestionAnswerBody>;
+  };
+  type: 'submitted';
+} | {
+  data: {
+    message?: string | null;
+  };
+  type: 'declined';
+};
 
 /**
  * How a user turn reached the session.
@@ -1294,6 +1428,36 @@ export type ModelUsageBody = {
 };
 
 /**
+ * An OAuth client as stored. Carries no secret: it only goes in.
+ */
+export type OAuthClientBody = {
+  authorization_endpoint: string;
+  authorization_params: Array<AuthorizationParamBody>;
+  client_id: string;
+  created_at: string;
+  display_name: string;
+  id: string;
+  scopes: Array<OAuthScopeBody>;
+  token_endpoint: string;
+  token_endpoint_auth_method: TokenEndpointAuthMethodBody;
+  updated_at: string;
+  workspace_id: string;
+};
+
+/**
+ * The id of the OAuth client just created. Read it back for the rest of its
+ * row; the secret is never returned.
+ */
+export type OAuthClientCreated = {
+  id: string;
+};
+
+/**
+ * One scope the client asks for: printable ASCII without spaces, quotes, or backslashes.
+ */
+export type OAuthScopeBody = string;
+
+/**
  * A replay confirms the start without the URL: it carries the `state`,
  * which Core keeps only as a hash.
  */
@@ -1302,7 +1466,7 @@ export type OAuthStartReceiptBody = {
 };
 
 /**
- * Where to send the browser to sign in at the MCP server's provider, and
+ * Where to send the browser to sign in at the provider, and
  * until when the connection waits for it to come back.
  */
 export type OAuthStarted = {
@@ -1489,6 +1653,18 @@ export type PageOutInvitationBody = {
 
 export type PageOutModelProviderBody = {
   items: Array<ModelProviderBody>;
+  /**
+   * Pass back as `after` for the next page; `null` on the last page.
+   */
+  next_cursor: string | null;
+  /**
+   * Pass back as `before` for the previous page; `null` on the first page.
+   */
+  prev_cursor: string | null;
+};
+
+export type PageOutOAuthClientBody = {
+  items: Array<OAuthClientBody>;
   /**
    * Pass back as `after` for the next page; `null` on the last page.
    */
@@ -1711,6 +1887,91 @@ export type PutAgentSecurityBody = {
    * Defaults to empty, which answers no browser.
    */
   allowed_origins?: Array<string>;
+};
+
+/**
+ * One question's outcome, named by the question's id.
+ */
+export type QuestionAnswerBody = {
+  outcome: QuestionOutcomeBody;
+  question_id: string;
+};
+
+/**
+ * One question of a form.
+ */
+export type QuestionBody = {
+  /**
+   * A short label, where the prompt is too long to show.
+   */
+  header?: string | null;
+  /**
+   * Unique within the form; the answer goes back under it.
+   */
+  id: string;
+  /**
+   * What the person is asked, in full.
+   */
+  prompt: string;
+  /**
+   * Whether the form can be submitted without answering it.
+   */
+  required: boolean;
+  widget: QuestionWidgetBody;
+};
+
+/**
+ * What became of one question.
+ */
+export type QuestionOutcomeBody = {
+  /**
+   * Answered with `value`, which the question's widget must take.
+   */
+  data: {
+    value: unknown;
+  };
+  type: 'answered';
+} | {
+  type: 'skipped';
+} | {
+  type: 'unsupported';
+};
+
+/**
+ * How a question is answered; `type` names the widget.
+ */
+export type QuestionWidgetBody = {
+  /**
+   * Answered with the list of labels picked: exactly one unless
+   * `multiple`, and with `allow_other` one may be the person's own text.
+   */
+  data: {
+    allow_other: boolean;
+    multiple: boolean;
+    options: Array<SelectOptionBody>;
+  };
+  type: 'select';
+} | {
+  /**
+   * Answered with a string.
+   */
+  data: {
+    multiline: boolean;
+  };
+  type: 'text';
+} | {
+  type: 'confirm';
+} | {
+  /**
+   * A widget the agent version declares, drawn by the client registered
+   * for `id` from `props`, and answered with what its answer schema
+   * takes. A client with no renderer for `id` answers `unsupported`.
+   */
+  data: {
+    id: string;
+    props: unknown;
+  };
+  type: 'custom';
 };
 
 export type RatedBytesBody = {
@@ -1943,6 +2204,17 @@ export type SandboxNetworkBody = {
 };
 
 /**
+ * One option of a select.
+ */
+export type SelectOptionBody = {
+  description?: string | null;
+  /**
+   * What the person picks, and what the answer carries.
+   */
+  label: string;
+};
+
+/**
  * A session: one agent version running against one event log.
  */
 export type SessionBody = {
@@ -2091,6 +2363,15 @@ export type SessionEventPayloadBody = {
   deny_message?: string | null;
   resolved_by?: string | null;
   type: 'approval_resolved';
+} | {
+  call_id: string;
+  request: InputRequestBody;
+  type: 'input_requested';
+} | {
+  call_id: string;
+  resolution: InputResolutionBody;
+  resolved_by?: string | null;
+  type: 'input_resolved';
 } | {
   client_id: string;
   lifetime: ClientLifetimeBody;
@@ -2337,20 +2618,49 @@ export type SkillVersionBody = {
   version: number;
 };
 
+/**
+ * A connection to start: what the credential it ends in is for, the client
+ * Subako presents to the provider, and where the provider sends the browser
+ * back.
+ */
 export type StartOAuthBody = {
   display_name: string;
   /**
+   * The workspace OAuth client to connect through, for a server whose
+   * provider registers no client on the spot. Omitted, Subako
+   * discovers the provider and registers a client there itself.
+   */
+  oauth_client_id?: string | null;
+  protocol: 'mcp';
+  /**
    * The client's own page the provider sends the browser back to, with
-   * `code` and `state` (or `error`) in its query: an absolute http(s) URL
-   * without a fragment.
+   * `code` and `state` (or `error`) in its query: an absolute http(s)
+   * URL without a fragment.
    */
   redirect_uri: string;
   /**
-   * The MCP server's URL. It must answer an unauthenticated request with a
-   * challenge naming its protected resource metadata, or publish that
-   * metadata at its well-known URL.
+   * The MCP server's URL. Without `oauth_client_id`, it must answer an
+   * unauthenticated request with a challenge naming its protected
+   * resource metadata, or publish that metadata at its well-known URL,
+   * and its authorization server must register clients on the spot.
    */
   target: string;
+} | {
+  display_name: string;
+  /**
+   * The workspace OAuth client to connect through.
+   */
+  oauth_client_id: string;
+  /**
+   * The origins the credential is sent to, each at most once, and
+   * none another credential in the vault is already sent to.
+   */
+  origins: Array<HttpOriginBody>;
+  protocol: 'http';
+  /**
+   * As for `mcp`.
+   */
+  redirect_uri: string;
 };
 
 export type StorageBody = {
@@ -2399,6 +2709,33 @@ export type SubmitOutcomeBody = {
   outcome: SubmitKindBody;
   run_id: string;
 };
+
+/**
+ * How Subako authenticates at the provider's token endpoint as this client
+ * (RFC 7591 §2): `none` for a public client, which PKCE alone proves, or the
+ * client secret in the form or in a `Basic` header.
+ */
+export type TokenEndpointAuthBody = {
+  method: 'none';
+} | {
+  method: 'client_secret_post';
+} | {
+  method: 'client_secret_basic';
+};
+
+/**
+ * How the client authenticates at the token endpoint, without its secret.
+ */
+export const TokenEndpointAuthMethodBody = {
+  NONE: 'none',
+  CLIENT_SECRET_POST: 'client_secret_post',
+  CLIENT_SECRET_BASIC: 'client_secret_basic'
+} as const;
+
+/**
+ * How the client authenticates at the token endpoint, without its secret.
+ */
+export type TokenEndpointAuthMethodBody = typeof TokenEndpointAuthMethodBody[keyof typeof TokenEndpointAuthMethodBody];
 
 /**
  * Token counts summed per format, each field on its own: the formats count
@@ -2451,6 +2788,20 @@ export type UpdateModelProviderBody = {
   base_url?: string | null;
   description?: string | null;
   display_name?: string | null;
+};
+
+/**
+ * An absent field leaves that part of the client as it stands; a present
+ * list replaces the stored one whole, so an empty one clears it. A present
+ * `token_endpoint_auth` replaces the method and the secret together. The
+ * endpoints and `client_id` are fixed at creation, so a body naming one is
+ * refused rather than read past.
+ */
+export type UpdateOAuthClientBody = {
+  authorization_params?: Array<AuthorizationParamBody> | null;
+  display_name?: string | null;
+  scopes?: Array<OAuthScopeBody> | null;
+  token_endpoint_auth?: null | TokenEndpointAuthBody;
 };
 
 /**
@@ -2772,6 +3123,41 @@ export type VolumeWriteSummaryBody = {
 };
 
 /**
+ * One widget a form may use: a built-in every Subako surface draws, or a
+ * `custom` one the app's own clients draw from its id.
+ */
+export type WidgetGrantBody = {
+  type: 'select';
+} | {
+  type: 'text';
+} | {
+  type: 'confirm';
+} | {
+  /**
+   * The JSON Schema an answer must match.
+   */
+  answer: {
+    [key: string]: unknown;
+  };
+  /**
+   * What the model reads to choose the widget.
+   */
+  description: string;
+  /**
+   * The renderer's key. A change to `props` or `answer` that would
+   * break a client takes a new id.
+   */
+  id: string;
+  /**
+   * The JSON Schema of what the agent fills in.
+   */
+  props: {
+    [key: string]: unknown;
+  };
+  type: 'custom';
+};
+
+/**
  * A workspace: the scope agents, sessions, vaults, skills, and keys
  * belong to.
  */
@@ -2805,6 +3191,34 @@ export const WorkspaceRoleBody = { ADMIN: 'admin', MEMBER: 'member' } as const;
  */
 export type WorkspaceRoleBody = typeof WorkspaceRoleBody[keyof typeof WorkspaceRoleBody];
 
+export type CreateOAuthClientBodyWritable = {
+  /**
+   * The provider's authorization endpoint (RFC 6749 §3.1), which the
+   * browser is sent to. A query is kept; a fragment is refused.
+   */
+  authorization_endpoint: string;
+  /**
+   * Appended to the authorization URL in order, each name at most once.
+   */
+  authorization_params?: Array<AuthorizationParamBody>;
+  /**
+   * The client identifier the provider issued.
+   */
+  client_id: string;
+  display_name: string;
+  /**
+   * Each at most once, joined by spaces into the `scope` parameter. Empty
+   * asks for none, leaving the provider's default.
+   */
+  scopes?: Array<OAuthScopeBody>;
+  /**
+   * The provider's token endpoint (RFC 6749 §3.2), which Subako redeems
+   * codes and refreshes tokens at.
+   */
+  token_endpoint: string;
+  token_endpoint_auth: TokenEndpointAuthBodyWritable;
+};
+
 export type CreateWorkspaceModelProviderBodyWritable = {
   api_key: string;
   /**
@@ -2818,6 +3232,21 @@ export type CreateWorkspaceModelProviderBodyWritable = {
   description?: string;
   display_name: string;
   format: ModelProviderFormatBody;
+};
+
+/**
+ * How Subako authenticates at the provider's token endpoint as this client
+ * (RFC 7591 §2): `none` for a public client, which PKCE alone proves, or the
+ * client secret in the form or in a `Basic` header.
+ */
+export type TokenEndpointAuthBodyWritable = {
+  method: 'none';
+} | {
+  client_secret: string;
+  method: 'client_secret_post';
+} | {
+  client_secret: string;
+  method: 'client_secret_basic';
 };
 
 /**
@@ -2835,6 +3264,20 @@ export type UpdateModelProviderBodyWritable = {
   base_url?: string | null;
   description?: string | null;
   display_name?: string | null;
+};
+
+/**
+ * An absent field leaves that part of the client as it stands; a present
+ * list replaces the stored one whole, so an empty one clears it. A present
+ * `token_endpoint_auth` replaces the method and the secret together. The
+ * endpoints and `client_id` are fixed at creation, so a body naming one is
+ * refused rather than read past.
+ */
+export type UpdateOAuthClientBodyWritable = {
+  authorization_params?: Array<AuthorizationParamBody> | null;
+  display_name?: string | null;
+  scopes?: Array<OAuthScopeBody> | null;
+  token_endpoint_auth?: null | TokenEndpointAuthBodyWritable;
 };
 
 export type ListAgentsData = {
@@ -4141,6 +4584,244 @@ export type UpdateModelProviderResponses = {
 };
 
 export type UpdateModelProviderResponse = UpdateModelProviderResponses[keyof UpdateModelProviderResponses];
+
+export type ListOauthClientsData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace to list from. Required for a user caller; implied by the key for an API key caller.
+     */
+    'Kikuvi-Workspace'?: string | null;
+  };
+  path?: never;
+  query?: {
+    limit?: number;
+    /**
+     * Rows past this id in `order`'s direction: a page's `next_cursor`.
+     */
+    after?: string;
+    /**
+     * Rows just before this id, still in `order`'s direction: a page's `prev_cursor`.
+     */
+    before?: string;
+    /**
+     * Newest first when omitted.
+     */
+    order?: OrderParam;
+  };
+  url: '/v1/oauth-clients';
+};
+
+export type ListOauthClientsErrors = {
+  /**
+   * Bad limit, cursor, or order, a malformed workspace header, or a user caller with no workspace header.
+   */
+  400: ErrorBody;
+  /**
+   * Missing, malformed, or invalid bearer token.
+   */
+  401: ErrorBody;
+  /**
+   * Caller lacks vault.read, or an API key's Kikuvi-Workspace header names another workspace.
+   */
+  403: ErrorBody;
+  /**
+   * No such workspace, or the caller cannot see it.
+   */
+  404: ErrorBody;
+};
+
+export type ListOauthClientsError = ListOauthClientsErrors[keyof ListOauthClientsErrors];
+
+export type ListOauthClientsResponses = {
+  /**
+   * One page, newest first unless order=asc; never a secret.
+   */
+  200: PageOutOAuthClientBody;
+};
+
+export type ListOauthClientsResponse = ListOauthClientsResponses[keyof ListOauthClientsResponses];
+
+export type CreateOauthClientData = {
+  body: CreateOAuthClientBodyWritable;
+  headers?: {
+    /**
+     * Retry the same operation with this key to return its saved receipt. Scoped by the operation's authenticated caller or resource. A different input under the same key returns 409. Receipts are retained for at least 7 days after completion, then removed by an hourly sweep. After removal the key can execute again. Fresh-only secrets are never included in a replay.
+     */
+    'Idempotency-Key'?: string;
+    /**
+     * Workspace to create in. Required for a user caller; implied by the key for an API key caller.
+     */
+    'Kikuvi-Workspace'?: string | null;
+  };
+  path?: never;
+  query?: never;
+  url: '/v1/oauth-clients';
+};
+
+export type CreateOauthClientErrors = {
+  /**
+   * Malformed body, a field outside its bound, an endpoint the deployment's network policy does not reach, a malformed workspace header, or a user caller with no workspace header.
+   */
+  400: ErrorBody;
+  /**
+   * Missing, malformed, or invalid bearer token.
+   */
+  401: ErrorBody;
+  /**
+   * Caller lacks vault.manage, the organization may not create, or an API key's Kikuvi-Workspace header names another workspace.
+   */
+  403: ErrorBody;
+  /**
+   * No such workspace, or the caller cannot see it.
+   */
+  404: ErrorBody;
+  /**
+   * Idempotency-Key was already used for a different request.
+   */
+  409: ErrorBody;
+};
+
+export type CreateOauthClientError = CreateOauthClientErrors[keyof CreateOauthClientErrors];
+
+export type CreateOauthClientResponses = {
+  /**
+   * Created.
+   */
+  201: OAuthClientCreated;
+};
+
+export type CreateOauthClientResponse = CreateOauthClientResponses[keyof CreateOauthClientResponses];
+
+export type DeleteOauthClientData = {
+  body?: never;
+  path: {
+    /**
+     * OAuth client id
+     */
+    oauth_client_id: string;
+  };
+  query?: never;
+  url: '/v1/oauth-clients/{oauth_client_id}';
+};
+
+export type DeleteOauthClientErrors = {
+  /**
+   * Malformed path parameter.
+   */
+  400: ErrorBody;
+  /**
+   * Missing, malformed, or invalid bearer token.
+   */
+  401: ErrorBody;
+  /**
+   * Caller lacks vault.manage.
+   */
+  403: ErrorBody;
+  /**
+   * No such client, or the caller cannot see it.
+   */
+  404: ErrorBody;
+  /**
+   * A credential was connected through the client: delete it first, since it could not refresh without the client.
+   */
+  409: ErrorBody;
+};
+
+export type DeleteOauthClientError = DeleteOauthClientErrors[keyof DeleteOauthClientErrors];
+
+export type DeleteOauthClientResponses = {
+  /**
+   * The client and its secret are gone. This cannot be undone.
+   */
+  204: void;
+};
+
+export type DeleteOauthClientResponse = DeleteOauthClientResponses[keyof DeleteOauthClientResponses];
+
+export type GetOauthClientData = {
+  body?: never;
+  path: {
+    /**
+     * OAuth client id
+     */
+    oauth_client_id: string;
+  };
+  query?: never;
+  url: '/v1/oauth-clients/{oauth_client_id}';
+};
+
+export type GetOauthClientErrors = {
+  /**
+   * Malformed path parameter.
+   */
+  400: ErrorBody;
+  /**
+   * Missing, malformed, or invalid bearer token.
+   */
+  401: ErrorBody;
+  /**
+   * Caller lacks vault.read.
+   */
+  403: ErrorBody;
+  /**
+   * No such client, or the caller cannot see it.
+   */
+  404: ErrorBody;
+};
+
+export type GetOauthClientError = GetOauthClientErrors[keyof GetOauthClientErrors];
+
+export type GetOauthClientResponses = {
+  /**
+   * The client. Carries no secret.
+   */
+  200: OAuthClientBody;
+};
+
+export type GetOauthClientResponse = GetOauthClientResponses[keyof GetOauthClientResponses];
+
+export type UpdateOauthClientData = {
+  body: UpdateOAuthClientBodyWritable;
+  path: {
+    /**
+     * OAuth client id
+     */
+    oauth_client_id: string;
+  };
+  query?: never;
+  url: '/v1/oauth-clients/{oauth_client_id}';
+};
+
+export type UpdateOauthClientErrors = {
+  /**
+   * Malformed body, path parameter, a field outside its bound, or a field that cannot change.
+   */
+  400: ErrorBody;
+  /**
+   * Missing, malformed, or invalid bearer token.
+   */
+  401: ErrorBody;
+  /**
+   * Caller lacks vault.manage.
+   */
+  403: ErrorBody;
+  /**
+   * No such client, or the caller cannot see it.
+   */
+  404: ErrorBody;
+};
+
+export type UpdateOauthClientError = UpdateOauthClientErrors[keyof UpdateOauthClientErrors];
+
+export type UpdateOauthClientResponses = {
+  /**
+   * The updated client. Carries no secret.
+   */
+  200: OAuthClientBody;
+};
+
+export type UpdateOauthClientResponse = UpdateOauthClientResponses[keyof UpdateOauthClientResponses];
 
 export type GetOrganizationData = {
   body?: never;
@@ -5495,6 +6176,62 @@ export type GetSessionImageResponses = {
 
 export type GetSessionImageResponse = GetSessionImageResponses[keyof GetSessionImageResponses];
 
+export type ResolveInputData = {
+  body: InputResponseForm;
+  headers?: {
+    /**
+     * Retry the same operation with this key to return its saved receipt. Scoped by the operation's authenticated caller or resource. A different input under the same key returns 409. Receipts are retained for at least 7 days after completion, then removed by an hourly sweep. After removal the key can execute again. Fresh-only secrets are never included in a replay.
+     */
+    'Idempotency-Key'?: string;
+  };
+  path: {
+    /**
+     * Session id
+     */
+    session_id: string;
+    /**
+     * The call_id the `input_requested` event named
+     */
+    call_id: string;
+  };
+  query?: never;
+  url: '/v1/sessions/{session_id}/inputs/{call_id}';
+};
+
+export type ResolveInputErrors = {
+  /**
+   * Malformed body or path parameter, or an answer the form does not take: an outcome missing or repeated, a required question skipped, or a value its widget refuses.
+   */
+  400: ErrorBody;
+  /**
+   * Missing, malformed, or invalid bearer token.
+   */
+  401: ErrorBody;
+  /**
+   * A workspace credential lacking session.manage. A session token carries no permissions and never lands here.
+   */
+  403: ErrorBody;
+  /**
+   * No such session, the caller cannot see it, or a session token authenticates for another one; or no form is pending for this call.
+   */
+  404: ErrorBody;
+  /**
+   * Idempotency-Key was already used for a different request. The form is already settled.
+   */
+  409: ErrorBody;
+};
+
+export type ResolveInputError = ResolveInputErrors[keyof ResolveInputErrors];
+
+export type ResolveInputResponses = {
+  /**
+   * Answered, and recorded in the log. The broker holding the call reads the answer on its next tick and answers the engine in line; past the hold, the run's requeue re-fires the call instead.
+   */
+  200: SessionEventBody;
+};
+
+export type ResolveInputResponse = ResolveInputResponses[keyof ResolveInputResponses];
+
 export type ListSessionSandboxesData = {
   body?: never;
   path: {
@@ -6714,7 +7451,7 @@ export type AddCredentialData = {
 
 export type AddCredentialErrors = {
   /**
-   * Malformed body, including an auth scheme the protocol does not take; a header named twice; or an `http` target that is not an origin, or one the deployment's network policy does not reach.
+   * Malformed body, including an auth scheme the protocol does not take; a header or an origin named twice; or an `http` origin that is not one, or one the deployment's network policy does not reach.
    */
   400: ErrorBody;
   /**
@@ -6730,7 +7467,7 @@ export type AddCredentialErrors = {
    */
   404: ErrorBody;
   /**
-   * Idempotency-Key was already used for a different request. Duplicate credential target.
+   * Idempotency-Key was already used for a different request. Duplicate credential target, or an origin another credential in the vault is already sent to.
    */
   409: ErrorBody;
 };
@@ -6766,7 +7503,7 @@ export type StartCredentialOauthData = {
 
 export type StartCredentialOauthErrors = {
   /**
-   * Malformed body; a target that is not OAuth protected, whose authorization server cannot be discovered, does not support dynamic client registration, or refused the registration; or a target the deployment's network policy does not reach.
+   * Malformed body; an `mcp` target without an OAuth client that is not OAuth protected, whose authorization server cannot be discovered, does not support dynamic client registration, or refused the registration; or a target, origin, or endpoint the deployment's network policy does not reach.
    */
   400: ErrorBody;
   /**
@@ -6778,11 +7515,11 @@ export type StartCredentialOauthErrors = {
    */
   403: ErrorBody;
   /**
-   * No such vault, or the caller cannot see it.
+   * No such vault, or the caller cannot see it; or no such OAuth client in the vault's workspace.
    */
   404: ErrorBody;
   /**
-   * Idempotency-Key was already used for a different request.
+   * Idempotency-Key was already used for a different request. Duplicate credential target, or an origin another credential in the vault is already sent to.
    */
   409: ErrorBody;
 };

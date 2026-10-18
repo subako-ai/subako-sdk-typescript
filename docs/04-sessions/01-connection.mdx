@@ -22,6 +22,7 @@ session.state.lastSeq; // number | undefined
 session.state.events; // every event seen, in seq order
 session.state.transcript; // the messages of the log, each call joined to its result and approval
 session.state.approvals; // the approvals no decision has settled
+session.state.inputs; // the forms the agent put that no answer has settled
 session.state.isRunning; // a run queued or under way
 session.state.hasEarlier; // the log holds events before the first in `events`
 session.state.live; // with `deltas`: messages a model is still writing

@@ -10,6 +10,7 @@ import {
 	createAgent,
 	createFunction,
 	createInvitation,
+	createOauthClient,
 	createSession,
 	createSkill,
 	createVault,
@@ -25,6 +26,7 @@ import {
 	reconnectCredentialOauth,
 	registerClient,
 	resolveApproval,
+	resolveInput,
 	startCredentialOauth,
 } from "./sdk.gen.js";
 
@@ -40,6 +42,7 @@ export const IDEMPOTENT_OPERATIONS: ReadonlySet<unknown> = new Set([
 	createAgent,
 	createFunction,
 	createInvitation,
+	createOauthClient,
 	createSession,
 	createSkill,
 	createVault,
@@ -55,5 +58,6 @@ export const IDEMPOTENT_OPERATIONS: ReadonlySet<unknown> = new Set([
 	reconnectCredentialOauth,
 	registerClient,
 	resolveApproval,
+	resolveInput,
 	startCredentialOauth,
 ]);

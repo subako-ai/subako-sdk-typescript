@@ -4,6 +4,7 @@ import { ApiKeys } from "./resources/api-keys.js";
 import { Functions } from "./resources/functions.js";
 import { Me } from "./resources/me.js";
 import { ModelProviders } from "./resources/model-providers.js";
+import { OAuthClients } from "./resources/oauth-clients.js";
 import { Organization } from "./resources/organization.js";
 import { Sessions } from "./resources/sessions.js";
 import { Skills } from "./resources/skills.js";
@@ -20,6 +21,7 @@ export class SubakoClient {
 	readonly functions: Functions;
 	readonly me: Me;
 	readonly modelProviders: ModelProviders;
+	readonly oauthClients: OAuthClients;
 	readonly organization: Organization;
 	readonly sessions: Sessions;
 	readonly skills: Skills;
@@ -33,6 +35,7 @@ export class SubakoClient {
 		this.functions = new Functions(core);
 		this.me = new Me(core);
 		this.modelProviders = new ModelProviders(core);
+		this.oauthClients = new OAuthClients(core);
 		this.organization = new Organization(core);
 		this.sessions = new Sessions(core);
 		this.skills = new Skills(core);

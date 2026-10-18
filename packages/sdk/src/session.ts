@@ -10,11 +10,13 @@ import {
 	type LiveState,
 	type PendingApproval,
 	pendingApprovals,
+	pendingInputs,
 	settleLive,
 	type TranscriptFold,
 	type TranscriptMessage,
 } from "./events.js";
 import * as api from "./generated/index.js";
+import type { InputAnswer, PendingInput } from "./input.js";
 import type { SessionApi } from "./resources/sessions.js";
 import { notify, Store } from "./store.js";
 import { LEAVE, REJOIN, ToolClient, type ToolClientOptions } from "./tool-client.js";
@@ -172,6 +174,8 @@ interface Following {
 interface Readings {
 	readonly transcript: readonly TranscriptMessage[];
 	readonly approvals: readonly PendingApproval[];
+	/** The forms `builtin:ask_user` put that no answer has settled. */
+	readonly inputs: readonly PendingInput[];
 	readonly isRunning: boolean;
 }
 
@@ -199,7 +203,7 @@ export class SessionConnection implements AsyncIterable<api.SessionEventBody> {
 	#stop = new AbortController();
 	#ready: Promise<void>;
 	/** The readings of the events array they were derived from, so a re-read costs nothing. */
-	#readings: Readings = { transcript: [], approvals: [], isRunning: false };
+	#readings: Readings = { transcript: [], approvals: [], inputs: [], isRunning: false };
 	#readFrom: readonly api.SessionEventBody[] | undefined;
 	/** The snapshot of the store state it was composed from, so an unchanged connection reads as the same object. */
 	#snapshot: SessionState | undefined;
@@ -296,6 +300,9 @@ export class SessionConnection implements AsyncIterable<api.SessionEventBody> {
 				get approvals() {
 					return read().approvals;
 				},
+				get inputs() {
+					return read().inputs;
+				},
 				get isRunning() {
 					return read().isRunning;
 				},
@@ -316,6 +323,11 @@ export class SessionConnection implements AsyncIterable<api.SessionEventBody> {
 	/** The approvals no decision has settled. */
 	get approvals(): readonly PendingApproval[] {
 		return this.#read().approvals;
+	}
+
+	/** The forms no answer has settled. */
+	get inputs(): readonly PendingInput[] {
+		return this.#read().inputs;
 	}
 
 	/** Whether a run is queued or under way. */
@@ -351,6 +363,15 @@ export class SessionConnection implements AsyncIterable<api.SessionEventBody> {
 			decision === "allow" ? { decision: "allow" } : { decision: "deny", message },
 			this.#callOptions,
 		);
+	};
+
+	/**
+	 * Answers a pending form: submitted with one outcome per question, or
+	 * declined. A question this client cannot draw is answered `unsupported`,
+	 * so the agent can ask it another way.
+	 */
+	readonly answerInput = async (callId: string, answer: InputAnswer): Promise<void> => {
+		await this.#sessions.resolveInput(this.sessionId, callId, answer, this.#callOptions);
 	};
 
 	/** Registers a client serving tools as `client__<name>__<tool>` (`[a-z0-9-]{1,32}`); it starts empty. */
@@ -678,6 +699,7 @@ export class SessionConnection implements AsyncIterable<api.SessionEventBody> {
 		return {
 			transcript: foldTranscript(EMPTY_TRANSCRIPT, events).messages,
 			approvals: pendingApprovals(events),
+			inputs: pendingInputs(events),
 			isRunning: isRunning(events),
 		};
 	}
@@ -695,6 +717,7 @@ export class SessionConnection implements AsyncIterable<api.SessionEventBody> {
 			this.#readings = {
 				transcript: this.#folded.messages,
 				approvals: pendingApprovals(events),
+				inputs: pendingInputs(events),
 				isRunning: isRunning(events),
 			};
 		}

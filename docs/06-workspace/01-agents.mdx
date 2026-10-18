@@ -73,7 +73,7 @@ To see what has been published:
 const versions = await subako.agents.listVersions(agent.id, { limit: 20 });
 ```
 
-A version's `config` comes back as Core stored it, typed only as an object. `readAgentConfig` reads it in the shape `publishVersion` takes, with every field present, so a new version can start from an old one:
+A version's `config` is in the shape `publishVersion` takes. `readAgentConfig` answers it with every field present, as Core writes it, so a new version can start from an old one:
 
 ```ts
 import { readAgentConfig } from "@subako-ai/sdk";
@@ -86,7 +86,7 @@ await subako.agents.publishVersion(agent.id, {
 });
 ```
 
-It throws `AgentConfigError`, naming the field, when the config holds something publishing cannot say. A client older than the Core that published the version can meet one.
+`publishVersion` refuses a field the config does not name, wherever it sits, and says where, so a misspelled setting never quietly takes its default.
 
 ## What the config grants
 

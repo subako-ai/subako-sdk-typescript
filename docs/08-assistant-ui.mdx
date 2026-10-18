@@ -42,6 +42,19 @@ The session is the one the app opened, so the tools the app declares and the thr
 
 It brings its own small stylesheet, so it renders acceptably with nothing else installed — no CSS framework, no shadcn registry, no `@assistant-ui/styles`.
 
+## Forms
+
+The forms an agent puts through `builtin:ask_user` appear above the composer, built-in widgets drawn by the chat. A custom widget is drawn by the renderer `widgets` registers under its id:
+
+```tsx
+<SubakoChat
+	session={session}
+	widgets={{ seat_picker: ({ props, value, onChange }) => <SeatMap venue={props} seat={value} onPick={onChange} /> }}
+/>
+```
+
+A widget with no renderer is sent as `unsupported`, and a form none of whose questions the app can draw offers only a button that tells the agent so. `SubakoInputForm` is the same form on its own, for a thread the app builds itself.
+
 ## Styling
 
 `className` lands on the root element, and these class names are stable:
