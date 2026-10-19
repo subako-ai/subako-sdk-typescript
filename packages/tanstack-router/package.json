@@ -1,6 +1,6 @@
 {
 	"name": "@subako-ai/tanstack-router",
-	"version": "0.2.4",
+	"version": "0.2.5",
 	"description": "TanStack Router as a navigate tool for Subako sessions",
 	"homepage": "https://subako.ai",
 	"license": "Apache-2.0",

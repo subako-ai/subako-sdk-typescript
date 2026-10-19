@@ -194,6 +194,17 @@ export type AnthropicUsageBody = {
 };
 
 /**
+ * What an Anthropic organization needs beyond the issuer and subject.
+ */
+export type AnthropicWorkloadIdentityBody = {
+  /**
+   * The `aud` of tokens exchanged at the Claude API, and the `audience` a
+   * federation rule's match checks.
+   */
+  audience: string;
+};
+
+/**
  * An API key's metadata. Neither the secret nor its hash appears here, or
  * anywhere but the one response that mints the key.
  */
@@ -266,6 +277,17 @@ export type AuthorizationParamBody = {
    */
   name: string;
   value: string;
+};
+
+/**
+ * What an AWS account needs beyond the issuer and subject.
+ */
+export type AwsWorkloadIdentityBody = {
+  /**
+   * The audience (client id) to register the issuer under in IAM, and the
+   * `aud` a role's trust policy checks.
+   */
+  audience: string;
 };
 
 /**
@@ -524,7 +546,22 @@ export type CreateSessionBody = {
 
 export type CreateVaultBody = {
   display_name: string;
-  metadata?: unknown;
+  /**
+   * Your own name for the vault, such as the id of the user it holds
+   * credentials for. At most one vault in the workspace has a given one,
+   * so the vault can be found again by it. Any string of 1 to 255
+   * characters.
+   */
+  external_id?: string | null;
+  /**
+   * Labels for the vault, which a listing can filter by. At most 50 keys,
+   * each 1 to 64 lowercase letters, digits, or underscores and not
+   * starting with `subako_`; each value a string of at most 500
+   * characters.
+   */
+  metadata?: {
+    [key: string]: string;
+  };
 };
 
 export type CreateWorkspaceBody = {
@@ -532,6 +569,7 @@ export type CreateWorkspaceBody = {
 };
 
 export type CreateWorkspaceModelProviderBody = {
+  auth?: null | ModelProviderAuthInput;
   /**
    * The upstream base URL, spelled the way this format's own client
    * spells it: `https://api.anthropic.com` for anthropic,
@@ -1347,6 +1385,100 @@ export type ModelPriceBody = {
 };
 
 /**
+ * How a BYOK provider authenticates, as read back: a key never comes back,
+ * so its arm says only that there is one.
+ */
+export type ModelProviderAuthBody = {
+  type: 'api_key';
+} | {
+  region: string;
+  role_arn: string;
+  type: 'aws_web_identity';
+} | {
+  federation_rule_id: string;
+  organization_id: string;
+  service_account_id: string;
+  type: 'anthropic_workload_identity';
+  /**
+   * Null when the rule picks its one workspace itself.
+   */
+  workspace_id: string | null;
+} | {
+  identity_provider_id: string;
+  service_account_id: string;
+  type: 'openai_workload_identity';
+};
+
+/**
+ * How a BYOK provider authenticates upstream. `api_key` holds a key the
+ * workspace hands over, sealed on arrival. `aws_web_identity` holds no
+ * secret at all: each call is signed as a role in the workspace's own AWS
+ * account, assumed with a short-lived token Subako issues for the workspace
+ * (see `GET /v1/workload-identity`). Such a provider's `base_url` is the
+ * region's Bedrock runtime, `https://bedrock-runtime.{region}.amazonaws.com`,
+ * followed by `/anthropic` for anthropic or `/openai/v1` for
+ * openai_responses, or its Bedrock Mantle,
+ * `https://bedrock-mantle.{region}.api.aws`, followed by `/anthropic` or
+ * `/v1`. `anthropic_workload_identity` holds no secret either: each call
+ * carries a short-lived Claude API access token, exchanged for that same
+ * workspace token under a federation rule in the workspace's own Anthropic
+ * organization. Such a provider speaks the anthropic format, and its
+ * `base_url` is `https://api.anthropic.com`. `openai_workload_identity`
+ * likewise carries a short-lived OpenAI access token, exchanged for the
+ * workspace token at a workload identity provider in the workspace's own
+ * OpenAI organization, whose mapping binds it to a service account. Such a
+ * provider speaks the openai_responses format, and its `base_url` is
+ * `https://api.openai.com/v1`.
+ */
+export type ModelProviderAuthInput = {
+  type: 'api_key';
+} | {
+  /**
+   * The region the role's signatures are scoped to, which the base
+   * URL's host must name.
+   */
+  region: string;
+  /**
+   * The IAM role to assume, `arn:aws:iam::<account>:role/<name>`. Its
+   * trust policy must admit this workspace's subject alone.
+   */
+  role_arn: string;
+  type: 'aws_web_identity';
+} | {
+  /**
+   * The federation rule the workspace's token is checked against,
+   * `fdrl_...`. Its match must admit this workspace's subject alone.
+   */
+  federation_rule_id: string;
+  /**
+   * The Anthropic organization's id.
+   */
+  organization_id: string;
+  /**
+   * The service account the access token acts as, `svac_...`.
+   */
+  service_account_id: string;
+  type: 'anthropic_workload_identity';
+  /**
+   * The Anthropic workspace the token is scoped to, `wrkspc_...`.
+   * Required when the rule is enabled for more than one workspace.
+   */
+  workspace_id?: string | null;
+} | {
+  /**
+   * The workload identity provider that trusts this deployment's
+   * issuer, as the OpenAI dashboard shows it.
+   */
+  identity_provider_id: string;
+  /**
+   * The service account the access token acts as. The provider's
+   * mapping to it must admit this workspace's subject alone.
+   */
+  service_account_id: string;
+  type: 'openai_workload_identity';
+};
+
+/**
  * Public provider choices. Platform providers publish a model catalog;
  * BYOK providers belong to a workspace and use its own credentials.
  */
@@ -1358,6 +1490,7 @@ export type ModelProviderBody = (ModelProviderDetailsBody & {
 } & {
   type: 'platform';
 }) | (ModelProviderDetailsBody & {
+  auth: ModelProviderAuthBody;
   /**
    * Where the proxy sends this provider's calls, as the workspace set
    * it. Its API key never comes back.
@@ -1500,6 +1633,17 @@ export type OpenaiResponsesUsageBody = {
   input_tokens: number;
   output_tokens: number;
   reasoning_output_tokens: number;
+};
+
+/**
+ * What an OpenAI organization needs beyond the issuer and subject.
+ */
+export type OpenaiWorkloadIdentityBody = {
+  /**
+   * The `aud` of tokens exchanged at OpenAI, and the audience to give the
+   * workload identity provider.
+   */
+  audience: string;
 };
 
 /**
@@ -2785,6 +2929,7 @@ export type UpdateClientToolsBody = {
  * rename need not restate the endpoint -- nor the credential.
  */
 export type UpdateModelProviderBody = {
+  auth?: null | ModelProviderAuthInput;
   base_url?: string | null;
   description?: string | null;
   display_name?: string | null;
@@ -2806,13 +2951,22 @@ export type UpdateOAuthClientBody = {
 
 /**
  * An absent field leaves that part of the vault as it stands, so a rename
- * need not restate the metadata.
+ * need not restate the metadata. Only `external_id` takes `null`, which
+ * removes it; a `null` name or metadata is refused rather than read as absent.
  */
 export type UpdateVaultBody = {
-  display_name?: string | null;
+  display_name?: string;
+  /**
+   * A new external id, or `null` to remove it.
+   */
+  external_id?: string | null;
+  /**
+   * Replaces every label the vault has, under the bounds
+   * `CreateVaultBody.metadata` states.
+   */
   metadata?: {
-    [key: string]: unknown;
-  } | null;
+    [key: string]: string;
+  };
 };
 
 /**
@@ -2993,12 +3147,16 @@ export type UsageSummaryBody = {
 export type VaultBody = {
   created_at: string;
   display_name: string;
+  /**
+   * The caller's own name for the vault, or `null` when it has none.
+   */
+  external_id: string | null;
   id: string;
   /**
-   * Whatever the caller stored alongside the vault.
+   * The vault's labels, by key.
    */
   metadata: {
-    [key: string]: unknown;
+    [key: string]: string;
   };
   workspace_id: string;
 };
@@ -3158,6 +3316,30 @@ export type WidgetGrantBody = {
 };
 
 /**
+ * What to register in a cloud account, and what to trust there, for this
+ * workspace's providers to authenticate as the workspace.
+ */
+export type WorkloadIdentityBody = {
+  anthropic: AnthropicWorkloadIdentityBody;
+  aws: AwsWorkloadIdentityBody;
+  /**
+   * The OpenID Connect issuer every workspace token names. Register it as
+   * an identity provider in your cloud account or your OpenAI
+   * organization, or as a federation issuer in your Anthropic
+   * organization; its discovery document is at
+   * `{issuer}/.well-known/openid-configuration`.
+   */
+  issuer: string;
+  openai: OpenaiWorkloadIdentityBody;
+  /**
+   * The `sub` claim of this workspace's tokens, and of no other
+   * workspace's: the value a role's trust policy, a federation rule's
+   * `subject_prefix`, or an OpenAI mapping's `sub` pins.
+   */
+  subject: string;
+};
+
+/**
  * A workspace: the scope agents, sessions, vaults, skills, and keys
  * belong to.
  */
@@ -3220,7 +3402,11 @@ export type CreateOAuthClientBodyWritable = {
 };
 
 export type CreateWorkspaceModelProviderBodyWritable = {
-  api_key: string;
+  /**
+   * Shorthand for an `api_key` auth. Send this or `auth`, exactly one.
+   */
+  api_key?: string | null;
+  auth?: null | ModelProviderAuthInputWritable;
   /**
    * The upstream base URL, spelled the way this format's own client
    * spells it: `https://api.anthropic.com` for anthropic,
@@ -3232,6 +3418,79 @@ export type CreateWorkspaceModelProviderBodyWritable = {
   description?: string;
   display_name: string;
   format: ModelProviderFormatBody;
+};
+
+/**
+ * How a BYOK provider authenticates upstream. `api_key` holds a key the
+ * workspace hands over, sealed on arrival. `aws_web_identity` holds no
+ * secret at all: each call is signed as a role in the workspace's own AWS
+ * account, assumed with a short-lived token Subako issues for the workspace
+ * (see `GET /v1/workload-identity`). Such a provider's `base_url` is the
+ * region's Bedrock runtime, `https://bedrock-runtime.{region}.amazonaws.com`,
+ * followed by `/anthropic` for anthropic or `/openai/v1` for
+ * openai_responses, or its Bedrock Mantle,
+ * `https://bedrock-mantle.{region}.api.aws`, followed by `/anthropic` or
+ * `/v1`. `anthropic_workload_identity` holds no secret either: each call
+ * carries a short-lived Claude API access token, exchanged for that same
+ * workspace token under a federation rule in the workspace's own Anthropic
+ * organization. Such a provider speaks the anthropic format, and its
+ * `base_url` is `https://api.anthropic.com`. `openai_workload_identity`
+ * likewise carries a short-lived OpenAI access token, exchanged for the
+ * workspace token at a workload identity provider in the workspace's own
+ * OpenAI organization, whose mapping binds it to a service account. Such a
+ * provider speaks the openai_responses format, and its `base_url` is
+ * `https://api.openai.com/v1`.
+ */
+export type ModelProviderAuthInputWritable = {
+  /**
+   * Write-only: no route answers with a key.
+   */
+  api_key: string;
+  type: 'api_key';
+} | {
+  /**
+   * The region the role's signatures are scoped to, which the base
+   * URL's host must name.
+   */
+  region: string;
+  /**
+   * The IAM role to assume, `arn:aws:iam::<account>:role/<name>`. Its
+   * trust policy must admit this workspace's subject alone.
+   */
+  role_arn: string;
+  type: 'aws_web_identity';
+} | {
+  /**
+   * The federation rule the workspace's token is checked against,
+   * `fdrl_...`. Its match must admit this workspace's subject alone.
+   */
+  federation_rule_id: string;
+  /**
+   * The Anthropic organization's id.
+   */
+  organization_id: string;
+  /**
+   * The service account the access token acts as, `svac_...`.
+   */
+  service_account_id: string;
+  type: 'anthropic_workload_identity';
+  /**
+   * The Anthropic workspace the token is scoped to, `wrkspc_...`.
+   * Required when the rule is enabled for more than one workspace.
+   */
+  workspace_id?: string | null;
+} | {
+  /**
+   * The workload identity provider that trusts this deployment's
+   * issuer, as the OpenAI dashboard shows it.
+   */
+  identity_provider_id: string;
+  /**
+   * The service account the access token acts as. The provider's
+   * mapping to it must admit this workspace's subject alone.
+   */
+  service_account_id: string;
+  type: 'openai_workload_identity';
 };
 
 /**
@@ -3255,12 +3514,12 @@ export type TokenEndpointAuthBodyWritable = {
  */
 export type UpdateModelProviderBodyWritable = {
   /**
-   * A new upstream credential, sealed and put in place of the stored one.
-   * Write-only: no route answers with a key, so there is nothing to read
-   * back and nothing to compare against. The provider keeps its id, so
-   * every agent version already naming it goes on resolving.
+   * A new upstream key, sealed and put in place of the stored credential:
+   * shorthand for an `api_key` auth. Write-only: no route answers with a
+   * key, so there is nothing to read back and nothing to compare against.
    */
   api_key?: string | null;
+  auth?: null | ModelProviderAuthInputWritable;
   base_url?: string | null;
   description?: string | null;
   display_name?: string | null;
@@ -4421,7 +4680,7 @@ export type CreateWorkspaceModelProviderData = {
 
 export type CreateWorkspaceModelProviderErrors = {
   /**
-   * Malformed body, invalid provider configuration, or malformed workspace header.
+   * Malformed body, invalid provider configuration, a role that does not trust this workspace alone, or malformed workspace header.
    */
   400: ErrorBody;
   /**
@@ -4440,6 +4699,10 @@ export type CreateWorkspaceModelProviderErrors = {
    * Idempotency-Key was already used for a different request.
    */
   409: ErrorBody;
+  /**
+   * This workspace checked roles' trust too often in the last minute; try again later.
+   */
+  429: ErrorBody;
 };
 
 export type CreateWorkspaceModelProviderError = CreateWorkspaceModelProviderErrors[keyof CreateWorkspaceModelProviderErrors];
@@ -4557,7 +4820,7 @@ export type UpdateModelProviderData = {
 
 export type UpdateModelProviderErrors = {
   /**
-   * Malformed body, path parameter, a field outside its bound, or a base URL the network policy refuses.
+   * Malformed body, path parameter, a field outside its bound, a base URL the network policy or the provider's auth refuses, or a role that does not trust this workspace alone.
    */
   400: ErrorBody;
   /**
@@ -4572,6 +4835,10 @@ export type UpdateModelProviderErrors = {
    * No such provider, or the caller cannot see it.
    */
   404: ErrorBody;
+  /**
+   * This workspace checked roles' trust too often in the last minute; try again later.
+   */
+  429: ErrorBody;
 };
 
 export type UpdateModelProviderError = UpdateModelProviderErrors[keyof UpdateModelProviderErrors];
@@ -7164,13 +7431,24 @@ export type ListVaultsData = {
      * Only vaults whose display name holds this, ignoring case, or whose id does.
      */
     search?: string;
+    /**
+     * Only the vault with this external id.
+     */
+    external_id?: string;
+    /**
+     * Only rows whose metadata holds each pair, matched exactly:
+     * `metadata[tenant_id]=t_123`. Several pairs must all hold.
+     */
+    metadata?: {
+      [key: string]: string;
+    };
   };
   url: '/v1/vaults';
 };
 
 export type ListVaultsErrors = {
   /**
-   * Bad limit, cursor, or order, a malformed workspace header, or no workspace header.
+   * Bad limit, cursor, order, or filter, a malformed workspace header, or no workspace header.
    */
   400: ErrorBody;
   /**
@@ -7233,7 +7511,7 @@ export type CreateVaultErrors = {
    */
   404: ErrorBody;
   /**
-   * Idempotency-Key was already used for a different request.
+   * Idempotency-Key was already used for a different request, or another vault in the workspace already has this external_id.
    */
   409: ErrorBody;
 };
@@ -7347,7 +7625,7 @@ export type UpdateVaultData = {
 
 export type UpdateVaultErrors = {
   /**
-   * Malformed body, path parameter, or a display name outside the bound.
+   * Malformed body, path parameter, or a display name, external id, or metadata outside its bounds.
    */
   400: ErrorBody;
   /**
@@ -7362,6 +7640,10 @@ export type UpdateVaultErrors = {
    * No such vault, or the caller cannot see it.
    */
   404: ErrorBody;
+  /**
+   * Another vault in the workspace already has this external_id.
+   */
+  409: ErrorBody;
 };
 
 export type UpdateVaultError = UpdateVaultErrors[keyof UpdateVaultErrors];
@@ -7752,6 +8034,49 @@ export type ReconnectCredentialOauthResponses = {
 };
 
 export type ReconnectCredentialOauthResponse = ReconnectCredentialOauthResponses[keyof ReconnectCredentialOauthResponses];
+
+export type GetWorkloadIdentityData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace to read. Required for a user caller; implied by the key for an API key caller.
+     */
+    'Kikuvi-Workspace'?: string | null;
+  };
+  path?: never;
+  query?: never;
+  url: '/v1/workload-identity';
+};
+
+export type GetWorkloadIdentityErrors = {
+  /**
+   * A malformed workspace header, or a user caller with no workspace header.
+   */
+  400: ErrorBody;
+  /**
+   * Missing, malformed, or invalid bearer token.
+   */
+  401: ErrorBody;
+  /**
+   * Caller lacks model_provider.read, or an API key's Kikuvi-Workspace header names another workspace.
+   */
+  403: ErrorBody;
+  /**
+   * No such workspace, the caller cannot see it, or this deployment issues no workload identity.
+   */
+  404: ErrorBody;
+};
+
+export type GetWorkloadIdentityError = GetWorkloadIdentityErrors[keyof GetWorkloadIdentityErrors];
+
+export type GetWorkloadIdentityResponses = {
+  /**
+   * The workspace's issuer and subject.
+   */
+  200: WorkloadIdentityBody;
+};
+
+export type GetWorkloadIdentityResponse = GetWorkloadIdentityResponses[keyof GetWorkloadIdentityResponses];
 
 export type ListWorkspacesData = {
   body?: never;

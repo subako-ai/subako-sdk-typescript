@@ -9,6 +9,22 @@ identity:
   issuer: http://127.0.0.1:8081/dev
   client_id: subako-dev
 
+# The mock model testbed/up.sh starts. Its key is SUBAKO_PROVIDER_KEY_ANTHROPIC.
+upstreams:
+  - slug: anthropic
+    format: anthropic
+    # CODESYNC(testbed-mock-anthropic-port)
+    base_url: http://127.0.0.1:9797
+
+providers:
+  - slug: anthropic
+    display_name: Mock Anthropic
+    format: anthropic
+    models:
+      - slug: claude-sonnet-4-5-20250929
+        upstream: anthropic
+        model: claude-sonnet-4-5-20250929
+
 rates:
   models:
     - provider: anthropic

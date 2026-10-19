@@ -10,7 +10,10 @@ export type ListCredentialsParams = IdPaged<NonNullable<api.ListCredentialsData[
 export class Vaults {
 	constructor(private readonly core: Core) {}
 
-	/** Lists the workspace's vaults, newest first; `order: "asc"` walks the other way. */
+	/**
+	 * Lists the workspace's vaults, newest first; `order: "asc"` walks the other way. `external_id`
+	 * finds the one vault holding it, and `metadata` keeps the vaults holding every pair it names.
+	 */
 	list(params?: ListVaultsParams, options?: RequestOptions) {
 		return this.core.page(api.listVaults, { query: params }, BY_ID, options);
 	}
@@ -25,7 +28,10 @@ export class Vaults {
 		return this.core.call(api.getVault, { path: { vault_id: vaultId } }, options);
 	}
 
-	/** Renames a vault or replaces its metadata; an absent field is left as it stands. */
+	/**
+	 * Renames a vault, sets or removes (`null`) its external id, or replaces its metadata; an absent
+	 * field is left as it stands.
+	 */
 	update(vaultId: string, params: api.UpdateVaultBody, options?: RequestOptions) {
 		return this.core.call(api.updateVault, { path: { vault_id: vaultId }, body: params }, options);
 	}

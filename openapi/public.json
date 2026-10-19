@@ -2275,7 +2275,7 @@
           "model-providers"
         ],
         "summary": "Create a model provider",
-        "description": "Binds one of your own provider accounts (BYOK) to a workspace. Platform providers are published by Subako and are not created here.",
+        "description": "Binds one of your own provider accounts (BYOK) to a workspace, by an API key or by a role in your own cloud account that trusts this workspace. Platform providers are published by Subako and are not created here.",
         "operationId": "create_workspace_model_provider",
         "parameters": [
           {
@@ -2333,7 +2333,7 @@
             }
           },
           "400": {
-            "description": "Malformed body, invalid provider configuration, or malformed workspace header.",
+            "description": "Malformed body, invalid provider configuration, a role that does not trust this workspace alone, or malformed workspace header.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2374,6 +2374,16 @@
           },
           "409": {
             "description": "Idempotency-Key was already used for a different request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "This workspace checked roles' trust too often in the last minute; try again later.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2554,7 +2564,7 @@
           "model-providers"
         ],
         "summary": "Update a model provider",
-        "description": "Changes a BYOK provider in place. An omitted field is left as it stands, including `api_key`: send one only to rotate the credential. The key is write-only -- it is sealed on arrival and no response carries it -- and rotating it keeps the provider's id, so agent versions already published against it go on resolving.",
+        "description": "Changes a BYOK provider in place. An omitted field is left as it stands, including its credential: send `api_key` or `auth` only to replace it. A key is write-only -- it is sealed on arrival and no response carries it -- and replacing the credential keeps the provider's id, so agent versions already published against it go on resolving.",
         "operationId": "update_model_provider",
         "parameters": [
           {
@@ -2590,7 +2600,7 @@
             }
           },
           "400": {
-            "description": "Malformed body, path parameter, a field outside its bound, or a base URL the network policy refuses.",
+            "description": "Malformed body, path parameter, a field outside its bound, a base URL the network policy or the provider's auth refuses, or a role that does not trust this workspace alone.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2621,6 +2631,16 @@
           },
           "404": {
             "description": "No such provider, or the caller cannot see it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "This workspace checked roles' trust too often in the last minute; try again later.",
             "content": {
               "application/json": {
                 "schema": {
@@ -7824,6 +7844,34 @@
               "maxLength": 200,
               "minLength": 1
             }
+          },
+          {
+            "name": "external_id",
+            "in": "query",
+            "description": "Only the vault with this external id.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 255,
+              "minLength": 1
+            }
+          },
+          {
+            "name": "metadata",
+            "in": "query",
+            "description": "Only rows whose metadata holds each pair, matched exactly:\n`metadata[tenant_id]=t_123`. Several pairs must all hold.",
+            "required": false,
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              },
+              "propertyNames": {
+                "type": "string"
+              }
+            },
+            "style": "deepObject",
+            "explode": true
           }
         ],
         "responses": {
@@ -7838,7 +7886,7 @@
             }
           },
           "400": {
-            "description": "Bad limit, cursor, or order, a malformed workspace header, or no workspace header.",
+            "description": "Bad limit, cursor, order, or filter, a malformed workspace header, or no workspace header.",
             "content": {
               "application/json": {
                 "schema": {
@@ -7986,7 +8034,7 @@
             }
           },
           "409": {
-            "description": "Idempotency-Key was already used for a different request.",
+            "description": "Idempotency-Key was already used for a different request, or another vault in the workspace already has this external_id.",
             "content": {
               "application/json": {
                 "schema": {
@@ -8189,7 +8237,7 @@
             }
           },
           "400": {
-            "description": "Malformed body, path parameter, or a display name outside the bound.",
+            "description": "Malformed body, path parameter, or a display name, external id, or metadata outside its bounds.",
             "content": {
               "application/json": {
                 "schema": {
@@ -8220,6 +8268,16 @@
           },
           "404": {
             "description": "No such vault, or the caller cannot see it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Another vault in the workspace already has this external_id.",
             "content": {
               "application/json": {
                 "schema": {
@@ -9037,6 +9095,88 @@
           },
           "409": {
             "description": "Idempotency-Key was already used for a different request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/workload-identity": {
+      "get": {
+        "tags": [
+          "model-providers"
+        ],
+        "summary": "Get the workspace's workload identity",
+        "description": "The issuer and subject a cloud account, an Anthropic organization, or an OpenAI organization trusts so that a model provider can authenticate as this workspace, with no long-lived credential handed over. A role whose trust policy, a federation rule whose match, or a mapping whose sub pins this subject admits this workspace and no other.",
+        "operationId": "get_workload_identity",
+        "parameters": [
+          {
+            "name": "Kikuvi-Workspace",
+            "in": "header",
+            "description": "Workspace to read. Required for a user caller; implied by the key for an API key caller.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The workspace's issuer and subject.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkloadIdentityBody"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A malformed workspace header, or a user caller with no workspace header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, malformed, or invalid bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks model_provider.read, or an API key's Kikuvi-Workspace header names another workspace.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such workspace, the caller cannot see it, or this deployment issues no workload identity.",
             "content": {
               "application/json": {
                 "schema": {
@@ -10668,6 +10808,19 @@
           }
         }
       },
+      "AnthropicWorkloadIdentityBody": {
+        "type": "object",
+        "description": "What an Anthropic organization needs beyond the issuer and subject.",
+        "required": [
+          "audience"
+        ],
+        "properties": {
+          "audience": {
+            "type": "string",
+            "description": "The `aud` of tokens exchanged at the Claude API, and the `audience` a\nfederation rule's match checks."
+          }
+        }
+      },
       "ApiKeyBody": {
         "type": "object",
         "description": "An API key's metadata. Neither the secret nor its hash appears here, or\nanywhere but the one response that mints the key.",
@@ -10852,6 +11005,19 @@
           "value": {
             "type": "string",
             "maxLength": 512
+          }
+        }
+      },
+      "AwsWorkloadIdentityBody": {
+        "type": "object",
+        "description": "What an AWS account needs beyond the issuer and subject.",
+        "required": [
+          "audience"
+        ],
+        "properties": {
+          "audience": {
+            "type": "string",
+            "description": "The audience (client id) to register the issuer under in IAM, and the\n`aud` a role's trust policy checks."
           }
         }
       },
@@ -11392,7 +11558,25 @@
             "type": "string",
             "maxLength": 200
           },
-          "metadata": {}
+          "external_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Your own name for the vault, such as the id of the user it holds\ncredentials for. At most one vault in the workspace has a given one,\nso the vault can be found again by it. Any string of 1 to 255\ncharacters.",
+            "maxLength": 255,
+            "minLength": 1
+          },
+          "metadata": {
+            "type": "object",
+            "description": "Labels for the vault, which a listing can filter by. At most 50 keys,\neach 1 to 64 lowercase letters, digits, or underscores and not\nstarting with `subako_`; each value a string of at most 500\ncharacters.",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          }
         }
       },
       "CreateWorkspaceBody": {
@@ -11413,15 +11597,28 @@
         "required": [
           "format",
           "display_name",
-          "base_url",
-          "api_key"
+          "base_url"
         ],
         "properties": {
           "api_key": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Shorthand for an `api_key` auth. Send this or `auth`, exactly one.",
             "writeOnly": true,
             "maxLength": 16384,
             "minLength": 1
+          },
+          "auth": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ModelProviderAuthInput"
+              }
+            ]
           },
           "base_url": {
             "type": "string",
@@ -13161,6 +13358,222 @@
         ],
         "description": "A model's price per token, in hundred-millionths of a credit, as a\nbalance is counted, in the format's own dimensions. A million tokens cost\na hundredth of a credit for each unit here."
       },
+      "ModelProviderAuthBody": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "api_key"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "role_arn",
+              "region",
+              "type"
+            ],
+            "properties": {
+              "region": {
+                "type": "string"
+              },
+              "role_arn": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "aws_web_identity"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "organization_id",
+              "service_account_id",
+              "federation_rule_id",
+              "workspace_id",
+              "type"
+            ],
+            "properties": {
+              "federation_rule_id": {
+                "type": "string"
+              },
+              "organization_id": {
+                "type": "string"
+              },
+              "service_account_id": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "anthropic_workload_identity"
+                ]
+              },
+              "workspace_id": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Null when the rule picks its one workspace itself."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "identity_provider_id",
+              "service_account_id",
+              "type"
+            ],
+            "properties": {
+              "identity_provider_id": {
+                "type": "string"
+              },
+              "service_account_id": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "openai_workload_identity"
+                ]
+              }
+            }
+          }
+        ],
+        "description": "How a BYOK provider authenticates, as read back: a key never comes back,\nso its arm says only that there is one."
+      },
+      "ModelProviderAuthInput": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "api_key",
+              "type"
+            ],
+            "properties": {
+              "api_key": {
+                "type": "string",
+                "description": "Write-only: no route answers with a key.",
+                "writeOnly": true,
+                "maxLength": 16384,
+                "minLength": 1
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "api_key"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "role_arn",
+              "region",
+              "type"
+            ],
+            "properties": {
+              "region": {
+                "type": "string",
+                "description": "The region the role's signatures are scoped to, which the base\nURL's host must name.",
+                "maxLength": 32
+              },
+              "role_arn": {
+                "type": "string",
+                "description": "The IAM role to assume, `arn:aws:iam::<account>:role/<name>`. Its\ntrust policy must admit this workspace's subject alone.",
+                "maxLength": 2048
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "aws_web_identity"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "organization_id",
+              "service_account_id",
+              "federation_rule_id",
+              "type"
+            ],
+            "properties": {
+              "federation_rule_id": {
+                "type": "string",
+                "description": "The federation rule the workspace's token is checked against,\n`fdrl_...`. Its match must admit this workspace's subject alone.",
+                "maxLength": 128
+              },
+              "organization_id": {
+                "type": "string",
+                "format": "uuid",
+                "description": "The Anthropic organization's id."
+              },
+              "service_account_id": {
+                "type": "string",
+                "description": "The service account the access token acts as, `svac_...`.",
+                "maxLength": 128
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "anthropic_workload_identity"
+                ]
+              },
+              "workspace_id": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "The Anthropic workspace the token is scoped to, `wrkspc_...`.\nRequired when the rule is enabled for more than one workspace.",
+                "maxLength": 128
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "identity_provider_id",
+              "service_account_id",
+              "type"
+            ],
+            "properties": {
+              "identity_provider_id": {
+                "type": "string",
+                "description": "The workload identity provider that trusts this deployment's\nissuer, as the OpenAI dashboard shows it.",
+                "maxLength": 128
+              },
+              "service_account_id": {
+                "type": "string",
+                "description": "The service account the access token acts as. The provider's\nmapping to it must admit this workspace's subject alone.",
+                "maxLength": 128
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "openai_workload_identity"
+                ]
+              }
+            }
+          }
+        ],
+        "description": "How a BYOK provider authenticates upstream. `api_key` holds a key the\nworkspace hands over, sealed on arrival. `aws_web_identity` holds no\nsecret at all: each call is signed as a role in the workspace's own AWS\naccount, assumed with a short-lived token Subako issues for the workspace\n(see `GET /v1/workload-identity`). Such a provider's `base_url` is the\nregion's Bedrock runtime, `https://bedrock-runtime.{region}.amazonaws.com`,\nfollowed by `/anthropic` for anthropic or `/openai/v1` for\nopenai_responses, or its Bedrock Mantle,\n`https://bedrock-mantle.{region}.api.aws`, followed by `/anthropic` or\n`/v1`. `anthropic_workload_identity` holds no secret either: each call\ncarries a short-lived Claude API access token, exchanged for that same\nworkspace token under a federation rule in the workspace's own Anthropic\norganization. Such a provider speaks the anthropic format, and its\n`base_url` is `https://api.anthropic.com`. `openai_workload_identity`\nlikewise carries a short-lived OpenAI access token, exchanged for the\nworkspace token at a workload identity provider in the workspace's own\nOpenAI organization, whose mapping binds it to a service account. Such a\nprovider speaks the openai_responses format, and its `base_url` is\n`https://api.openai.com/v1`."
+      },
       "ModelProviderBody": {
         "oneOf": [
           {
@@ -13208,9 +13621,13 @@
                 "type": "object",
                 "required": [
                   "workspace_id",
-                  "base_url"
+                  "base_url",
+                  "auth"
                 ],
                 "properties": {
+                  "auth": {
+                    "$ref": "#/components/schemas/ModelProviderAuthBody"
+                  },
                   "base_url": {
                     "type": "string",
                     "description": "Where the proxy sends this provider's calls, as the workspace set\nit. Its API key never comes back."
@@ -13551,6 +13968,19 @@
           "reasoning_output_tokens": {
             "type": "integer",
             "format": "int64"
+          }
+        }
+      },
+      "OpenaiWorkloadIdentityBody": {
+        "type": "object",
+        "description": "What an OpenAI organization needs beyond the issuer and subject.",
+        "required": [
+          "audience"
+        ],
+        "properties": {
+          "audience": {
+            "type": "string",
+            "description": "The `aud` of tokens exchanged at OpenAI, and the audience to give the\nworkload identity provider."
           }
         }
       },
@@ -16459,10 +16889,21 @@
               "string",
               "null"
             ],
-            "description": "A new upstream credential, sealed and put in place of the stored one.\nWrite-only: no route answers with a key, so there is nothing to read\nback and nothing to compare against. The provider keeps its id, so\nevery agent version already naming it goes on resolving.",
+            "description": "A new upstream key, sealed and put in place of the stored credential:\nshorthand for an `api_key` auth. Write-only: no route answers with a\nkey, so there is nothing to read back and nothing to compare against.",
             "writeOnly": true,
             "maxLength": 16384,
             "minLength": 1
+          },
+          "auth": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ModelProviderAuthInput",
+                "description": "A new auth, put in place of the stored one whole: a new key, a new\nrole, or a switch between the two. The provider keeps its id, so every\nagent version already naming it goes on resolving. Send this or\n`api_key`, not both."
+              }
+            ]
           },
           "base_url": {
             "type": [
@@ -16533,20 +16974,30 @@
       },
       "UpdateVaultBody": {
         "type": "object",
-        "description": "An absent field leaves that part of the vault as it stands, so a rename\nneed not restate the metadata.",
+        "description": "An absent field leaves that part of the vault as it stands, so a rename\nneed not restate the metadata. Only `external_id` takes `null`, which\nremoves it; a `null` name or metadata is refused rather than read as absent.",
         "properties": {
           "display_name": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "external_id": {
             "type": [
               "string",
               "null"
             ],
-            "maxLength": 200
+            "description": "A new external id, or `null` to remove it.",
+            "maxLength": 255,
+            "minLength": 1
           },
           "metadata": {
-            "type": [
-              "object",
-              "null"
-            ]
+            "type": "object",
+            "description": "Replaces every label the vault has, under the bounds\n`CreateVaultBody.metadata` states.",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
           }
         }
       },
@@ -16992,6 +17443,7 @@
           "id",
           "workspace_id",
           "display_name",
+          "external_id",
           "metadata",
           "created_at"
         ],
@@ -17003,13 +17455,26 @@
           "display_name": {
             "type": "string"
           },
+          "external_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The caller's own name for the vault, or `null` when it has none."
+          },
           "id": {
             "type": "string",
             "format": "uuid"
           },
           "metadata": {
             "type": "object",
-            "description": "Whatever the caller stored alongside the vault."
+            "description": "The vault's labels, by key.",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
           },
           "workspace_id": {
             "type": "string",
@@ -17311,6 +17776,36 @@
         ],
         "description": "One widget a form may use: a built-in every Subako surface draws, or a\n`custom` one the app's own clients draw from its id."
       },
+      "WorkloadIdentityBody": {
+        "type": "object",
+        "description": "What to register in a cloud account, and what to trust there, for this\nworkspace's providers to authenticate as the workspace.",
+        "required": [
+          "issuer",
+          "subject",
+          "aws",
+          "anthropic",
+          "openai"
+        ],
+        "properties": {
+          "anthropic": {
+            "$ref": "#/components/schemas/AnthropicWorkloadIdentityBody"
+          },
+          "aws": {
+            "$ref": "#/components/schemas/AwsWorkloadIdentityBody"
+          },
+          "issuer": {
+            "type": "string",
+            "description": "The OpenID Connect issuer every workspace token names. Register it as\nan identity provider in your cloud account or your OpenAI\norganization, or as a federation issuer in your Anthropic\norganization; its discovery document is at\n`{issuer}/.well-known/openid-configuration`."
+          },
+          "openai": {
+            "$ref": "#/components/schemas/OpenaiWorkloadIdentityBody"
+          },
+          "subject": {
+            "type": "string",
+            "description": "The `sub` claim of this workspace's tokens, and of no other\nworkspace's: the value a role's trust policy, a federation rule's\n`subject_prefix`, or an OpenAI mapping's `sub` pins."
+          }
+        }
+      },
       "WorkspaceBody": {
         "type": "object",
         "description": "A workspace: the scope agents, sessions, vaults, skills, and keys\nbelong to.",
@@ -17425,7 +17920,7 @@
     },
     {
       "name": "model-providers",
-      "description": "Where model calls are sent: a platform provider Subako publishes, or one bound to your own key."
+      "description": "Where model calls are sent: a platform provider Subako publishes, or one bound to your own key or to a role in your own cloud account."
     },
     {
       "name": "api-keys",

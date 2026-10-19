@@ -1,7 +1,7 @@
 # Environment for running the backend locally against the dev containers.
 # Source it, or let testbed/up.sh source it. Values match the backend's mise.toml.
 SDK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SUBAKO_REPO_GIVEN="${SUBAKO_REPO:-$SDK_DIR/../../subako}"
+SUBAKO_REPO_GIVEN="${SUBAKO_REPO:-$SDK_DIR/../..}"
 if ! SUBAKO_REPO="$(cd "$SUBAKO_REPO_GIVEN" 2>/dev/null && pwd)"; then
 	echo "error: no subako checkout at $SUBAKO_REPO_GIVEN; set SUBAKO_REPO to it" >&2
 	return 1 2>/dev/null || exit 1
@@ -25,12 +25,14 @@ export SUBAKO_PUBLIC_BASE_URL="http://localhost:8080"
 export SUBAKO_ALLOW_LOOPBACK="true"
 export SUBAKO_CREDENTIAL_ENV="dev"
 export SUBAKO_OBJECT_STORE_BUCKET="subako-dev"
-export SUBAKO_DELTA_BUS="memory"
+export SUBAKO_SESSION_BUS="memory"
 export SUBAKO_ENGINE_HOST="127.0.0.1"
 export SUBAKO_ENGINE_PORT="7801"
 export SUBAKO_ENGINE_BASE_URL="http://127.0.0.1:7801"
 export SUBAKO_CORE_WS="ws://127.0.0.1:7801/v1/engine/ws"
+# CODESYNC(testbed-mock-anthropic-port)
 export MOCK_ANTHROPIC_PORT="9797"
+export SUBAKO_PROVIDER_KEY_ANTHROPIC="mock"
 
 export SUBAKO_TESTBED_ORG="dev"
 export SUBAKO_TESTBED_EMAIL="dev@localhost.test"

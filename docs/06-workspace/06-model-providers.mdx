@@ -1,0 +1,196 @@
+---
+title: Model providers
+description: Binding your own model account to a workspace, by an API key, by a role in your own AWS account, or by workload identity federation with your own Anthropic or OpenAI organization.
+sidebar:
+  order: 6
+---
+
+A workspace reaches models through providers. The deployment runs some of its own, which every workspace can use; the rest are yours: an account at a model provider that you bind to the workspace (BYOK). An agent version names the provider it runs against.
+
+```ts
+const providers = await subako.modelProviders.list({ type: "byok" });
+```
+
+## With an API key
+
+```ts
+await subako.modelProviders.create({
+	format: "anthropic",
+	display_name: "Team Anthropic",
+	base_url: "https://api.anthropic.com",
+	api_key: process.env.ANTHROPIC_API_KEY!,
+});
+```
+
+The key is sealed on arrival and never comes back. Replacing it keeps the provider's id, so agent versions already published against it go on resolving:
+
+```ts
+await subako.modelProviders.update(providerId, { api_key: rotatedKey });
+```
+
+## As a role in your own AWS account
+
+A provider can reach Amazon Bedrock with no key at all. Subako is an OpenID Connect issuer, and each workspace has a subject of its own. Your AWS account trusts the issuer, and a role in it trusts the workspace's subject; Subako then assumes that role for each call and signs the call as the role. Nothing long-lived is handed over, and you can revoke access from your own account at any time.
+
+### 1. Read what to trust
+
+```ts
+const identity = await subako.modelProviders.workloadIdentity();
+// {
+//   issuer: "https://oidc.subako.ai",
+//   subject: "workspace:0190a5a4-...",
+//   aws: { audience: "sts.amazonaws.com" },
+//   anthropic: { audience: "https://api.anthropic.com" },
+//   openai: { audience: "https://api.openai.com/v1" },
+// }
+```
+
+The subject names this workspace and no other.
+
+### 2. Register the issuer and create the role
+
+In the IAM console, add an identity provider of type OpenID Connect with the `issuer` as its URL and the `aws.audience` as its audience. Then create a role whose trust policy admits that provider, for this audience and this workspace's subject alone:
+
+```json
+{
+	"Version": "2012-10-17",
+	"Statement": [
+		{
+			"Effect": "Allow",
+			"Principal": { "Federated": "arn:aws:iam::123456789012:oidc-provider/oidc.subako.ai" },
+			"Action": "sts:AssumeRoleWithWebIdentity",
+			"Condition": {
+				"StringEquals": {
+					"oidc.subako.ai:aud": "sts.amazonaws.com",
+					"oidc.subako.ai:sub": "<subject, whole>"
+				}
+			}
+		}
+	]
+}
+```
+
+Give the role permission to invoke the models you want to use — `bedrock:InvokeModel` and `bedrock:InvokeModelWithResponseStream` on them — and nothing more.
+
+The `sub` condition is what keeps every other workspace out. A trust policy that checks only the audience would admit any workspace on the deployment, so Subako refuses a role that admits a subject other than this workspace's.
+
+### 3. Create the provider
+
+```ts
+await subako.modelProviders.create({
+	format: "anthropic",
+	display_name: "Claude on Bedrock",
+	base_url: "https://bedrock-runtime.us-east-1.amazonaws.com/anthropic",
+	auth: {
+		type: "aws_web_identity",
+		role_arn: "arn:aws:iam::123456789012:role/subako-bedrock",
+		region: "us-east-1",
+	},
+});
+```
+
+The base URL is the region's Bedrock runtime, followed by the route of the format: `/anthropic` for `anthropic`, `/openai/v1` for `openai_responses`. Bedrock Mantle, `https://bedrock-mantle.{region}.api.aws`, is accepted too, with `/anthropic` or `/v1`; Mantle names models without the runtime's version suffix, such as `openai.gpt-oss-120b`. Either host must name the role's region. An agent version names Bedrock's own model ids, such as `us.anthropic.claude-sonnet-4-5-20250929-v1:0`.
+
+Before the provider exists, Subako assumes the role as this workspace, then twice as workspaces that do not exist, and then as this workspace again: one stranger's id differs from this workspace's in its last digit, and the other is made at random. This workspace must succeed both times and the strangers must be refused by the role's trust policy; a `400` says which did not, and what to change. Workspace ids begin with the time they were made, so a `StringLike` pattern on the subject would admit the workspaces made around the same time as this one; the first stranger is refused only by a condition that names the whole subject. Each check costs Subako four signatures, so a workspace may run ten a minute; past that, the request is a `429`.
+
+### When the role stops trusting the workspace
+
+Each provider reuses a session for up to an hour. After you change the role's trust policy, the next session Subako asks for is refused, and the provider's calls fail with `403` until the trust is restored; Subako asks again at most every thirty seconds. To cut off a session already handed out, revoke the role's active sessions in IAM. Switching the provider to another role, or to an API key, is an `update` with a new `auth`:
+
+```ts
+await subako.modelProviders.update(providerId, {
+	auth: { type: "aws_web_identity", role_arn: otherRole, region: "us-west-2" },
+	base_url: "https://bedrock-runtime.us-west-2.amazonaws.com/anthropic",
+});
+```
+
+## As a service account in your own Anthropic organization
+
+A provider can reach the Claude API with no key either, through Anthropic's [workload identity federation](https://platform.claude.com/docs/en/manage-claude/workload-identity-federation). Your Anthropic organization registers Subako's issuer, and a federation rule in it admits the workspace's subject as one of your service accounts. For each call, Subako exchanges a short-lived token for the workspace at `https://api.anthropic.com/v1/oauth/token` and sends the access token the rule grants. Nothing long-lived is handed over, and you can revoke access from the Claude Console at any time.
+
+### 1. Register the issuer and create the rule
+
+Read the issuer and subject with `workloadIdentity()`, as above. In the Claude Console, under **Workload identity**, choose **Connect workload** and then **Custom OIDC**, or use the Admin API:
+
+- A federation issuer whose `issuer_url` is the `issuer`, with `{ "type": "discovery" }` as its JWKS source.
+- A service account that is a member of the Anthropic workspace whose rate limits and billing the calls should count against.
+- A federation rule on that issuer, targeting the service account, whose match pins this workspace's subject exactly and the `anthropic.audience`:
+
+```json
+{
+	"match": {
+		"subject_prefix": "<subject, whole>",
+		"audience": "https://api.anthropic.com"
+	},
+	"oauth_scope": "workspace:inference"
+}
+```
+
+`workspace:inference` covers the Messages API, which is all Subako calls; `workspace:developer` works too. Leave `token_lifetime_seconds` at ten minutes or more: Anthropic caps a token Subako exchanges at ten minutes anyway, and a shorter one makes Subako exchange more often, with less room to ride out a slow exchange. The `subject_prefix` must carry no trailing `*`: a prefix match would admit other workspaces on the deployment, so Subako refuses a rule that admits a subject other than this workspace's.
+
+### 2. Create the provider
+
+```ts
+await subako.modelProviders.create({
+	format: "anthropic",
+	display_name: "Claude",
+	base_url: "https://api.anthropic.com",
+	auth: {
+		type: "anthropic_workload_identity",
+		organization_id: "00000000-0000-0000-0000-000000000000",
+		service_account_id: "svac_...",
+		federation_rule_id: "fdrl_...",
+		// Only when the rule is enabled for more than one Anthropic workspace.
+		workspace_id: "wrkspc_...",
+	},
+});
+```
+
+Such a provider speaks the `anthropic` format, and its base URL is `https://api.anthropic.com`: the access token is a credential for your organization, so it goes nowhere else.
+
+Before the provider exists, Subako exchanges a token for this workspace, two for workspaces that do not exist, and one for this workspace again: one stranger's id differs from this workspace's in its last digit, and the other is made at random. This workspace's must be granted both times and the strangers' refused; a `400` says which did not, and what to change. Workspace ids begin with the time they were made, so a `subject_prefix` ending in `*` would admit the workspaces made around the same time as this one, and the first stranger catches it. Anthropic refuses every token in the same words, `Authentication failed`, and the Console's authentication history names the check that failed.
+
+### When the rule stops admitting the workspace
+
+Each provider reuses an access token for about half its life, and replaces it in the background while calls go on with the one in hand; Anthropic caps a token at ten minutes, twice what Subako's own token lives. After you change or archive the rule, the next exchange is refused, and once the token in hand runs out, the provider's calls fail with `403` until the rule admits the workspace again; Subako asks again at most every thirty seconds.
+
+## As a service account in your own OpenAI organization
+
+A provider can reach the OpenAI API with no key as well, through OpenAI's [workload identity federation](https://developers.openai.com/api/docs/guides/workload-identity-federation). A workload identity provider in your OpenAI organization trusts Subako's issuer, and a mapping on it binds the workspace's subject to one of your service accounts. For each call, Subako exchanges a short-lived token for the workspace at `https://auth.openai.com/oauth/token` and sends the access token the mapping grants. Nothing long-lived is handed over, and you can revoke access from your OpenAI organization at any time.
+
+### 1. Create the identity provider and the mapping
+
+Read the issuer and subject with `workloadIdentity()`, as above. In your OpenAI organization's workload identity settings:
+
+- An OIDC workload identity provider whose issuer URL is the `issuer` and whose audience is the `openai.audience`, `https://api.openai.com/v1`. OpenAI reads the issuer's keys through its discovery document.
+- A service account in the project the calls should bill to.
+- A mapping on that provider to the service account, whose one attribute pins this workspace's subject exactly:
+
+| Key | Value |
+| --- | --- |
+| `sub` | `<subject, whole>` |
+
+The value must carry no trailing `*`: a prefix match would admit other workspaces on the deployment, so Subako refuses a mapping that admits a subject other than this workspace's. Grant the mapping the permissions the Responses API needs.
+
+### 2. Create the provider
+
+```ts
+await subako.modelProviders.create({
+	format: "openai_responses",
+	display_name: "OpenAI",
+	base_url: "https://api.openai.com/v1",
+	auth: {
+		type: "openai_workload_identity",
+		identity_provider_id: "idp_...",
+		service_account_id: "...",
+	},
+});
+```
+
+Such a provider speaks the `openai_responses` format, and its base URL is `https://api.openai.com/v1`: the access token is a credential for your project, so it goes nowhere else.
+
+Before the provider exists, Subako exchanges tokens for this workspace and for workspaces that do not exist, as it does for an Anthropic rule. This workspace's must be granted, the strangers' refused, and this workspace's granted again. The exchanges differ in their subject alone, so any `400`, `401` or `403` for a stranger is taken as the mapping's refusal, whatever OpenAI's words for it; a throttled or failed exchange fails the check. A `400` says what did not hold, and what to change.
+
+### When the mapping stops admitting the workspace
+
+OpenAI's access token never outlives the token it was exchanged for, so Subako's token for OpenAI lives an hour, as the access token may. Each provider replaces the access token in the background about five minutes before it runs out, while calls go on with the one in hand. After you disable or change the mapping, the next exchange is refused, and once the token in hand runs out, the provider's calls fail with `403` until the mapping admits the workspace again; Subako asks again at most every thirty seconds.

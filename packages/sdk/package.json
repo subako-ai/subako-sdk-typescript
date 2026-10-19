@@ -1,6 +1,6 @@
 {
 	"name": "@subako-ai/sdk",
-	"version": "0.2.4",
+	"version": "0.2.5",
 	"description": "TypeScript client for the Subako API",
 	"homepage": "https://subako.ai",
 	"license": "Apache-2.0",

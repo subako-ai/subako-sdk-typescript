@@ -77,6 +77,19 @@ describe("params", () => {
 		expect(url.searchParams.get("starting_at")).toBe("2026-10-01T00:00:00Z");
 	});
 
+	it("spell a vault listing's metadata filter as a deep object beside its external id", async () => {
+		const http = stubFetch(() => json({ items: [], next_cursor: null, prev_cursor: null }));
+		const client = testClient({ fetch: http.fetch });
+
+		await client.vaults.list({ external_id: "user_42", metadata: { plan: "pro", region: "jp" } });
+
+		const url = new URL(http.calls[0]!.url);
+		expect(url.pathname).toBe("/v1/vaults");
+		expect(url.searchParams.get("external_id")).toBe("user_42");
+		expect(url.searchParams.get("metadata[plan]")).toBe("pro");
+		expect(url.searchParams.get("metadata[region]")).toBe("jp");
+	});
+
 	it("carry a new API key in a provider update, the key alone", async () => {
 		const http = stubFetch(() => json({ id: "p1" }));
 		const client = testClient({ fetch: http.fetch });
@@ -87,6 +100,89 @@ describe("params", () => {
 		expect(request.method).toBe("PATCH");
 		expect(new URL(request.url).pathname).toBe("/v1/model-providers/p1");
 		await expect(request.text()).resolves.toBe(JSON.stringify({ api_key: "sk-rotated" }));
+	});
+
+	it("bind a model provider to a role instead of a key", async () => {
+		const http = stubFetch(() => json({ id: "p1" }));
+		const client = testClient({ fetch: http.fetch });
+		const auth = {
+			type: "aws_web_identity",
+			role_arn: "arn:aws:iam::123456789012:role/subako-bedrock",
+			region: "us-east-1",
+		} as const;
+
+		await client.modelProviders.create({
+			format: "anthropic",
+			display_name: "Claude on Bedrock",
+			base_url: "https://bedrock-runtime.us-east-1.amazonaws.com/anthropic",
+			auth,
+		});
+
+		const request = http.calls[0]!;
+		expect(new URL(request.url).pathname).toBe("/v1/model-providers");
+		expect(JSON.parse(await request.text())).toMatchObject({ auth });
+	});
+
+	it("bind a model provider to an Anthropic federation rule instead of a key", async () => {
+		const http = stubFetch(() => json({ id: "p1" }));
+		const client = testClient({ fetch: http.fetch });
+		const auth = {
+			type: "anthropic_workload_identity",
+			organization_id: "6f1c2a7e-3b4d-4e5f-8a9b-0c1d2e3f4a5b",
+			service_account_id: "svac_01Subako",
+			federation_rule_id: "fdrl_01Subako",
+			workspace_id: "wrkspc_01Subako",
+		} as const;
+
+		await client.modelProviders.create({
+			format: "anthropic",
+			display_name: "Claude",
+			base_url: "https://api.anthropic.com",
+			auth,
+		});
+
+		const request = http.calls[0]!;
+		expect(JSON.parse(await request.text())).toMatchObject({ auth });
+	});
+
+	it("bind a model provider to an OpenAI workload identity provider instead of a key", async () => {
+		const http = stubFetch(() => json({ id: "p1" }));
+		const client = testClient({ fetch: http.fetch });
+		const auth = {
+			type: "openai_workload_identity",
+			identity_provider_id: "idp_01Subako",
+			service_account_id: "user-01Subako",
+		} as const;
+
+		await client.modelProviders.create({
+			format: "openai_responses",
+			display_name: "OpenAI",
+			base_url: "https://api.openai.com/v1",
+			auth,
+		});
+
+		const request = http.calls[0]!;
+		expect(JSON.parse(await request.text())).toMatchObject({ auth });
+	});
+
+	it("read the workspace's workload identity", async () => {
+		const http = stubFetch(() =>
+			json({
+				issuer: "https://oidc.subako.test",
+				subject: "workspace:w1",
+				aws: { audience: "sts.amazonaws.com" },
+				anthropic: { audience: "https://api.anthropic.com" },
+				openai: { audience: "https://api.openai.com/v1" },
+			}),
+		);
+		const client = testClient({ fetch: http.fetch });
+
+		const identity = await client.modelProviders.workloadIdentity();
+
+		expect(new URL(http.calls[0]!.url).pathname).toBe("/v1/workload-identity");
+		expect(identity.subject).toBe("workspace:w1");
+		expect(identity.anthropic.audience).toBe("https://api.anthropic.com");
+		expect(identity.openai.audience).toBe("https://api.openai.com/v1");
 	});
 
 	it("narrow the model providers listing to one type", async () => {

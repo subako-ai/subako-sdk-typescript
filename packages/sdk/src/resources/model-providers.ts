@@ -14,9 +14,22 @@ export class ModelProviders {
 		return this.core.page(api.listModelProviders, { query: params }, BY_ID, options);
 	}
 
-	/** Binds a provider to the workspace; the key is never returned. */
+	/**
+	 * Binds a provider to the workspace, by an API key (`api_key`, never
+	 * returned) or by `auth`: an `aws_web_identity` names a role in your own AWS
+	 * account that Subako assumes as the workspace, so no key is handed over.
+	 */
 	create(params: api.CreateWorkspaceModelProviderBodyWritable, options?: RequestOptions) {
 		return this.core.call(api.createWorkspaceModelProvider, { body: params }, options);
+	}
+
+	/**
+	 * What a cloud account registers and trusts so that a provider can reach it
+	 * as this workspace: the issuer, the workspace's subject, and the audience
+	 * AWS checks.
+	 */
+	workloadIdentity(options?: RequestOptions) {
+		return this.core.call(api.getWorkloadIdentity, {}, options);
 	}
 
 	/** Reads one provider. */
@@ -25,10 +38,10 @@ export class ModelProviders {
 	}
 
 	/**
-	 * Changes a BYOK provider's name, description, endpoint, or API key; an
-	 * absent field is left as it stands. A new `api_key` replaces the stored one
-	 * under the same id, so agents using the provider keep resolving it; no
-	 * response carries the key.
+	 * Changes a BYOK provider's name, description, endpoint, or credential; an
+	 * absent field is left as it stands. A new `api_key` or `auth` replaces the
+	 * stored credential under the same id, so agents using the provider keep
+	 * resolving it; no response carries a key.
 	 */
 	update(modelProviderId: string, params: api.UpdateModelProviderBodyWritable, options?: RequestOptions) {
 		return this.core.call(

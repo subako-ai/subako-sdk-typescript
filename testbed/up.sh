@@ -10,7 +10,6 @@ source testbed/env.sh
 STATE=testbed/.state
 mkdir -p "$STATE"
 
-psql() { docker exec subako-postgres-1 psql -U subako -d subako -tAc "$1"; }
 listening() { ss -ltn 2>/dev/null | grep -qE ":$1\b"; }
 start() { # name, log, command...
 	local name="$1" log="$2"; shift 2
@@ -46,16 +45,12 @@ echo "== release"
 core_cli "$SUBAKO_CORE" release
 
 echo "== organization"
-if [ "$(psql "select count(*) from organizations where handle='$SUBAKO_TESTBED_ORG'")" = "0" ]; then
-	provider="$(psql "select id from oidc_providers order by created_at desc limit 1")"
+if ! core_cli "$SUBAKO_CORE" org show --org "$SUBAKO_TESTBED_ORG" >/dev/null 2>&1; then
+	provider="$(core_cli "$SUBAKO_CORE" oidc-provider list | awk '$5 == "declared" { print $1 }')"
 	core_cli "$SUBAKO_CORE" org create --handle "$SUBAKO_TESTBED_ORG" --name "Local Dev" --oidc-provider "$provider" >/dev/null
 	core_cli "$SUBAKO_CORE" org invite --org "$SUBAKO_TESTBED_ORG" --email "$SUBAKO_TESTBED_EMAIL" --role admin >/dev/null
-	core_cli "$SUBAKO_CORE" org deposit --org "$SUBAKO_TESTBED_ORG" --sc 1000 --external-ref local-seed >/dev/null
-fi
-if ! core_cli "$SUBAKO_CORE" model-provider list | grep -q '^anthropic'; then
-	SUBAKO_MODEL_PROVIDER_API_KEY=mock core_cli "$SUBAKO_CORE" model-provider create \
-		--slug anthropic --display-name "Mock Anthropic" --format anthropic \
-		--base-url "http://127.0.0.1:$MOCK_ANTHROPIC_PORT" >/dev/null
+	core_cli "$SUBAKO_CORE" org deposit --org "$SUBAKO_TESTBED_ORG" --sc 1000 --external-ref local-seed \
+		--expires-at never --note "Local testbed seed" >/dev/null
 fi
 
 echo "== processes"
@@ -76,12 +71,13 @@ fi
 
 echo "== workspace, agent, api key"
 if [ ! -f "$STATE/sdk.env" ]; then
-	workspace="$("$SUBAKO_CLI" workspace list | grep -oE '^ *[0-9a-f-]{36}' | tr -d ' ' | head -1)"
+	# A first run has no workspace to list, so no match is not a failure.
+	workspace="$("$SUBAKO_CLI" workspace list | { grep -oE '^ *[0-9a-f-]{36}' || true; } | tr -d ' ' | head -1)"
 	if [ -z "$workspace" ]; then
 		workspace="$("$SUBAKO_CLI" workspace create --name dev | grep -oE '[0-9a-f-]{36}' | head -1)"
 	fi
 	"$SUBAKO_CLI" workspace use "$workspace" >/dev/null
-	provider="$("$SUBAKO_CLI" model-provider list | grep 'owner=platform' | grep -oE '^[0-9a-f-]{36}' | head -1)"
+	provider="$("$SUBAKO_CLI" model-provider list | grep 'type=platform' | grep -oE '^[0-9a-f-]{36}' | head -1)"
 	agent="$("$SUBAKO_CLI" agent create --name dev-assistant | grep -oE '[0-9a-f-]{36}' | head -1)"
 	cat > "$STATE/agent-config.json" <<'JSON'
 {
