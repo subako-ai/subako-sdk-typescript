@@ -90,6 +90,19 @@ describe("params", () => {
 		expect(url.searchParams.get("metadata[region]")).toBe("jp");
 	});
 
+	it("spell a session listing's metadata filter as a deep object beside its agent", async () => {
+		const http = stubFetch(() => json({ items: [], next_cursor: null, prev_cursor: null }));
+		const client = testClient({ fetch: http.fetch });
+
+		await client.sessions.list({ agent_id: "a1", metadata: { user_id: "user_42", tenant: "t_1" } });
+
+		const url = new URL(http.calls[0]!.url);
+		expect(url.pathname).toBe("/v1/sessions");
+		expect(url.searchParams.get("agent_id")).toBe("a1");
+		expect(url.searchParams.get("metadata[user_id]")).toBe("user_42");
+		expect(url.searchParams.get("metadata[tenant]")).toBe("t_1");
+	});
+
 	it("carry a new API key in a provider update, the key alone", async () => {
 		const http = stubFetch(() => json({ id: "p1" }));
 		const client = testClient({ fetch: http.fetch });

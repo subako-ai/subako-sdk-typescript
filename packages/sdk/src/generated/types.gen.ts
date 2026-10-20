@@ -5587,13 +5587,20 @@ export type ListSessionsData = {
      * Newest first when omitted.
      */
     order?: OrderParam;
+    /**
+     * Only rows whose metadata holds each pair, matched exactly:
+     * `metadata[tenant_id]=t_123`. Several pairs must all hold.
+     */
+    metadata?: {
+      [key: string]: string;
+    };
   };
   url: '/v1/sessions';
 };
 
 export type ListSessionsErrors = {
   /**
-   * Bad limit, cursor, or order, a malformed workspace header, or a user caller with no workspace header.
+   * Bad limit, cursor, order, or filter, a malformed workspace header, or a user caller with no workspace header.
    */
   400: ErrorBody;
   /**

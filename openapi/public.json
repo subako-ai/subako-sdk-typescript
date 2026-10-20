@@ -4104,6 +4104,23 @@
             "schema": {
               "$ref": "#/components/schemas/OrderParam"
             }
+          },
+          {
+            "name": "metadata",
+            "in": "query",
+            "description": "Only rows whose metadata holds each pair, matched exactly:\n`metadata[tenant_id]=t_123`. Several pairs must all hold.",
+            "required": false,
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              },
+              "propertyNames": {
+                "type": "string"
+              }
+            },
+            "style": "deepObject",
+            "explode": true
           }
         ],
         "responses": {
@@ -4118,7 +4135,7 @@
             }
           },
           "400": {
-            "description": "Bad limit, cursor, or order, a malformed workspace header, or a user caller with no workspace header.",
+            "description": "Bad limit, cursor, order, or filter, a malformed workspace header, or a user caller with no workspace header.",
             "content": {
               "application/json": {
                 "schema": {

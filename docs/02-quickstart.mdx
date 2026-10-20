@@ -54,6 +54,15 @@ async function tokenFor(created: CreatedSessionBody | CreatedSessionReceiptBody)
 
 The `in` check is the whole narrowing — the receipt type simply has no `session_token` field. [Receipts](/reference/timeouts-and-retries#receipts) covers the five operations this applies to.
 
+To show each person their own sessions, label a session with `metadata` when you create it and list by the same pairs. Subako keeps the mapping, so the backend stores none:
+
+```ts
+await subako.sessions.create({ agent_id: agentId, metadata: { user_id: user.id } });
+const mine = await subako.sessions.list({ metadata: { user_id: user.id } });
+```
+
+`metadata` is at most 50 keys of lowercase letters, digits, and underscores, not starting with `subako_`, each holding a string of at most 500 characters, and it is fixed once the session is created. A listing keeps the sessions holding every pair it names. Before minting a token for a session the browser names, read the session and check its `metadata` is the person's.
+
 ## The browser
 
 It holds only session tokens, one per session.

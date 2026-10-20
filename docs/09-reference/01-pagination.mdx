@@ -71,6 +71,7 @@ await subako.organization.listInvitations();
 await subako.organization.listUsage({ limit: 100 });
 await subako.sessions.list();
 await subako.sessions.list({ agent_id: agentId }); // one agent's sessions
+await subako.sessions.list({ metadata: { user_id: "user_42" } }); // the sessions holding every pair
 await subako.skills.list();
 await subako.skills.listVersions(skillId);
 await subako.vaults.list();

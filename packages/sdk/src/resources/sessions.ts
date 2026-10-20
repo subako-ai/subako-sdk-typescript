@@ -194,7 +194,10 @@ export class SessionApi {
 
 /** The session routes, and the workspace-scoped ones only a workspace credential reaches. */
 export class Sessions extends SessionApi {
-	/** Lists the workspace's sessions, newest first; `order: "asc"` walks the other way. */
+	/**
+	 * Lists the workspace's sessions, newest first; `order: "asc"` walks the other way. `agent_id`
+	 * keeps one agent's sessions, and `metadata` keeps the sessions holding every pair it names.
+	 */
 	list(params?: ListSessionsParams, options?: RequestOptions) {
 		return this.core.page(api.listSessions, { query: params }, BY_ID, options);
 	}
