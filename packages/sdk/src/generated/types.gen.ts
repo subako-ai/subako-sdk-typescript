@@ -1292,8 +1292,8 @@ export const McpSchemeBody = { OAUTH: 'oauth', STATIC_BEARER: 'static_bearer' } 
 export type McpSchemeBody = typeof McpSchemeBody[keyof typeof McpSchemeBody];
 
 /**
- * The organization named here is the one the caller's access token was
- * granted for -- not every organization the user belongs to.
+ * The organization named here is the one the user belongs to, which the
+ * caller's access token was granted for.
  */
 export type MeBody = {
   organization: MeOrgBody;

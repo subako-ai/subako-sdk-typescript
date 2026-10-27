@@ -137,7 +137,7 @@ Core's API: a deployment that bills names them itself.
 const me = await subako.me.get();
 ```
 
-Answers with the signed-in user and the organizations they belong to. It needs an `accessToken`, since an API key is not a person.
+Answers with the signed-in user and the organization they belong to. It needs an `accessToken`, since an API key is not a person.
 
 ```ts
 await subako.me.rename({ display_name: "Alice Anderson" });
@@ -145,6 +145,6 @@ await subako.me.rename({ display_name: null });
 ```
 
 `rename` sets the signed-in user's own name, trimmed of surrounding whitespace, or
-clears it with `null`. A user is one person across every organization they belong
-to, so the name shows in each of them. A sign-in names a user who has no name from
+clears it with `null`. A user belongs to one organization, and the same person in
+another organization is another user, so the name shows only in this one. A sign-in names a user who has no name from
 what the identity provider says, and never replaces one.

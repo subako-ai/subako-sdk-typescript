@@ -1,6 +1,6 @@
 {
 	"name": "@subako-ai/tools",
-	"version": "0.2.6",
+	"version": "0.2.8",
 	"description": "Tools that let a Subako agent drive the page: forms, navigation, and a reader for an existing form",
 	"homepage": "https://subako.ai",
 	"license": "Apache-2.0",
@@ -34,9 +34,9 @@
 	},
 	"devDependencies": {
 		"@subako-ai/sdk": "workspace:*",
-		"happy-dom": "^20.14.0",
+		"happy-dom": "^21.0.4",
 		"typescript": "^7",
-		"zod": "^4.5.0"
+		"zod": "^4.6.6"
 	},
 	"peerDependencies": {
 		"@subako-ai/sdk": "workspace:^"

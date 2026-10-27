@@ -2090,7 +2090,7 @@
           "me"
         ],
         "summary": "Rename the authenticated caller",
-        "description": "Sets or clears the caller's own name. A user is one person across every organization they belong to, so the name shows in each of them. A later sign-in names a user who has none from the identity provider, and never replaces a name.",
+        "description": "Sets or clears the caller's own name in the caller's organization. The same person in another organization is another user, with a name of their own there. A later sign-in names a user who has none from the identity provider, and never replaces a name.",
         "operationId": "rename_me",
         "requestBody": {
           "content": {
@@ -13091,7 +13091,7 @@
       },
       "MeBody": {
         "type": "object",
-        "description": "The organization named here is the one the caller's access token was\ngranted for -- not every organization the user belongs to.",
+        "description": "The organization named here is the one the user belongs to, which the\ncaller's access token was granted for.",
         "required": [
           "user",
           "organization",

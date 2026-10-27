@@ -265,7 +265,7 @@ export const getMe = <ThrowOnError extends boolean = false>(options?: Options<Ge
 /**
  * Rename the authenticated caller
  *
- * Sets or clears the caller's own name. A user is one person across every organization they belong to, so the name shows in each of them. A later sign-in names a user who has none from the identity provider, and never replaces a name.
+ * Sets or clears the caller's own name in the caller's organization. The same person in another organization is another user, with a name of their own there. A later sign-in names a user who has none from the identity provider, and never replaces a name.
  */
 export const renameMe = <ThrowOnError extends boolean = false>(options: Options<RenameMeData, ThrowOnError>): RequestResult<RenameMeResponses, RenameMeErrors, ThrowOnError> => (options.client ?? client).patch<RenameMeResponses, RenameMeErrors, ThrowOnError>({
   security: [{ scheme: 'bearer', type: 'http' }],
