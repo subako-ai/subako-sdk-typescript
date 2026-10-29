@@ -5,6 +5,13 @@ export type ClientOptions = {
 };
 
 /**
+ * One access token was revoked; the login it belongs to goes on.
+ */
+export type AccessTokenRevokedDetails = {
+  [key: string]: unknown;
+};
+
+/**
  * Who did something, resolved for display. `users` rows are never deleted, so
  * this renders after a membership ends.
  */
@@ -74,6 +81,43 @@ export type AgentConfigBody = {
    * read; a child's is ignored.
    */
   volume?: VolumeConfigBody;
+};
+
+/**
+ * An agent was created.
+ */
+export type AgentCreatedDetails = {
+  [key: string]: unknown;
+};
+
+/**
+ * An agent was deleted.
+ */
+export type AgentDeletedDetails = {
+  [key: string]: unknown;
+};
+
+/**
+ * The browser origins an agent's sessions answer were replaced.
+ */
+export type AgentOriginsSetDetails = {
+  allowed_origins: Array<string>;
+};
+
+/**
+ * A new version of an agent was published.
+ */
+export type AgentPublishedDetails = {
+  agent_id: string;
+  model_provider_id?: string | null;
+  version: number;
+};
+
+/**
+ * An agent was renamed.
+ */
+export type AgentRenamedDetails = {
+  [key: string]: unknown;
 };
 
 /**
@@ -225,6 +269,14 @@ export type ApiKeyBody = {
 };
 
 /**
+ * An API key was created.
+ */
+export type ApiKeyCreatedDetails = {
+  expires_at?: string | null;
+  permissions: Array<'workspace.read' | 'agent.read' | 'agent.publish' | 'agent.delete' | 'vault.read' | 'vault.manage' | 'credential.read' | 'credential.manage' | 'session.create' | 'session.read' | 'session.manage' | 'skill.read' | 'skill.manage' | 'function.read' | 'function.manage' | 'model_provider.read' | 'model_provider.manage' | 'usage.read'>;
+};
+
+/**
  * A replay confirms creation without exposing the credential again.
  */
 export type ApiKeyReceiptBody = {
@@ -234,6 +286,13 @@ export type ApiKeyReceiptBody = {
   label: string;
   permissions: Array<KeyPermissionSchema>;
   prefix: string;
+};
+
+/**
+ * An API key was revoked.
+ */
+export type ApiKeyRevokedDetails = {
+  [key: string]: unknown;
 };
 
 /**
@@ -258,10 +317,419 @@ export type ApprovalDecisionForm = {
 };
 
 /**
+ * A tool call waiting on approval was denied when no one answered in time.
+ */
+export type ApprovalExpiredDetails = {
+  suspension_id: string;
+};
+
+/**
+ * A tool call waiting on approval was allowed or denied.
+ */
+export type ApprovalResolvedDetails = {
+  answer: 'allow' | 'deny';
+  suspension_id: string;
+};
+
+/**
  * The widgets an agent's forms may be built from, each listed once.
  */
 export type AskUserGrantBody = {
   widgets: Array<WidgetGrantBody>;
+};
+
+/**
+ * The credential an action came in on.
+ * Stable vocabulary for v1: adding a value requires a new API version.
+ */
+export type AuditActorBody = {
+  grant_id?: string | null;
+  type: 'user';
+  user_id: string;
+} | {
+  api_key_id: string;
+  type: 'api_key';
+} | {
+  session_id?: string | null;
+  session_token_id?: string | null;
+  type: 'session_token';
+} | {
+  type: 'operator';
+} | {
+  type: 'billing';
+} | {
+  type: 'system';
+};
+
+/**
+ * The categories this version files actions under, which the log can be
+ * narrowed to. An entry's `category` stays an open string: a later version
+ * may add one.
+ */
+export const AuditCategoryBody = {
+  MANAGEMENT: 'management',
+  AUTHENTICATION: 'authentication',
+  SESSION: 'session'
+} as const;
+
+/**
+ * The categories this version files actions under, which the log can be
+ * narrowed to. An entry's `category` stays an open string: a later version
+ * may add one.
+ */
+export type AuditCategoryBody = typeof AuditCategoryBody[keyof typeof AuditCategoryBody];
+
+/**
+ * An action this version of the API knows, with its details. An entry's `action` and `details` match one of these, or name an action added since.
+ */
+export type AuditEvent = {
+  action: 'org_created';
+  details: OrgCreatedDetails;
+} | {
+  action: 'org_renamed';
+  details: OrgRenamedDetails;
+} | {
+  action: 'org_status_set';
+  details: OrgStatusSetDetails;
+} | {
+  action: 'org_plan_set';
+  details: OrgPlanSetDetails;
+} | {
+  action: 'org_metadata_set';
+  details: OrgMetadataSetDetails;
+} | {
+  action: 'org_metadata_deleted';
+  details: OrgMetadataDeletedDetails;
+} | {
+  action: 'oidc_provider_created';
+  details: OidcProviderCreatedDetails;
+} | {
+  action: 'org_oidc_provider_set';
+  details: OrgOidcProviderSetDetails;
+} | {
+  action: 'credits_deposited';
+  details: CreditsDepositedDetails;
+} | {
+  action: 'credits_expired';
+  details: CreditsExpiredDetails;
+} | {
+  action: 'billing_checkout_started';
+  details: BillingCheckoutStartedDetails;
+} | {
+  action: 'billing_portal_opened';
+  details: BillingPortalOpenedDetails;
+} | {
+  action: 'invitation_created';
+  details: InvitationCreatedDetails;
+} | {
+  action: 'invitation_revoked';
+  details: InvitationRevokedDetails;
+} | {
+  action: 'org_member_added';
+  details: OrgMemberAddedDetails;
+} | {
+  action: 'org_member_role_set';
+  details: OrgMemberRoleSetDetails;
+} | {
+  action: 'org_member_removed';
+  details: OrgMemberRemovedDetails;
+} | {
+  action: 'org_member_renamed';
+  details: OrgMemberRenamedDetails;
+} | {
+  action: 'workspace_member_added';
+  details: WorkspaceMemberAddedDetails;
+} | {
+  action: 'workspace_member_role_set';
+  details: WorkspaceMemberRoleSetDetails;
+} | {
+  action: 'workspace_member_removed';
+  details: WorkspaceMemberRemovedDetails;
+} | {
+  action: 'workspace_created';
+  details: WorkspaceCreatedDetails;
+} | {
+  action: 'workspace_renamed';
+  details: WorkspaceRenamedDetails;
+} | {
+  action: 'workspace_deleted';
+  details: WorkspaceDeletedDetails;
+} | {
+  action: 'api_key_created';
+  details: ApiKeyCreatedDetails;
+} | {
+  action: 'api_key_revoked';
+  details: ApiKeyRevokedDetails;
+} | {
+  action: 'agent_created';
+  details: AgentCreatedDetails;
+} | {
+  action: 'agent_renamed';
+  details: AgentRenamedDetails;
+} | {
+  action: 'agent_origins_set';
+  details: AgentOriginsSetDetails;
+} | {
+  action: 'agent_published';
+  details: AgentPublishedDetails;
+} | {
+  action: 'agent_deleted';
+  details: AgentDeletedDetails;
+} | {
+  action: 'vault_created';
+  details: VaultCreatedDetails;
+} | {
+  action: 'vault_updated';
+  details: VaultUpdatedDetails;
+} | {
+  action: 'vault_deleted';
+  details: VaultDeletedDetails;
+} | {
+  action: 'vault_credential_created';
+  details: VaultCredentialCreatedDetails;
+} | {
+  action: 'vault_credential_reconnected';
+  details: VaultCredentialReconnectedDetails;
+} | {
+  action: 'vault_credential_checked';
+  details: VaultCredentialCheckedDetails;
+} | {
+  action: 'vault_credential_deleted';
+  details: VaultCredentialDeletedDetails;
+} | {
+  action: 'oauth_client_created';
+  details: OauthClientCreatedDetails;
+} | {
+  action: 'oauth_client_updated';
+  details: OauthClientUpdatedDetails;
+} | {
+  action: 'oauth_client_deleted';
+  details: OauthClientDeletedDetails;
+} | {
+  action: 'model_provider_created';
+  details: ModelProviderCreatedDetails;
+} | {
+  action: 'model_provider_updated';
+  details: ModelProviderUpdatedDetails;
+} | {
+  action: 'model_provider_deleted';
+  details: ModelProviderDeletedDetails;
+} | {
+  action: 'skill_published';
+  details: SkillPublishedDetails;
+} | {
+  action: 'skill_renamed';
+  details: SkillRenamedDetails;
+} | {
+  action: 'skill_deleted';
+  details: SkillDeletedDetails;
+} | {
+  action: 'function_published';
+  details: FunctionPublishedDetails;
+} | {
+  action: 'function_renamed';
+  details: FunctionRenamedDetails;
+} | {
+  action: 'function_deleted';
+  details: FunctionDeletedDetails;
+} | {
+  action: 'session_created';
+  details: SessionCreatedDetails;
+} | {
+  action: 'session_renamed';
+  details: SessionRenamedDetails;
+} | {
+  action: 'session_deleted';
+  details: SessionDeletedDetails;
+} | {
+  action: 'session_token_created';
+  details: SessionTokenCreatedDetails;
+} | {
+  action: 'session_vault_added';
+  details: SessionVaultAddedDetails;
+} | {
+  action: 'sandbox_archive_deleted';
+  details: SandboxArchiveDeletedDetails;
+} | {
+  action: 'message_sent';
+  details: MessageSentDetails;
+} | {
+  action: 'run_cancelled';
+  details: RunCancelledDetails;
+} | {
+  action: 'approval_resolved';
+  details: ApprovalResolvedDetails;
+} | {
+  action: 'approval_expired';
+  details: ApprovalExpiredDetails;
+} | {
+  action: 'input_resolved';
+  details: InputResolvedDetails;
+} | {
+  action: 'input_expired';
+  details: InputExpiredDetails;
+} | {
+  action: 'session_client_added';
+  details: SessionClientAddedDetails;
+} | {
+  action: 'session_client_tools_set';
+  details: SessionClientToolsSetDetails;
+} | {
+  action: 'session_client_removed';
+  details: SessionClientRemovedDetails;
+} | {
+  action: 'volume_file_written';
+  details: VolumeFileWrittenDetails;
+} | {
+  action: 'volume_file_deleted';
+  details: VolumeFileDeletedDetails;
+} | {
+  action: 'volume_deleted';
+  details: VolumeDeletedDetails;
+} | {
+  action: 'vault_credential_used';
+  details: VaultCredentialUsedDetails;
+} | {
+  action: 'child_session_created';
+  details: ChildSessionCreatedDetails;
+} | {
+  action: 'login';
+  details: LoginDetails;
+} | {
+  action: 'login_refused';
+  details: LoginRefusedDetails;
+} | {
+  action: 'logout';
+  details: LogoutDetails;
+} | {
+  action: 'access_token_revoked';
+  details: AccessTokenRevokedDetails;
+} | {
+  action: 'authorization_code_replayed';
+  details: AuthorizationCodeReplayedDetails;
+} | {
+  action: 'login_revoked';
+  details: LoginRevokedDetails;
+} | {
+  action: 'refresh_token_replayed';
+  details: RefreshTokenReplayedDetails;
+};
+
+/**
+ * Who issued the credential an action came in on: the member who minted an
+ * API key, the member or API key that minted a session token, the admin
+ * billing acted for.
+ * Stable vocabulary for v1: adding a value requires a new API version.
+ */
+export type AuditIssuerBody = {
+  type: 'user';
+  user_id: string;
+} | {
+  api_key_id: string;
+  type: 'api_key';
+};
+
+/**
+ * One thing done in the organization.
+ */
+export type AuditLogEntryBody = {
+  /**
+   * What was done. An open vocabulary: an action Subako starts recording
+   * later arrives under its own name, so a client keeps a row it does not
+   * know rather than rejecting it. `AuditEvent` lists the actions this
+   * version knows.
+   */
+  action: string;
+  actor: AuditActorBody;
+  /**
+   * The action's category, or null for an action this version does not
+   * know. An open vocabulary, as `action` is.
+   */
+  category?: string | null;
+  /**
+   * The action's facts. Their shape is the action's, as `AuditEvent`
+   * documents it; a field added later is absent from older rows.
+   */
+  details: {
+    [key: string]: unknown;
+  };
+  id: string;
+  /**
+   * The address a member's or an API key's request came from. A session
+   * token's request, and Subako's own, record none.
+   */
+  ip?: string | null;
+  issuer?: null | AuditIssuerBody;
+  names: AuditNamesBody;
+  occurred_at: string;
+  /**
+   * The request that did it, as its response's `x-request-id` named it.
+   */
+  request_id?: string | null;
+  result: AuditResultBody;
+  /**
+   * The run the action happened in, for what an agent did.
+   */
+  run_id?: string | null;
+  /**
+   * The id of what the action was done to.
+   */
+  subject?: string | null;
+  /**
+   * What kind of thing `subject` is, which its action decides: `agent`,
+   * `vault`, `user`, and so on, as `KnownAuditSubjectKind` lists them. An
+   * open vocabulary, as `action` is; null when there is no subject or the
+   * action is one this version does not know.
+   */
+  subject_kind?: string | null;
+  /**
+   * The `User-Agent` the request came with. A session token's request,
+   * and the server acting on its own, record none.
+   */
+  user_agent?: string | null;
+  workspace_id?: string | null;
+};
+
+/**
+ * What an id in an entry names now. The log keeps ids only; names are
+ * looked up as the entry is read.
+ */
+export type AuditNameBody = {
+  name?: string | null;
+  state: 'current';
+} | {
+  state: 'deleted';
+};
+
+/**
+ * The names of what an entry names, as they are now. A field is null where
+ * the entry has no such id, or where what it names has no name: a session
+ * token, a login, a credit lot, an identity provider, or Subako itself.
+ */
+export type AuditNamesBody = {
+  actor?: null | AuditNameBody;
+  issuer?: null | AuditNameBody;
+  subject?: null | AuditNameBody;
+  workspace?: null | AuditNameBody;
+};
+
+/**
+ * Whether the operation went ahead.
+ * Stable vocabulary for v1: adding a value requires a new API version.
+ */
+export const AuditResultBody = { SUCCESS: 'success', DENIED: 'denied' } as const;
+
+/**
+ * Whether the operation went ahead.
+ * Stable vocabulary for v1: adding a value requires a new API version.
+ */
+export type AuditResultBody = typeof AuditResultBody[keyof typeof AuditResultBody];
+
+/**
+ * An authorization code was presented a second time, so the login it was redeemed for was revoked.
+ */
+export type AuthorizationCodeReplayedDetails = {
+  authorization_request_id: string;
 };
 
 /**
@@ -288,6 +756,28 @@ export type AwsWorkloadIdentityBody = {
    * `aud` a role's trust policy checks.
    */
   audience: string;
+};
+
+/**
+ * An admin started a checkout with Subako's payment provider.
+ */
+export type BillingCheckoutStartedDetails = {
+  /**
+   * The credits a purchase is for, in SC.
+   */
+  amount_sc?: number | null;
+  kind: 'subscription' | 'plan_change' | 'credits';
+  /**
+   * The plan a subscription or plan change is for.
+   */
+  plan?: string | null;
+};
+
+/**
+ * An admin opened the payment provider's billing portal, where the payment method and the subscription can be changed.
+ */
+export type BillingPortalOpenedDetails = {
+  [key: string]: unknown;
 };
 
 /**
@@ -341,6 +831,17 @@ export type ChangeMemberRoleBody = {
 
 export type ChangeWorkspaceMemberRoleBody = {
   role: WorkspaceRoleBody;
+};
+
+/**
+ * A run created a child session, which draws on the parent's vaults.
+ */
+export type ChildSessionCreatedDetails = {
+  parent_session_id: string;
+  /**
+   * The parent's vaults the child received.
+   */
+  vault_ids: Array<string>;
 };
 
 /**
@@ -779,6 +1280,28 @@ export type CreditsBody = {
 };
 
 /**
+ * Credits were added to the organization.
+ */
+export type CreditsDepositedDetails = {
+  /**
+   * In base units of 1e-10 USD.
+   */
+  amount: number;
+  expires_at?: string | null;
+  source: 'grant' | 'purchase';
+};
+
+/**
+ * Credits lapsed at the end of their lot's term.
+ */
+export type CreditsExpiredDetails = {
+  /**
+   * What was left of the lot, in base units of 1e-10 USD.
+   */
+  amount: number;
+};
+
+/**
  * What one delta frame says about its target.
  */
 export type DeltaBody = {
@@ -959,6 +1482,13 @@ export type FunctionBody = {
 };
 
 /**
+ * A function was deleted.
+ */
+export type FunctionDeletedDetails = {
+  [key: string]: unknown;
+};
+
+/**
  * Grants access to the tools of one function package.
  */
 export type FunctionGrantBody = {
@@ -1014,6 +1544,21 @@ export type FunctionNetworkBody = {
 } | {
   hosts: Array<HostPatternBody>;
   type: 'allowlist';
+};
+
+/**
+ * A function's version was published; version 1 creates the function.
+ */
+export type FunctionPublishedDetails = {
+  module_bytes: number;
+  version: number;
+};
+
+/**
+ * A function was renamed.
+ */
+export type FunctionRenamedDetails = {
+  [key: string]: unknown;
 };
 
 /**
@@ -1114,6 +1659,13 @@ export const ImageMediaTypeBody = {
 export type ImageMediaTypeBody = typeof ImageMediaTypeBody[keyof typeof ImageMediaTypeBody];
 
 /**
+ * A form the agent asked lapsed when no one answered in time.
+ */
+export type InputExpiredDetails = {
+  suspension_id: string;
+};
+
+/**
  * A form an agent put to a person: up to four questions answered at once.
  */
 export type InputRequestBody = {
@@ -1141,6 +1693,14 @@ export type InputResolutionBody = {
   type: 'declined';
 } | {
   type: 'expired';
+};
+
+/**
+ * A form the agent asked was answered or declined. The answers stay in the session.
+ */
+export type InputResolvedDetails = {
+  answer: 'submitted' | 'declined';
+  suspension_id: string;
 };
 
 /**
@@ -1189,6 +1749,20 @@ export type InvitationBody = {
 };
 
 /**
+ * An address was invited to the organization.
+ */
+export type InvitationCreatedDetails = {
+  role: 'admin' | 'member';
+};
+
+/**
+ * A pending invitation was withdrawn.
+ */
+export type InvitationRevokedDetails = {
+  [key: string]: unknown;
+};
+
+/**
  * One thing a key may do. A key holds a set of these, and a route refuses a caller whose key lacks the permission it names.
  */
 export const KeyPermissionSchema = {
@@ -1218,6 +1792,124 @@ export const KeyPermissionSchema = {
 export type KeyPermissionSchema = typeof KeyPermissionSchema[keyof typeof KeyPermissionSchema];
 
 /**
+ * The actions this version of the API knows. The list grows without a new API version; an entry may name an action outside it.
+ */
+export const KnownAuditAction = {
+  ORG_CREATED: 'org_created',
+  ORG_RENAMED: 'org_renamed',
+  ORG_STATUS_SET: 'org_status_set',
+  ORG_PLAN_SET: 'org_plan_set',
+  ORG_METADATA_SET: 'org_metadata_set',
+  ORG_METADATA_DELETED: 'org_metadata_deleted',
+  OIDC_PROVIDER_CREATED: 'oidc_provider_created',
+  ORG_OIDC_PROVIDER_SET: 'org_oidc_provider_set',
+  CREDITS_DEPOSITED: 'credits_deposited',
+  CREDITS_EXPIRED: 'credits_expired',
+  BILLING_CHECKOUT_STARTED: 'billing_checkout_started',
+  BILLING_PORTAL_OPENED: 'billing_portal_opened',
+  INVITATION_CREATED: 'invitation_created',
+  INVITATION_REVOKED: 'invitation_revoked',
+  ORG_MEMBER_ADDED: 'org_member_added',
+  ORG_MEMBER_ROLE_SET: 'org_member_role_set',
+  ORG_MEMBER_REMOVED: 'org_member_removed',
+  ORG_MEMBER_RENAMED: 'org_member_renamed',
+  WORKSPACE_MEMBER_ADDED: 'workspace_member_added',
+  WORKSPACE_MEMBER_ROLE_SET: 'workspace_member_role_set',
+  WORKSPACE_MEMBER_REMOVED: 'workspace_member_removed',
+  WORKSPACE_CREATED: 'workspace_created',
+  WORKSPACE_RENAMED: 'workspace_renamed',
+  WORKSPACE_DELETED: 'workspace_deleted',
+  API_KEY_CREATED: 'api_key_created',
+  API_KEY_REVOKED: 'api_key_revoked',
+  AGENT_CREATED: 'agent_created',
+  AGENT_RENAMED: 'agent_renamed',
+  AGENT_ORIGINS_SET: 'agent_origins_set',
+  AGENT_PUBLISHED: 'agent_published',
+  AGENT_DELETED: 'agent_deleted',
+  VAULT_CREATED: 'vault_created',
+  VAULT_UPDATED: 'vault_updated',
+  VAULT_DELETED: 'vault_deleted',
+  VAULT_CREDENTIAL_CREATED: 'vault_credential_created',
+  VAULT_CREDENTIAL_RECONNECTED: 'vault_credential_reconnected',
+  VAULT_CREDENTIAL_CHECKED: 'vault_credential_checked',
+  VAULT_CREDENTIAL_DELETED: 'vault_credential_deleted',
+  OAUTH_CLIENT_CREATED: 'oauth_client_created',
+  OAUTH_CLIENT_UPDATED: 'oauth_client_updated',
+  OAUTH_CLIENT_DELETED: 'oauth_client_deleted',
+  MODEL_PROVIDER_CREATED: 'model_provider_created',
+  MODEL_PROVIDER_UPDATED: 'model_provider_updated',
+  MODEL_PROVIDER_DELETED: 'model_provider_deleted',
+  SKILL_PUBLISHED: 'skill_published',
+  SKILL_RENAMED: 'skill_renamed',
+  SKILL_DELETED: 'skill_deleted',
+  FUNCTION_PUBLISHED: 'function_published',
+  FUNCTION_RENAMED: 'function_renamed',
+  FUNCTION_DELETED: 'function_deleted',
+  SESSION_CREATED: 'session_created',
+  SESSION_RENAMED: 'session_renamed',
+  SESSION_DELETED: 'session_deleted',
+  SESSION_TOKEN_CREATED: 'session_token_created',
+  SESSION_VAULT_ADDED: 'session_vault_added',
+  SANDBOX_ARCHIVE_DELETED: 'sandbox_archive_deleted',
+  MESSAGE_SENT: 'message_sent',
+  RUN_CANCELLED: 'run_cancelled',
+  APPROVAL_RESOLVED: 'approval_resolved',
+  APPROVAL_EXPIRED: 'approval_expired',
+  INPUT_RESOLVED: 'input_resolved',
+  INPUT_EXPIRED: 'input_expired',
+  SESSION_CLIENT_ADDED: 'session_client_added',
+  SESSION_CLIENT_TOOLS_SET: 'session_client_tools_set',
+  SESSION_CLIENT_REMOVED: 'session_client_removed',
+  VOLUME_FILE_WRITTEN: 'volume_file_written',
+  VOLUME_FILE_DELETED: 'volume_file_deleted',
+  VOLUME_DELETED: 'volume_deleted',
+  VAULT_CREDENTIAL_USED: 'vault_credential_used',
+  CHILD_SESSION_CREATED: 'child_session_created',
+  LOGIN: 'login',
+  LOGIN_REFUSED: 'login_refused',
+  LOGOUT: 'logout',
+  ACCESS_TOKEN_REVOKED: 'access_token_revoked',
+  AUTHORIZATION_CODE_REPLAYED: 'authorization_code_replayed',
+  LOGIN_REVOKED: 'login_revoked',
+  REFRESH_TOKEN_REPLAYED: 'refresh_token_replayed'
+} as const;
+
+/**
+ * The actions this version of the API knows. The list grows without a new API version; an entry may name an action outside it.
+ */
+export type KnownAuditAction = typeof KnownAuditAction[keyof typeof KnownAuditAction];
+
+/**
+ * The kinds of subject this version of the API knows. The list grows without a new API version; an entry may name a kind outside it.
+ */
+export const KnownAuditSubjectKind = {
+  ORGANIZATION: 'organization',
+  WORKSPACE: 'workspace',
+  USER: 'user',
+  INVITATION: 'invitation',
+  API_KEY: 'api_key',
+  AGENT: 'agent',
+  AGENT_VERSION: 'agent_version',
+  VAULT: 'vault',
+  CREDENTIAL: 'credential',
+  OAUTH_CLIENT: 'oauth_client',
+  MODEL_PROVIDER: 'model_provider',
+  SKILL: 'skill',
+  FUNCTION: 'function',
+  SESSION: 'session',
+  SESSION_TOKEN: 'session_token',
+  CLIENT: 'client',
+  GRANT: 'grant',
+  CREDIT_LOT: 'credit_lot',
+  OIDC_PROVIDER: 'oidc_provider'
+} as const;
+
+/**
+ * The kinds of subject this version of the API knows. The list grows without a new API version; an entry may name a kind outside it.
+ */
+export type KnownAuditSubjectKind = typeof KnownAuditSubjectKind[keyof typeof KnownAuditSubjectKind];
+
+/**
  * Model calls by how they were priced. A class with no calls is absent.
  */
 export type LlmTokensSummaryBody = {
@@ -1231,6 +1923,36 @@ export type LlmTokensSummaryBody = {
    * Calls a charge was due for but no rate priced.
    */
   unrated?: TokensBody;
+};
+
+/**
+ * A member logged in. The login is the subject: what an access token it issued does carries the same id.
+ */
+export type LoginDetails = {
+  method: 'authorization_code' | 'device';
+};
+
+/**
+ * A login into the organization did not complete, one row per attempt. Whoever signs in at the identity provider is recorded only when they are a user this organization knows, such as a former member: then the actor is that user, with the address and `User-Agent` they came from. Anyone else is recorded as the system, with no name, email address, IP address, or `User-Agent`; the identity provider's sign-in log says who they were.
+ */
+export type LoginRefusedDetails = {
+  method: 'authorization_code' | 'device';
+  reason: 'email_unverified' | 'not_invited' | 'upstream_failed' | 'no_refresh_token';
+};
+
+/**
+ * A login's identity provider, asked again, no longer vouched for it, so the login was revoked.
+ */
+export type LoginRevokedDetails = {
+  oidc_provider_id: string;
+  refusal: 'invalid_grant' | 'subject_changed';
+};
+
+/**
+ * A member logged out, ending the login and every token it issued.
+ */
+export type LogoutDetails = {
+  [key: string]: unknown;
 };
 
 /**
@@ -1335,6 +2057,16 @@ export type MessageBody = {
   model_call_id?: string | null;
   role: RoleBody;
   tool_call_id?: string | null;
+};
+
+/**
+ * A message was sent to a session, starting a run or steering the one under way. The message itself stays in the session.
+ */
+export type MessageSentDetails = {
+  /**
+   * Whether it steered a run under way rather than starting one.
+   */
+  steered: boolean;
 };
 
 export type MintApiKeyBody = {
@@ -1502,6 +2234,21 @@ export type ModelProviderBody = (ModelProviderDetailsBody & {
 });
 
 /**
+ * A model provider was added to a workspace.
+ */
+export type ModelProviderCreatedDetails = {
+  auth: 'api_key' | 'aws_web_identity' | 'anthropic_workload_identity' | 'openai_workload_identity';
+  format: 'anthropic' | 'openai_responses';
+};
+
+/**
+ * A model provider was deleted.
+ */
+export type ModelProviderDeletedDetails = {
+  [key: string]: unknown;
+};
+
+/**
  * Shared public provider metadata. Connections and credentials stay private.
  */
 export type ModelProviderDetailsBody = {
@@ -1551,6 +2298,28 @@ export const ModelProviderTypeParam = { PLATFORM: 'platform', BYOK: 'byok' } as 
  * provider's own `type`.
  */
 export type ModelProviderTypeParam = typeof ModelProviderTypeParam[keyof typeof ModelProviderTypeParam];
+
+/**
+ * A model provider's settings changed.
+ */
+export type ModelProviderUpdatedDetails = {
+  /**
+   * How it now authenticates, when that changed.
+   */
+  auth?: 'api_key' | 'aws_web_identity' | 'anthropic_workload_identity' | 'openai_workload_identity' | null;
+  /**
+   * Whether the base URL changed.
+   */
+  base_url: boolean;
+  /**
+   * Whether the description changed.
+   */
+  description: boolean;
+  /**
+   * Whether the display name changed.
+   */
+  display_name: boolean;
+};
 
 export type ModelUsageBody = {
   format: 'anthropic';
@@ -1607,6 +2376,49 @@ export type OAuthStarted = {
   expires_at: string;
 };
 
+/**
+ * An OAuth client was registered for connecting credentials.
+ */
+export type OauthClientCreatedDetails = {
+  [key: string]: unknown;
+};
+
+/**
+ * An OAuth client was deleted.
+ */
+export type OauthClientDeletedDetails = {
+  [key: string]: unknown;
+};
+
+/**
+ * An OAuth client's settings changed.
+ */
+export type OauthClientUpdatedDetails = {
+  /**
+   * Whether how the client authenticates changed, its secret included.
+   */
+  auth: boolean;
+  /**
+   * Whether the extra authorization parameters changed.
+   */
+  authorization_params: boolean;
+  /**
+   * Whether the display name changed.
+   */
+  display_name: boolean;
+  /**
+   * Whether the scopes changed.
+   */
+  scopes: boolean;
+};
+
+/**
+ * An identity provider was registered.
+ */
+export type OidcProviderCreatedDetails = {
+  kind: 'standard' | 'google';
+};
+
 export type OpenaiResponsesModelBody = {
   context_window: number;
   image_input?: null | ImageInputBody;
@@ -1656,12 +2468,102 @@ export const OrderParam = { ASC: 'asc', DESC: 'desc' } as const;
  */
 export type OrderParam = typeof OrderParam[keyof typeof OrderParam];
 
+/**
+ * The organization was created.
+ */
+export type OrgCreatedDetails = {
+  /**
+   * The catalog metadata it was created with, by key.
+   */
+  metadata_keys: Array<string>;
+};
+
+/**
+ * An invited person joined at their first login.
+ */
+export type OrgMemberAddedDetails = {
+  invitation_id: string;
+  role: 'admin' | 'member';
+};
+
 export type OrgMemberBody = {
   created_at: string;
   display_name: string | null;
   primary_email: string | null;
   role: OrgRoleBody;
   user_id: string;
+};
+
+/**
+ * A member was removed from the organization.
+ */
+export type OrgMemberRemovedDetails = {
+  /**
+   * The member's logins in the organization, revoked with the membership.
+   */
+  grants_revoked: number;
+  /**
+   * Live API keys the member created, which keep working.
+   */
+  orphaned_api_keys: Array<string>;
+  pending_invitations_deleted: number;
+  workspace_memberships_removed: number;
+};
+
+/**
+ * A member changed their own display name.
+ */
+export type OrgMemberRenamedDetails = {
+  /**
+   * Whether the name was cleared rather than set.
+   */
+  cleared: boolean;
+};
+
+/**
+ * A member's role in the organization changed.
+ */
+export type OrgMemberRoleSetDetails = {
+  role: 'admin' | 'member';
+};
+
+/**
+ * A metadata entry was removed from the organization.
+ */
+export type OrgMetadataDeletedDetails = {
+  key: string;
+};
+
+/**
+ * A metadata entry was set on the organization.
+ */
+export type OrgMetadataSetDetails = {
+  key: string;
+};
+
+/**
+ * The organization's members now sign in through another identity provider.
+ */
+export type OrgOidcProviderSetDetails = {
+  /**
+   * Members whose sign-in the switch affects.
+   */
+  member_count: number;
+  oidc_provider_id: string;
+};
+
+/**
+ * The organization moved to another plan.
+ */
+export type OrgPlanSetDetails = {
+  plan: string;
+};
+
+/**
+ * The organization was renamed.
+ */
+export type OrgRenamedDetails = {
+  [key: string]: unknown;
 };
 
 /**
@@ -1675,6 +2577,17 @@ export const OrgRoleBody = { ADMIN: 'admin', MEMBER: 'member' } as const;
  * invitations, and billing; a member does not.
  */
 export type OrgRoleBody = typeof OrgRoleBody[keyof typeof OrgRoleBody];
+
+/**
+ * Subako set the organization's status.
+ */
+export type OrgStatusSetDetails = {
+  /**
+   * Runs the change stopped.
+   */
+  runs_cancelled: number;
+  status: 'active' | 'suspended' | 'closed';
+};
 
 /**
  * The organization a bearer token acts in: the tenant every other
@@ -1737,6 +2650,18 @@ export type PageOutAgentVersionBody = {
 
 export type PageOutApiKeyBody = {
   items: Array<ApiKeyBody>;
+  /**
+   * Pass back as `after` for the next page; `null` on the last page.
+   */
+  next_cursor: string | null;
+  /**
+   * Pass back as `before` for the previous page; `null` on the first page.
+   */
+  prev_cursor: string | null;
+};
+
+export type PageOutAuditLogEntryBody = {
+  items: Array<AuditLogEntryBody>;
   /**
    * Pass back as `after` for the next page; `null` on the last page.
    */
@@ -2200,6 +3125,13 @@ export type RefreshBlockBody = {
   };
 };
 
+/**
+ * A refresh token was presented after it was spent, so the login it belongs to was revoked.
+ */
+export type RefreshTokenReplayedDetails = {
+  presented_refresh_token_id: string;
+};
+
 export type RegisterClientBody = {
   lifetime: ClientLifetimeForm;
   /**
@@ -2286,6 +3218,13 @@ export const RoleBody = {
 export type RoleBody = typeof RoleBody[keyof typeof RoleBody];
 
 /**
+ * A session's run was cancelled.
+ */
+export type RunCancelledDetails = {
+  [key: string]: unknown;
+};
+
+/**
  * Run time by how it was priced. A class with none is absent.
  */
 export type RuntimeSummaryBody = {
@@ -2306,6 +3245,13 @@ export type SandboxArchiveBody = {
   bytes: number;
   expires_at: string;
   url: string;
+};
+
+/**
+ * A session's sandbox archive was deleted.
+ */
+export type SandboxArchiveDeletedDetails = {
+  bytes: number;
 };
 
 /**
@@ -2385,6 +3331,39 @@ export type SessionBody = {
 };
 
 /**
+ * A client joined a session, offering its tools to the agent.
+ */
+export type SessionClientAddedDetails = {
+  session_id: string;
+};
+
+/**
+ * A client left a session.
+ */
+export type SessionClientRemovedDetails = {
+  session_id: string;
+};
+
+/**
+ * A client replaced the tools it offers.
+ */
+export type SessionClientToolsSetDetails = {
+  session_id: string;
+};
+
+/**
+ * A session was created.
+ */
+export type SessionCreatedDetails = {
+  agent_id: string;
+  agent_version_id: string;
+  /**
+   * Vaults whose credentials the session's tools may use.
+   */
+  vault_ids: Array<string>;
+};
+
+/**
  * Who created the session: the header-surface user or the API key a
  * backend presented.
  */
@@ -2394,6 +3373,13 @@ export type SessionCreatorBody = (ActorBody & {
   api_key_id: string;
   label: string;
   type: 'api_key';
+};
+
+/**
+ * A session was deleted, with the sessions under it.
+ */
+export type SessionDeletedDetails = {
+  [key: string]: unknown;
 };
 
 /**
@@ -2571,6 +3557,13 @@ export type SessionEventPayloadBody = {
   type: 'custom';
 };
 
+/**
+ * A session was renamed.
+ */
+export type SessionRenamedDetails = {
+  [key: string]: unknown;
+};
+
 export type SessionSandboxBody = {
   /**
    * Size of the last published snapshot, which can predate the latest exec.
@@ -2697,10 +3690,25 @@ export type SessionTokenBody = {
   session_token: string;
 };
 
+/**
+ * A session token was created.
+ */
+export type SessionTokenCreatedDetails = {
+  expires_at: string;
+  session_id: string;
+};
+
 export type SessionTokenReceiptBody = {
   expires_at: string;
   id: string;
   session_id: string;
+};
+
+/**
+ * A vault was added to a session.
+ */
+export type SessionVaultAddedDetails = {
+  vault_id: string;
 };
 
 /**
@@ -2730,6 +3738,13 @@ export type SkillBundleBody = {
 };
 
 /**
+ * A skill was deleted.
+ */
+export type SkillDeletedDetails = {
+  [key: string]: unknown;
+};
+
+/**
  * Grants read access to one versioned skill bundle.
  */
 export type SkillGrantBody = {
@@ -2746,6 +3761,21 @@ export type SkillGrantBody = {
    * their resolved content across runs and retries.
    */
   version: VersionPinBody;
+};
+
+/**
+ * A skill's version was published; version 1 creates the skill.
+ */
+export type SkillPublishedDetails = {
+  bundle_bytes: number;
+  version: number;
+};
+
+/**
+ * A skill was renamed.
+ */
+export type SkillRenamedDetails = {
+  [key: string]: unknown;
 };
 
 /**
@@ -3169,6 +4199,76 @@ export type VaultCreated = {
 };
 
 /**
+ * A vault was created.
+ */
+export type VaultCreatedDetails = {
+  [key: string]: unknown;
+};
+
+/**
+ * A credential was tried against its server, which may refresh it or mark it for reconnecting.
+ */
+export type VaultCredentialCheckedDetails = {
+  outcome: 'connected' | 'rejected' | 'reconnect_required';
+  vault_id: string;
+};
+
+/**
+ * A credential was created in a vault.
+ */
+export type VaultCredentialCreatedDetails = {
+  vault_id: string;
+  via: 'direct' | 'oauth';
+};
+
+/**
+ * A credential was deleted.
+ */
+export type VaultCredentialDeletedDetails = {
+  vault_id: string;
+};
+
+/**
+ * A credential was reauthorized through OAuth.
+ */
+export type VaultCredentialReconnectedDetails = {
+  vault_id: string;
+};
+
+/**
+ * A run used a vault credential, the first time it did. The actor is whoever sent the message that started the run.
+ */
+export type VaultCredentialUsedDetails = {
+  session_id: string;
+  used_for: 'mcp' | 'http';
+};
+
+/**
+ * A vault was deleted, with its credentials.
+ */
+export type VaultDeletedDetails = {
+  [key: string]: unknown;
+};
+
+/**
+ * A vault's settings changed.
+ */
+export type VaultUpdatedDetails = {
+  /**
+   * Whether the display name changed.
+   */
+  display_name: boolean;
+  /**
+   * Whether the external id changed.
+   */
+  external_id: boolean;
+  /**
+   * Whether the metadata changed.
+   */
+  metadata: boolean;
+};
+
+/**
  * The latest version at resolution time, or an exact one.
  */
 export type VersionPinBody = {
@@ -3212,6 +4312,13 @@ export type VolumeDataBody = {
   type: 'enabled';
 };
 
+/**
+ * A session's volume was deleted.
+ */
+export type VolumeDeletedDetails = {
+  [key: string]: unknown;
+};
+
 export type VolumeFileBody = {
   kind: VolumeFileKindBody;
   /**
@@ -3226,6 +4333,13 @@ export type VolumeFileBody = {
    * Bytes for a file; 0 for a directory or a symlink.
    */
   size: number;
+};
+
+/**
+ * A file was deleted from a session's volume.
+ */
+export type VolumeFileDeletedDetails = {
+  area: 'data' | 'tmp';
 };
 
 export const VolumeFileKindBody = {
@@ -3254,6 +4368,14 @@ export type VolumeFileWrittenBody = {
    * The file's path in the area.
    */
   path: string;
+};
+
+/**
+ * A file was written to a session's volume. Its path and content stay in the volume.
+ */
+export type VolumeFileWrittenDetails = {
+  area: 'data' | 'tmp';
+  bytes: number;
 };
 
 /**
@@ -3351,6 +4473,27 @@ export type WorkspaceBody = {
 };
 
 /**
+ * A workspace was created.
+ */
+export type WorkspaceCreatedDetails = {
+  [key: string]: unknown;
+};
+
+/**
+ * A workspace was deleted, with everything in it.
+ */
+export type WorkspaceDeletedDetails = {
+  [key: string]: unknown;
+};
+
+/**
+ * A member was added to a workspace.
+ */
+export type WorkspaceMemberAddedDetails = {
+  role: 'admin' | 'member';
+};
+
+/**
  * One member of a workspace, with the role they hold in it.
  */
 export type WorkspaceMemberBody = {
@@ -3359,6 +4502,30 @@ export type WorkspaceMemberBody = {
   primary_email: string | null;
   role: WorkspaceRoleBody;
   user_id: string;
+};
+
+/**
+ * A member was removed from a workspace.
+ */
+export type WorkspaceMemberRemovedDetails = {
+  /**
+   * Live API keys the member created in the workspace, which keep working.
+   */
+  orphaned_api_keys: Array<string>;
+};
+
+/**
+ * A member's role in a workspace changed.
+ */
+export type WorkspaceMemberRoleSetDetails = {
+  role: 'admin' | 'member';
+};
+
+/**
+ * A workspace was renamed.
+ */
+export type WorkspaceRenamedDetails = {
+  [key: string]: unknown;
 };
 
 /**
@@ -5147,6 +6314,86 @@ export type RenameOrganizationResponses = {
 };
 
 export type RenameOrganizationResponse = RenameOrganizationResponses[keyof RenameOrganizationResponses];
+
+export type ListAuditLogsData = {
+  body?: never;
+  path?: never;
+  query?: {
+    limit?: number;
+    /**
+     * Rows past this id in `order`'s direction: a page's `next_cursor`.
+     */
+    after?: string;
+    /**
+     * Rows just before this id, still in `order`'s direction: a page's `prev_cursor`.
+     */
+    before?: string;
+    /**
+     * Newest first when omitted.
+     */
+    order?: OrderParam;
+    /**
+     * Only rows recorded at or after this instant.
+     */
+    since?: string;
+    /**
+     * Only rows recorded before this instant.
+     */
+    until?: string;
+    /**
+     * Only rows whose action is in this category.
+     */
+    category?: AuditCategoryBody;
+    /**
+     * Only rows of this action.
+     */
+    action?: string;
+    /**
+     * Only rows with this result.
+     */
+    result?: AuditResultBody;
+    /**
+     * Only rows this member, API key, or session token acted in, or that a
+     * credential it issued acted in.
+     */
+    actor_id?: string;
+    /**
+     * Only rows in this workspace.
+     */
+    workspace_id?: string;
+    /**
+     * Only rows about this subject.
+     */
+    subject?: string;
+  };
+  url: '/v1/organization/audit-logs';
+};
+
+export type ListAuditLogsErrors = {
+  /**
+   * Bad limit, cursor, order, instant, category, or result.
+   */
+  400: ErrorBody;
+  /**
+   * Missing, malformed, or invalid bearer token.
+   */
+  401: ErrorBody;
+  /**
+   * Caller lacks org.audit.read.
+   */
+  403: ErrorBody;
+};
+
+export type ListAuditLogsError = ListAuditLogsErrors[keyof ListAuditLogsErrors];
+
+export type ListAuditLogsResponses = {
+  /**
+   * One page, newest first unless order=asc.
+   */
+  200: PageOutAuditLogEntryBody;
+};
+
+export type ListAuditLogsResponse = ListAuditLogsResponses[keyof ListAuditLogsResponses];
 
 export type GetCreditsData = {
   body?: never;

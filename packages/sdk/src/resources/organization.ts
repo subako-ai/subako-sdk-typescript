@@ -6,8 +6,9 @@ import type { IdPaged } from "../pagination.js";
 export type ListInvitationsParams = IdPaged<NonNullable<api.ListInvitationsData["query"]>>;
 export type ListMembersParams = IdPaged<NonNullable<api.ListMembersData["query"]>>;
 export type ListUsageParams = IdPaged<NonNullable<api.ListUsageData["query"]>>;
+export type ListAuditLogsParams = IdPaged<NonNullable<api.ListAuditLogsData["query"]>>;
 
-/** The caller's organization: its members, invitations, plan, credits, and usage. */
+/** The caller's organization: its members, invitations, plan, credits, usage, and audit log. */
 export class Organization {
 	constructor(private readonly core: Core) {}
 
@@ -69,5 +70,14 @@ export class Organization {
 	/** Lists usage events across the organization, newest first. */
 	listUsage(params?: ListUsageParams, options?: RequestOptions) {
 		return this.core.page(api.listUsage, { query: params }, BY_ID, options);
+	}
+
+	/**
+	 * Lists the organization's audit log, newest first: what was done over the last year, by which
+	 * credential, and whether it was allowed. Needs `org.audit.read`, which organization admins hold.
+	 * {@link auditEventOf} reads an entry's action and details.
+	 */
+	listAuditLogs(params?: ListAuditLogsParams, options?: RequestOptions) {
+		return this.core.page(api.listAuditLogs, { query: params }, BY_ID, options);
 	}
 }

@@ -256,7 +256,12 @@
           {
             "bearer": []
           }
-        ]
+        ],
+        "x-audit": {
+          "records": [
+            "agent_created"
+          ]
+        }
       }
     },
     "/v1/agents/{agent_id}": {
@@ -403,7 +408,12 @@
           {
             "bearer": []
           }
-        ]
+        ],
+        "x-audit": {
+          "records": [
+            "agent_deleted"
+          ]
+        }
       },
       "patch": {
         "tags": [
@@ -489,7 +499,12 @@
           {
             "bearer": []
           }
-        ]
+        ],
+        "x-audit": {
+          "records": [
+            "agent_renamed"
+          ]
+        }
       }
     },
     "/v1/agents/{agent_id}/security": {
@@ -655,7 +670,12 @@
           {
             "bearer": []
           }
-        ]
+        ],
+        "x-audit": {
+          "records": [
+            "agent_origins_set"
+          ]
+        }
       }
     },
     "/v1/agents/{agent_id}/versions": {
@@ -889,7 +909,12 @@
           {
             "bearer": []
           }
-        ]
+        ],
+        "x-audit": {
+          "records": [
+            "agent_published"
+          ]
+        }
       }
     },
     "/v1/api-keys": {
@@ -1113,7 +1138,12 @@
           {
             "bearer": []
           }
-        ]
+        ],
+        "x-audit": {
+          "records": [
+            "api_key_created"
+          ]
+        }
       }
     },
     "/v1/api-keys/{api_key_id}": {
@@ -1182,7 +1212,12 @@
           {
             "bearer": []
           }
-        ]
+        ],
+        "x-audit": {
+          "records": [
+            "api_key_revoked"
+          ]
+        }
       }
     },
     "/v1/functions": {
@@ -1433,7 +1468,12 @@
           {
             "bearer": []
           }
-        ]
+        ],
+        "x-audit": {
+          "records": [
+            "function_published"
+          ]
+        }
       }
     },
     "/v1/functions/platform": {
@@ -1627,7 +1667,12 @@
           {
             "bearer": []
           }
-        ]
+        ],
+        "x-audit": {
+          "records": [
+            "function_deleted"
+          ]
+        }
       },
       "patch": {
         "tags": [
@@ -1713,7 +1758,12 @@
           {
             "bearer": []
           }
-        ]
+        ],
+        "x-audit": {
+          "records": [
+            "function_renamed"
+          ]
+        }
       }
     },
     "/v1/functions/{function_id}/versions": {
@@ -1959,7 +2009,12 @@
           {
             "bearer": []
           }
-        ]
+        ],
+        "x-audit": {
+          "records": [
+            "function_published"
+          ]
+        }
       }
     },
     "/v1/functions/{function_id}/versions/{version}": {
@@ -2138,7 +2193,12 @@
           {
             "bearer": []
           }
-        ]
+        ],
+        "x-audit": {
+          "records": [
+            "org_member_renamed"
+          ]
+        }
       }
     },
     "/v1/model-providers": {
@@ -2397,7 +2457,12 @@
           {
             "bearer": []
           }
-        ]
+        ],
+        "x-audit": {
+          "records": [
+            "model_provider_created"
+          ]
+        }
       }
     },
     "/v1/model-providers/{model_provider_id}": {
@@ -2557,7 +2622,12 @@
           {
             "bearer": []
           }
-        ]
+        ],
+        "x-audit": {
+          "records": [
+            "model_provider_deleted"
+          ]
+        }
       },
       "patch": {
         "tags": [
@@ -2654,7 +2724,12 @@
           {
             "bearer": []
           }
-        ]
+        ],
+        "x-audit": {
+          "records": [
+            "model_provider_updated"
+          ]
+        }
       }
     },
     "/v1/oauth-clients": {
@@ -2894,7 +2969,12 @@
           {
             "bearer": []
           }
-        ]
+        ],
+        "x-audit": {
+          "records": [
+            "oauth_client_created"
+          ]
+        }
       }
     },
     "/v1/oauth-clients/{oauth_client_id}": {
@@ -3051,7 +3131,12 @@
           {
             "bearer": []
           }
-        ]
+        ],
+        "x-audit": {
+          "records": [
+            "oauth_client_deleted"
+          ]
+        }
       },
       "patch": {
         "tags": [
@@ -3138,7 +3223,12 @@
           {
             "bearer": []
           }
-        ]
+        ],
+        "x-audit": {
+          "records": [
+            "oauth_client_updated"
+          ]
+        }
       }
     },
     "/v1/organization": {
@@ -3225,6 +3315,186 @@
           },
           "403": {
             "description": "Caller lacks org.manage.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-audit": {
+          "records": [
+            "org_renamed"
+          ]
+        }
+      }
+    },
+    "/v1/organization/audit-logs": {
+      "get": {
+        "tags": [
+          "organization"
+        ],
+        "summary": "List the audit log",
+        "description": "What was done in the organization over the last year, by which credential, and whether it was allowed.",
+        "operationId": "list_audit_logs",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "maximum": 200,
+              "minimum": 1
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "description": "Rows past this id in `order`'s direction: a page's `next_cursor`.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "description": "Rows just before this id, still in `order`'s direction: a page's `prev_cursor`.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "description": "Newest first when omitted.",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/OrderParam"
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "description": "Only rows recorded at or after this instant.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "until",
+            "in": "query",
+            "description": "Only rows recorded before this instant.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "description": "Only rows whose action is in this category.",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/AuditCategoryBody"
+            }
+          },
+          {
+            "name": "action",
+            "in": "query",
+            "description": "Only rows of this action.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "result",
+            "in": "query",
+            "description": "Only rows with this result.",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/AuditResultBody"
+            }
+          },
+          {
+            "name": "actor_id",
+            "in": "query",
+            "description": "Only rows this member, API key, or session token acted in, or that a\ncredential it issued acted in.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "workspace_id",
+            "in": "query",
+            "description": "Only rows in this workspace.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "subject",
+            "in": "query",
+            "description": "Only rows about this subject.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page, newest first unless order=asc.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageOut_AuditLogEntryBody"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad limit, cursor, order, instant, category, or result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, malformed, or invalid bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks org.audit.read.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3477,7 +3747,12 @@
           {
             "bearer": []
           }
-        ]
+        ],
+        "x-audit": {
+          "records": [
+            "invitation_created"
+          ]
+        }
       }
     },
     "/v1/organization/invitations/{invitation_id}": {
@@ -3548,7 +3823,12 @@
           {
             "bearer": []
           }
-        ]
+        ],
+        "x-audit": {
+          "records": [
+            "invitation_revoked"
+          ]
+        }
       }
     },
     "/v1/organization/members": {
@@ -3737,7 +4017,12 @@
           {
             "bearer": []
           }
-        ]
+        ],
+        "x-audit": {
+          "records": [
+            "org_member_role_set"
+          ]
+        }
       },
       "delete": {
         "tags": [
@@ -3823,7 +4108,12 @@
           {
             "bearer": []
           }
-        ]
+        ],
+        "x-audit": {
+          "records": [
+            "org_member_removed"
+          ]
+        }
       }
     },
     "/v1/organization/plan": {
@@ -4308,7 +4598,12 @@
           {
             "bearer": []
           }
-        ]
+        ],
+        "x-audit": {
+          "records": [
+            "session_created"
+          ]
+        }
       }
     },
     "/v1/sessions/{session_id}": {
@@ -4455,7 +4750,12 @@
           {
             "bearer": []
           }
-        ]
+        ],
+        "x-audit": {
+          "records": [
+            "session_deleted"
+          ]
+        }
       },
       "patch": {
         "tags": [
@@ -4542,7 +4842,12 @@
           {
             "bearer": []
           }
-        ]
+        ],
+        "x-audit": {
+          "records": [
+            "session_renamed"
+          ]
+        }
       }
     },
     "/v1/sessions/{session_id}/approvals/{call_id}": {
@@ -4669,7 +4974,12 @@
           {
             "bearer": []
           }
-        ]
+        ],
+        "x-audit": {
+          "records": [
+            "approval_resolved"
+          ]
+        }
       }
     },
     "/v1/sessions/{session_id}/cancel": {
@@ -4776,7 +5086,12 @@
           {
             "bearer": []
           }
-        ]
+        ],
+        "x-audit": {
+          "records_when_changed": [
+            "run_cancelled"
+          ]
+        }
       }
     },
     "/v1/sessions/{session_id}/clients": {
@@ -4894,7 +5209,12 @@
           {
             "bearer": []
           }
-        ]
+        ],
+        "x-audit": {
+          "records": [
+            "session_client_added"
+          ]
+        }
       }
     },
     "/v1/sessions/{session_id}/clients/{client_id}": {
@@ -4975,7 +5295,12 @@
           {
             "bearer": []
           }
-        ]
+        ],
+        "x-audit": {
+          "records": [
+            "session_client_removed"
+          ]
+        }
       }
     },
     "/v1/sessions/{session_id}/clients/{client_id}/calls/{call_id}/ack": {
@@ -5102,7 +5427,10 @@
           {
             "bearer": []
           }
-        ]
+        ],
+        "x-audit": {
+          "exempt": "client_traffic"
+        }
       }
     },
     "/v1/sessions/{session_id}/clients/{client_id}/calls/{call_id}/result": {
@@ -5232,7 +5560,10 @@
           {
             "bearer": []
           }
-        ]
+        ],
+        "x-audit": {
+          "exempt": "client_traffic"
+        }
       }
     },
     "/v1/sessions/{session_id}/clients/{client_id}/ping": {
@@ -5350,7 +5681,10 @@
           {
             "bearer": []
           }
-        ]
+        ],
+        "x-audit": {
+          "exempt": "client_traffic"
+        }
       }
     },
     "/v1/sessions/{session_id}/clients/{client_id}/tools": {
@@ -5448,7 +5782,12 @@
           {
             "bearer": []
           }
-        ]
+        ],
+        "x-audit": {
+          "records": [
+            "session_client_tools_set"
+          ]
+        }
       }
     },
     "/v1/sessions/{session_id}/events": {
@@ -5683,7 +6022,12 @@
           {
             "bearer": []
           }
-        ]
+        ],
+        "x-audit": {
+          "records": [
+            "message_sent"
+          ]
+        }
       }
     },
     "/v1/sessions/{session_id}/events/stream": {
@@ -6010,7 +6354,12 @@
           {
             "bearer": []
           }
-        ]
+        ],
+        "x-audit": {
+          "records": [
+            "input_resolved"
+          ]
+        }
       }
     },
     "/v1/sessions/{session_id}/sandboxes": {
@@ -6263,7 +6612,12 @@
           {
             "bearer": []
           }
-        ]
+        ],
+        "x-audit": {
+          "records": [
+            "sandbox_archive_deleted"
+          ]
+        }
       }
     },
     "/v1/sessions/{session_id}/tokens": {
@@ -6381,7 +6735,12 @@
           {
             "bearer": []
           }
-        ]
+        ],
+        "x-audit": {
+          "records": [
+            "session_token_created"
+          ]
+        }
       }
     },
     "/v1/sessions/{session_id}/volume": {
@@ -6453,7 +6812,12 @@
           {
             "bearer": []
           }
-        ]
+        ],
+        "x-audit": {
+          "records_when_changed": [
+            "volume_deleted"
+          ]
+        }
       }
     },
     "/v1/sessions/{session_id}/volume/{area}": {
@@ -6783,7 +7147,12 @@
           {
             "bearer": []
           }
-        ]
+        ],
+        "x-audit": {
+          "records": [
+            "volume_file_written"
+          ]
+        }
       },
       "delete": {
         "tags": [
@@ -6871,7 +7240,12 @@
           {
             "bearer": []
           }
-        ]
+        ],
+        "x-audit": {
+          "records": [
+            "volume_file_deleted"
+          ]
+        }
       }
     },
     "/v1/skills": {
@@ -7122,7 +7496,12 @@
           {
             "bearer": []
           }
-        ]
+        ],
+        "x-audit": {
+          "records": [
+            "skill_published"
+          ]
+        }
       }
     },
     "/v1/skills/{skill_id}": {
@@ -7279,7 +7658,12 @@
           {
             "bearer": []
           }
-        ]
+        ],
+        "x-audit": {
+          "records": [
+            "skill_deleted"
+          ]
+        }
       },
       "patch": {
         "tags": [
@@ -7365,7 +7749,12 @@
           {
             "bearer": []
           }
-        ]
+        ],
+        "x-audit": {
+          "records": [
+            "skill_renamed"
+          ]
+        }
       }
     },
     "/v1/skills/{skill_id}/versions": {
@@ -7611,7 +8000,12 @@
           {
             "bearer": []
           }
-        ]
+        ],
+        "x-audit": {
+          "records": [
+            "skill_published"
+          ]
+        }
       }
     },
     "/v1/skills/{skill_id}/versions/{version}": {
@@ -8065,7 +8459,12 @@
           {
             "bearer": []
           }
-        ]
+        ],
+        "x-audit": {
+          "records": [
+            "vault_created"
+          ]
+        }
       }
     },
     "/v1/vaults/{vault_id}": {
@@ -8212,7 +8611,12 @@
           {
             "bearer": []
           }
-        ]
+        ],
+        "x-audit": {
+          "records": [
+            "vault_deleted"
+          ]
+        }
       },
       "patch": {
         "tags": [
@@ -8308,7 +8712,12 @@
           {
             "bearer": []
           }
-        ]
+        ],
+        "x-audit": {
+          "records": [
+            "vault_updated"
+          ]
+        }
       }
     },
     "/v1/vaults/{vault_id}/credentials": {
@@ -8542,7 +8951,12 @@
           {
             "bearer": []
           }
-        ]
+        ],
+        "x-audit": {
+          "records": [
+            "vault_credential_created"
+          ]
+        }
       }
     },
     "/v1/vaults/{vault_id}/credentials/oauth": {
@@ -8670,7 +9084,10 @@
           {
             "bearer": []
           }
-        ]
+        ],
+        "x-audit": {
+          "exempt": "oauth_connection_in_progress"
+        }
       }
     },
     "/v1/vaults/{vault_id}/credentials/oauth/complete": {
@@ -8788,7 +9205,13 @@
           {
             "bearer": []
           }
-        ]
+        ],
+        "x-audit": {
+          "records": [
+            "vault_credential_created",
+            "vault_credential_reconnected"
+          ]
+        }
       }
     },
     "/v1/vaults/{vault_id}/credentials/{credential_id}": {
@@ -8869,7 +9292,12 @@
           {
             "bearer": []
           }
-        ]
+        ],
+        "x-audit": {
+          "records": [
+            "vault_credential_deleted"
+          ]
+        }
       }
     },
     "/v1/vaults/{vault_id}/credentials/{credential_id}/check": {
@@ -8987,7 +9415,12 @@
           {
             "bearer": []
           }
-        ]
+        ],
+        "x-audit": {
+          "records": [
+            "vault_credential_checked"
+          ]
+        }
       }
     },
     "/v1/vaults/{vault_id}/credentials/{credential_id}/oauth": {
@@ -9125,7 +9558,10 @@
           {
             "bearer": []
           }
-        ]
+        ],
+        "x-audit": {
+          "exempt": "oauth_connection_in_progress"
+        }
       }
     },
     "/v1/workload-identity": {
@@ -9401,7 +9837,12 @@
           {
             "bearer": []
           }
-        ]
+        ],
+        "x-audit": {
+          "records": [
+            "workspace_created"
+          ]
+        }
       }
     },
     "/v1/workspaces/{workspace_id}": {
@@ -9548,7 +9989,12 @@
           {
             "bearer": []
           }
-        ]
+        ],
+        "x-audit": {
+          "records": [
+            "workspace_deleted"
+          ]
+        }
       },
       "patch": {
         "tags": [
@@ -9634,7 +10080,12 @@
           {
             "bearer": []
           }
-        ]
+        ],
+        "x-audit": {
+          "records": [
+            "workspace_renamed"
+          ]
+        }
       }
     },
     "/v1/workspaces/{workspace_id}/members": {
@@ -9867,7 +10318,12 @@
           {
             "bearer": []
           }
-        ]
+        ],
+        "x-audit": {
+          "records": [
+            "workspace_member_added"
+          ]
+        }
       }
     },
     "/v1/workspaces/{workspace_id}/members/{user_id}": {
@@ -9958,7 +10414,12 @@
           {
             "bearer": []
           }
-        ]
+        ],
+        "x-audit": {
+          "records": [
+            "workspace_member_role_set"
+          ]
+        }
       },
       "delete": {
         "tags": [
@@ -10037,7 +10498,12 @@
           {
             "bearer": []
           }
-        ]
+        ],
+        "x-audit": {
+          "records": [
+            "workspace_member_removed"
+          ]
+        }
       }
     },
     "/v1/workspaces/{workspace_id}/usage": {
@@ -10369,6 +10835,10 @@
   },
   "components": {
     "schemas": {
+      "AccessTokenRevokedDetails": {
+        "type": "object",
+        "description": "One access token was revoked; the login it belongs to goes on."
+      },
       "ActorBody": {
         "type": "object",
         "description": "Who did something, resolved for display. `users` rows are never deleted, so\nthis renders after a membership ends.",
@@ -10556,6 +11026,62 @@
             "description": "The session tree's file volume. Only the root session's config is\nread; a child's is ignored."
           }
         }
+      },
+      "AgentCreatedDetails": {
+        "type": "object",
+        "description": "An agent was created."
+      },
+      "AgentDeletedDetails": {
+        "type": "object",
+        "description": "An agent was deleted."
+      },
+      "AgentOriginsSetDetails": {
+        "type": "object",
+        "description": "The browser origins an agent's sessions answer were replaced.",
+        "required": [
+          "allowed_origins"
+        ],
+        "properties": {
+          "allowed_origins": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "AgentPublishedDetails": {
+        "type": "object",
+        "description": "A new version of an agent was published.",
+        "required": [
+          "agent_id",
+          "version"
+        ],
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "model_provider_id": {
+            "oneOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "AgentRenamedDetails": {
+        "type": "object",
+        "description": "An agent was renamed."
       },
       "AgentSecurityBody": {
         "type": "object",
@@ -10900,6 +11426,53 @@
           }
         }
       },
+      "ApiKeyCreatedDetails": {
+        "type": "object",
+        "description": "An API key was created.",
+        "required": [
+          "permissions"
+        ],
+        "properties": {
+          "expires_at": {
+            "oneOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "workspace.read",
+                "agent.read",
+                "agent.publish",
+                "agent.delete",
+                "vault.read",
+                "vault.manage",
+                "credential.read",
+                "credential.manage",
+                "session.create",
+                "session.read",
+                "session.manage",
+                "skill.read",
+                "skill.manage",
+                "function.read",
+                "function.manage",
+                "model_provider.read",
+                "model_provider.manage",
+                "usage.read"
+              ]
+            },
+            "uniqueItems": true
+          }
+        }
+      },
       "ApiKeyReceiptBody": {
         "type": "object",
         "description": "A replay confirms creation without exposing the credential again.",
@@ -10940,6 +11513,10 @@
             "type": "string"
           }
         }
+      },
+      "ApiKeyRevokedDetails": {
+        "type": "object",
+        "description": "An API key was revoked."
       },
       "ApprovalDecisionBody": {
         "type": "string",
@@ -10988,6 +11565,40 @@
         ],
         "description": "How to answer a held call. Only a denial carries a message, which reaches\nthe model in place of the tool's result."
       },
+      "ApprovalExpiredDetails": {
+        "type": "object",
+        "description": "A tool call waiting on approval was denied when no one answered in time.",
+        "required": [
+          "suspension_id"
+        ],
+        "properties": {
+          "suspension_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "ApprovalResolvedDetails": {
+        "type": "object",
+        "description": "A tool call waiting on approval was allowed or denied.",
+        "required": [
+          "suspension_id",
+          "answer"
+        ],
+        "properties": {
+          "answer": {
+            "type": "string",
+            "enum": [
+              "allow",
+              "deny"
+            ]
+          },
+          "suspension_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
       "AskUserGrantBody": {
         "type": "object",
         "description": "The widgets an agent's forms may be built from, each listed once.",
@@ -11002,6 +11613,1868 @@
             },
             "maxItems": 32,
             "minItems": 1
+          }
+        }
+      },
+      "AuditActorBody": {
+        "oneOf": [
+          {
+            "type": "object",
+            "description": "A member, signed in. `grant_id` names the login; a login's own row\nand a row recorded before logins were kept have none.",
+            "required": [
+              "user_id",
+              "type"
+            ],
+            "properties": {
+              "grant_id": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "uuid"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "user"
+                ]
+              },
+              "user_id": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "api_key_id",
+              "type"
+            ],
+            "properties": {
+              "api_key_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "api_key"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "A session token. Rows recorded before tokens were kept name only the\nsession.",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "session_id": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "uuid"
+              },
+              "session_token_id": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "uuid"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "session_token"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "A Subako operator.",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "operator"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Subako's billing service, on behalf of the `issuer` when an admin\nstarted the action.",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "billing"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "The server acting on its own: a deadline passing, a credit lapsing, a\nreplayed credential caught.",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "system"
+                ]
+              }
+            }
+          }
+        ],
+        "description": "The credential an action came in on.\nStable vocabulary for v1: adding a value requires a new API version."
+      },
+      "AuditCategoryBody": {
+        "type": "string",
+        "description": "The categories this version files actions under, which the log can be\nnarrowed to. An entry's `category` stays an open string: a later version\nmay add one.",
+        "enum": [
+          "management",
+          "authentication",
+          "session"
+        ]
+      },
+      "AuditEvent": {
+        "oneOf": [
+          {
+            "type": "object",
+            "title": "OrgCreatedDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "org_created"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/OrgCreatedDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "OrgRenamedDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "org_renamed"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/OrgRenamedDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "OrgStatusSetDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "org_status_set"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/OrgStatusSetDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "OrgPlanSetDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "org_plan_set"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/OrgPlanSetDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "OrgMetadataSetDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "org_metadata_set"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/OrgMetadataSetDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "OrgMetadataDeletedDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "org_metadata_deleted"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/OrgMetadataDeletedDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "OidcProviderCreatedDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "oidc_provider_created"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/OidcProviderCreatedDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "OrgOidcProviderSetDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "org_oidc_provider_set"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/OrgOidcProviderSetDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "CreditsDepositedDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "credits_deposited"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/CreditsDepositedDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "CreditsExpiredDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "credits_expired"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/CreditsExpiredDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "BillingCheckoutStartedDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "billing_checkout_started"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/BillingCheckoutStartedDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "BillingPortalOpenedDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "billing_portal_opened"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/BillingPortalOpenedDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "InvitationCreatedDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "invitation_created"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/InvitationCreatedDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "InvitationRevokedDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "invitation_revoked"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/InvitationRevokedDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "OrgMemberAddedDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "org_member_added"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/OrgMemberAddedDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "OrgMemberRoleSetDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "org_member_role_set"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/OrgMemberRoleSetDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "OrgMemberRemovedDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "org_member_removed"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/OrgMemberRemovedDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "OrgMemberRenamedDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "org_member_renamed"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/OrgMemberRenamedDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "WorkspaceMemberAddedDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "workspace_member_added"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/WorkspaceMemberAddedDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "WorkspaceMemberRoleSetDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "workspace_member_role_set"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/WorkspaceMemberRoleSetDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "WorkspaceMemberRemovedDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "workspace_member_removed"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/WorkspaceMemberRemovedDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "WorkspaceCreatedDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "workspace_created"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/WorkspaceCreatedDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "WorkspaceRenamedDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "workspace_renamed"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/WorkspaceRenamedDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "WorkspaceDeletedDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "workspace_deleted"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/WorkspaceDeletedDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "ApiKeyCreatedDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "api_key_created"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/ApiKeyCreatedDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "ApiKeyRevokedDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "api_key_revoked"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/ApiKeyRevokedDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "AgentCreatedDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "agent_created"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/AgentCreatedDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "AgentRenamedDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "agent_renamed"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/AgentRenamedDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "AgentOriginsSetDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "agent_origins_set"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/AgentOriginsSetDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "AgentPublishedDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "agent_published"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/AgentPublishedDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "AgentDeletedDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "agent_deleted"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/AgentDeletedDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "VaultCreatedDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "vault_created"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/VaultCreatedDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "VaultUpdatedDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "vault_updated"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/VaultUpdatedDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "VaultDeletedDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "vault_deleted"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/VaultDeletedDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "VaultCredentialCreatedDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "vault_credential_created"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/VaultCredentialCreatedDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "VaultCredentialReconnectedDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "vault_credential_reconnected"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/VaultCredentialReconnectedDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "VaultCredentialCheckedDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "vault_credential_checked"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/VaultCredentialCheckedDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "VaultCredentialDeletedDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "vault_credential_deleted"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/VaultCredentialDeletedDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "OauthClientCreatedDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "oauth_client_created"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/OauthClientCreatedDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "OauthClientUpdatedDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "oauth_client_updated"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/OauthClientUpdatedDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "OauthClientDeletedDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "oauth_client_deleted"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/OauthClientDeletedDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "ModelProviderCreatedDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "model_provider_created"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/ModelProviderCreatedDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "ModelProviderUpdatedDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "model_provider_updated"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/ModelProviderUpdatedDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "ModelProviderDeletedDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "model_provider_deleted"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/ModelProviderDeletedDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "SkillPublishedDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "skill_published"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/SkillPublishedDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "SkillRenamedDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "skill_renamed"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/SkillRenamedDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "SkillDeletedDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "skill_deleted"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/SkillDeletedDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "FunctionPublishedDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "function_published"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/FunctionPublishedDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "FunctionRenamedDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "function_renamed"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/FunctionRenamedDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "FunctionDeletedDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "function_deleted"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/FunctionDeletedDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "SessionCreatedDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "session_created"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/SessionCreatedDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "SessionRenamedDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "session_renamed"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/SessionRenamedDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "SessionDeletedDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "session_deleted"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/SessionDeletedDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "SessionTokenCreatedDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "session_token_created"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/SessionTokenCreatedDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "SessionVaultAddedDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "session_vault_added"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/SessionVaultAddedDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "SandboxArchiveDeletedDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "sandbox_archive_deleted"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/SandboxArchiveDeletedDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "MessageSentDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "message_sent"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/MessageSentDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "RunCancelledDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "run_cancelled"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/RunCancelledDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "ApprovalResolvedDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "approval_resolved"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/ApprovalResolvedDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "ApprovalExpiredDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "approval_expired"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/ApprovalExpiredDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "InputResolvedDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "input_resolved"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/InputResolvedDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "InputExpiredDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "input_expired"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/InputExpiredDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "SessionClientAddedDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "session_client_added"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/SessionClientAddedDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "SessionClientToolsSetDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "session_client_tools_set"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/SessionClientToolsSetDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "SessionClientRemovedDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "session_client_removed"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/SessionClientRemovedDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "VolumeFileWrittenDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "volume_file_written"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/VolumeFileWrittenDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "VolumeFileDeletedDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "volume_file_deleted"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/VolumeFileDeletedDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "VolumeDeletedDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "volume_deleted"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/VolumeDeletedDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "VaultCredentialUsedDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "vault_credential_used"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/VaultCredentialUsedDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "ChildSessionCreatedDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "child_session_created"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/ChildSessionCreatedDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "LoginDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "login"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/LoginDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "LoginRefusedDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "login_refused"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/LoginRefusedDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "LogoutDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "logout"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/LogoutDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "AccessTokenRevokedDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "access_token_revoked"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/AccessTokenRevokedDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "AuthorizationCodeReplayedDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "authorization_code_replayed"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/AuthorizationCodeReplayedDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "LoginRevokedDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "login_revoked"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/LoginRevokedDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "RefreshTokenReplayedDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "refresh_token_replayed"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/RefreshTokenReplayedDetails"
+              }
+            }
+          }
+        ],
+        "description": "An action this version of the API knows, with its details. An entry's `action` and `details` match one of these, or name an action added since."
+      },
+      "AuditIssuerBody": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "user_id",
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "user"
+                ]
+              },
+              "user_id": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "api_key_id",
+              "type"
+            ],
+            "properties": {
+              "api_key_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "api_key"
+                ]
+              }
+            }
+          }
+        ],
+        "description": "Who issued the credential an action came in on: the member who minted an\nAPI key, the member or API key that minted a session token, the admin\nbilling acted for.\nStable vocabulary for v1: adding a value requires a new API version."
+      },
+      "AuditLogEntryBody": {
+        "type": "object",
+        "description": "One thing done in the organization.",
+        "required": [
+          "id",
+          "occurred_at",
+          "action",
+          "result",
+          "actor",
+          "details",
+          "names"
+        ],
+        "properties": {
+          "action": {
+            "type": "string",
+            "description": "What was done. An open vocabulary: an action Subako starts recording\nlater arrives under its own name, so a client keeps a row it does not\nknow rather than rejecting it. `AuditEvent` lists the actions this\nversion knows."
+          },
+          "actor": {
+            "$ref": "#/components/schemas/AuditActorBody"
+          },
+          "category": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The action's category, or null for an action this version does not\nknow. An open vocabulary, as `action` is."
+          },
+          "details": {
+            "type": "object",
+            "description": "The action's facts. Their shape is the action's, as `AuditEvent`\ndocuments it; a field added later is absent from older rows."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "ip": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The address a member's or an API key's request came from. A session\ntoken's request, and Subako's own, record none."
+          },
+          "issuer": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AuditIssuerBody"
+              }
+            ]
+          },
+          "names": {
+            "$ref": "#/components/schemas/AuditNamesBody"
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "request_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "The request that did it, as its response's `x-request-id` named it."
+          },
+          "result": {
+            "$ref": "#/components/schemas/AuditResultBody"
+          },
+          "run_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "The run the action happened in, for what an agent did."
+          },
+          "subject": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The id of what the action was done to."
+          },
+          "subject_kind": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "What kind of thing `subject` is, which its action decides: `agent`,\n`vault`, `user`, and so on, as `KnownAuditSubjectKind` lists them. An\nopen vocabulary, as `action` is; null when there is no subject or the\naction is one this version does not know."
+          },
+          "user_agent": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The `User-Agent` the request came with. A session token's request,\nand the server acting on its own, record none."
+          },
+          "workspace_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          }
+        }
+      },
+      "AuditNameBody": {
+        "oneOf": [
+          {
+            "type": "object",
+            "description": "It is still there. `name` is null for one with no name, such as a\nsession no one named.",
+            "required": [
+              "state"
+            ],
+            "properties": {
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "state": {
+                "type": "string",
+                "enum": [
+                  "current"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "It was deleted, or the member left the organization.",
+            "required": [
+              "state"
+            ],
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": [
+                  "deleted"
+                ]
+              }
+            }
+          }
+        ],
+        "description": "What an id in an entry names now. The log keeps ids only; names are\nlooked up as the entry is read."
+      },
+      "AuditNamesBody": {
+        "type": "object",
+        "description": "The names of what an entry names, as they are now. A field is null where\nthe entry has no such id, or where what it names has no name: a session\ntoken, a login, a credit lot, an identity provider, or Subako itself.",
+        "properties": {
+          "actor": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AuditNameBody",
+                "description": "The member or API key the action came in on."
+              }
+            ]
+          },
+          "issuer": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AuditNameBody"
+              }
+            ]
+          },
+          "subject": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AuditNameBody"
+              }
+            ]
+          },
+          "workspace": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AuditNameBody"
+              }
+            ]
+          }
+        }
+      },
+      "AuditResultBody": {
+        "type": "string",
+        "description": "Whether the operation went ahead.\nStable vocabulary for v1: adding a value requires a new API version.",
+        "enum": [
+          "success",
+          "denied"
+        ]
+      },
+      "AuthorizationCodeReplayedDetails": {
+        "type": "object",
+        "description": "An authorization code was presented a second time, so the login it was redeemed for was revoked.",
+        "required": [
+          "authorization_request_id"
+        ],
+        "properties": {
+          "authorization_request_id": {
+            "type": "string",
+            "format": "uuid"
           }
         }
       },
@@ -11037,6 +13510,50 @@
             "description": "The audience (client id) to register the issuer under in IAM, and the\n`aud` a role's trust policy checks."
           }
         }
+      },
+      "BillingCheckoutStartedDetails": {
+        "type": "object",
+        "description": "An admin started a checkout with Subako's payment provider.",
+        "required": [
+          "kind"
+        ],
+        "properties": {
+          "amount_sc": {
+            "oneOf": [
+              {
+                "type": "integer",
+                "format": "int64"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The credits a purchase is for, in SC."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "subscription",
+              "plan_change",
+              "credits"
+            ]
+          },
+          "plan": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The plan a subscription or plan change is for."
+          }
+        }
+      },
+      "BillingPortalOpenedDetails": {
+        "type": "object",
+        "description": "An admin opened the payment provider's billing portal, where the payment method and the subscription can be changed."
       },
       "BucketWidthParam": {
         "type": "string",
@@ -11116,6 +13633,28 @@
         "properties": {
           "role": {
             "$ref": "#/components/schemas/WorkspaceRoleBody"
+          }
+        }
+      },
+      "ChildSessionCreatedDetails": {
+        "type": "object",
+        "description": "A run created a child session, which draws on the parent's vaults.",
+        "required": [
+          "parent_session_id",
+          "vault_ids"
+        ],
+        "properties": {
+          "parent_session_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "vault_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "The parent's vaults the child received."
           }
         }
       },
@@ -12048,6 +14587,53 @@
           }
         }
       },
+      "CreditsDepositedDetails": {
+        "type": "object",
+        "description": "Credits were added to the organization.",
+        "required": [
+          "source",
+          "amount"
+        ],
+        "properties": {
+          "amount": {
+            "type": "integer",
+            "format": "int64",
+            "description": "In base units of 1e-10 USD."
+          },
+          "expires_at": {
+            "oneOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "grant",
+              "purchase"
+            ]
+          }
+        }
+      },
+      "CreditsExpiredDetails": {
+        "type": "object",
+        "description": "Credits lapsed at the end of their lot's term.",
+        "required": [
+          "amount"
+        ],
+        "properties": {
+          "amount": {
+            "type": "integer",
+            "format": "int64",
+            "description": "What was left of the lot, in base units of 1e-10 USD."
+          }
+        }
+      },
       "DeltaBody": {
         "oneOf": [
           {
@@ -12430,6 +15016,10 @@
           }
         }
       },
+      "FunctionDeletedDetails": {
+        "type": "object",
+        "description": "A function was deleted."
+      },
       "FunctionGrantBody": {
         "type": "object",
         "description": "Grants access to the tools of one function package.",
@@ -12563,6 +15153,28 @@
           }
         ],
         "description": "Where a function's HTTP requests may go. Every variant refuses private\nand metadata addresses."
+      },
+      "FunctionPublishedDetails": {
+        "type": "object",
+        "description": "A function's version was published; version 1 creates the function.",
+        "required": [
+          "version",
+          "module_bytes"
+        ],
+        "properties": {
+          "module_bytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "FunctionRenamedDetails": {
+        "type": "object",
+        "description": "A function was renamed."
       },
       "FunctionSourceBody": {
         "oneOf": [
@@ -12731,6 +15343,19 @@
           "image/webp"
         ]
       },
+      "InputExpiredDetails": {
+        "type": "object",
+        "description": "A form the agent asked lapsed when no one answered in time.",
+        "required": [
+          "suspension_id"
+        ],
+        "properties": {
+          "suspension_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
       "InputRequestBody": {
         "type": "object",
         "description": "A form an agent put to a person: up to four questions answered at once.",
@@ -12824,6 +15449,27 @@
           }
         ],
         "description": "What settled a form."
+      },
+      "InputResolvedDetails": {
+        "type": "object",
+        "description": "A form the agent asked was answered or declined. The answers stay in the session.",
+        "required": [
+          "suspension_id",
+          "answer"
+        ],
+        "properties": {
+          "answer": {
+            "type": "string",
+            "enum": [
+              "submitted",
+              "declined"
+            ]
+          },
+          "suspension_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
       },
       "InputResponseForm": {
         "oneOf": [
@@ -12929,6 +15575,26 @@
           }
         }
       },
+      "InvitationCreatedDetails": {
+        "type": "object",
+        "description": "An address was invited to the organization.",
+        "required": [
+          "role"
+        ],
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "admin",
+              "member"
+            ]
+          }
+        }
+      },
+      "InvitationRevokedDetails": {
+        "type": "object",
+        "description": "A pending invitation was withdrawn."
+      },
       "KeyPermissionSchema": {
         "type": "string",
         "description": "One thing a key may do. A key holds a set of these, and a route refuses a caller whose key lacks the permission it names.",
@@ -12953,6 +15619,114 @@
           "usage.read"
         ]
       },
+      "KnownAuditAction": {
+        "type": "string",
+        "description": "The actions this version of the API knows. The list grows without a new API version; an entry may name an action outside it.",
+        "enum": [
+          "org_created",
+          "org_renamed",
+          "org_status_set",
+          "org_plan_set",
+          "org_metadata_set",
+          "org_metadata_deleted",
+          "oidc_provider_created",
+          "org_oidc_provider_set",
+          "credits_deposited",
+          "credits_expired",
+          "billing_checkout_started",
+          "billing_portal_opened",
+          "invitation_created",
+          "invitation_revoked",
+          "org_member_added",
+          "org_member_role_set",
+          "org_member_removed",
+          "org_member_renamed",
+          "workspace_member_added",
+          "workspace_member_role_set",
+          "workspace_member_removed",
+          "workspace_created",
+          "workspace_renamed",
+          "workspace_deleted",
+          "api_key_created",
+          "api_key_revoked",
+          "agent_created",
+          "agent_renamed",
+          "agent_origins_set",
+          "agent_published",
+          "agent_deleted",
+          "vault_created",
+          "vault_updated",
+          "vault_deleted",
+          "vault_credential_created",
+          "vault_credential_reconnected",
+          "vault_credential_checked",
+          "vault_credential_deleted",
+          "oauth_client_created",
+          "oauth_client_updated",
+          "oauth_client_deleted",
+          "model_provider_created",
+          "model_provider_updated",
+          "model_provider_deleted",
+          "skill_published",
+          "skill_renamed",
+          "skill_deleted",
+          "function_published",
+          "function_renamed",
+          "function_deleted",
+          "session_created",
+          "session_renamed",
+          "session_deleted",
+          "session_token_created",
+          "session_vault_added",
+          "sandbox_archive_deleted",
+          "message_sent",
+          "run_cancelled",
+          "approval_resolved",
+          "approval_expired",
+          "input_resolved",
+          "input_expired",
+          "session_client_added",
+          "session_client_tools_set",
+          "session_client_removed",
+          "volume_file_written",
+          "volume_file_deleted",
+          "volume_deleted",
+          "vault_credential_used",
+          "child_session_created",
+          "login",
+          "login_refused",
+          "logout",
+          "access_token_revoked",
+          "authorization_code_replayed",
+          "login_revoked",
+          "refresh_token_replayed"
+        ]
+      },
+      "KnownAuditSubjectKind": {
+        "type": "string",
+        "description": "The kinds of subject this version of the API knows. The list grows without a new API version; an entry may name a kind outside it.",
+        "enum": [
+          "organization",
+          "workspace",
+          "user",
+          "invitation",
+          "api_key",
+          "agent",
+          "agent_version",
+          "vault",
+          "credential",
+          "oauth_client",
+          "model_provider",
+          "skill",
+          "function",
+          "session",
+          "session_token",
+          "client",
+          "grant",
+          "credit_lot",
+          "oidc_provider"
+        ]
+      },
       "LlmTokensSummaryBody": {
         "type": "object",
         "description": "Model calls by how they were priced. A class with no calls is absent.",
@@ -12969,6 +15743,73 @@
             "description": "Calls a charge was due for but no rate priced."
           }
         }
+      },
+      "LoginDetails": {
+        "type": "object",
+        "description": "A member logged in. The login is the subject: what an access token it issued does carries the same id.",
+        "required": [
+          "method"
+        ],
+        "properties": {
+          "method": {
+            "type": "string",
+            "enum": [
+              "authorization_code",
+              "device"
+            ]
+          }
+        }
+      },
+      "LoginRefusedDetails": {
+        "type": "object",
+        "description": "A login into the organization did not complete, one row per attempt. Whoever signs in at the identity provider is recorded only when they are a user this organization knows, such as a former member: then the actor is that user, with the address and `User-Agent` they came from. Anyone else is recorded as the system, with no name, email address, IP address, or `User-Agent`; the identity provider's sign-in log says who they were.",
+        "required": [
+          "method",
+          "reason"
+        ],
+        "properties": {
+          "method": {
+            "type": "string",
+            "enum": [
+              "authorization_code",
+              "device"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "email_unverified",
+              "not_invited",
+              "upstream_failed",
+              "no_refresh_token"
+            ]
+          }
+        }
+      },
+      "LoginRevokedDetails": {
+        "type": "object",
+        "description": "A login's identity provider, asked again, no longer vouched for it, so the login was revoked.",
+        "required": [
+          "oidc_provider_id",
+          "refusal"
+        ],
+        "properties": {
+          "oidc_provider_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "refusal": {
+            "type": "string",
+            "enum": [
+              "invalid_grant",
+              "subject_changed"
+            ]
+          }
+        }
+      },
+      "LogoutDetails": {
+        "type": "object",
+        "description": "A member logged out, ending the login and every token it issued."
       },
       "ManifestFunctionBody": {
         "type": "object",
@@ -13211,6 +16052,19 @@
               "string",
               "null"
             ]
+          }
+        }
+      },
+      "MessageSentDetails": {
+        "type": "object",
+        "description": "A message was sent to a session, starting a run or steering the one under way. The message itself stays in the session.",
+        "required": [
+          "steered"
+        ],
+        "properties": {
+          "steered": {
+            "type": "boolean",
+            "description": "Whether it steered a run under way rather than starting one."
           }
         }
       },
@@ -13674,6 +16528,36 @@
         ],
         "description": "Public provider choices. Platform providers publish a model catalog;\nBYOK providers belong to a workspace and use its own credentials."
       },
+      "ModelProviderCreatedDetails": {
+        "type": "object",
+        "description": "A model provider was added to a workspace.",
+        "required": [
+          "format",
+          "auth"
+        ],
+        "properties": {
+          "auth": {
+            "type": "string",
+            "enum": [
+              "api_key",
+              "aws_web_identity",
+              "anthropic_workload_identity",
+              "openai_workload_identity"
+            ]
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "anthropic",
+              "openai_responses"
+            ]
+          }
+        }
+      },
+      "ModelProviderDeletedDetails": {
+        "type": "object",
+        "description": "A model provider was deleted."
+      },
       "ModelProviderDetailsBody": {
         "type": "object",
         "description": "Shared public provider metadata. Connections and credentials stay private.",
@@ -13733,6 +16617,46 @@
           "platform",
           "byok"
         ]
+      },
+      "ModelProviderUpdatedDetails": {
+        "type": "object",
+        "description": "A model provider's settings changed.",
+        "required": [
+          "display_name",
+          "description",
+          "base_url"
+        ],
+        "properties": {
+          "auth": {
+            "oneOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "api_key",
+                  "aws_web_identity",
+                  "anthropic_workload_identity",
+                  "openai_workload_identity"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How it now authenticates, when that changed."
+          },
+          "base_url": {
+            "type": "boolean",
+            "description": "Whether the base URL changed."
+          },
+          "description": {
+            "type": "boolean",
+            "description": "Whether the description changed."
+          },
+          "display_name": {
+            "type": "boolean",
+            "description": "Whether the display name changed."
+          }
+        }
       },
       "ModelUsageBody": {
         "oneOf": [
@@ -13885,6 +16809,58 @@
           }
         }
       },
+      "OauthClientCreatedDetails": {
+        "type": "object",
+        "description": "An OAuth client was registered for connecting credentials."
+      },
+      "OauthClientDeletedDetails": {
+        "type": "object",
+        "description": "An OAuth client was deleted."
+      },
+      "OauthClientUpdatedDetails": {
+        "type": "object",
+        "description": "An OAuth client's settings changed.",
+        "required": [
+          "display_name",
+          "auth",
+          "scopes",
+          "authorization_params"
+        ],
+        "properties": {
+          "auth": {
+            "type": "boolean",
+            "description": "Whether how the client authenticates changed, its secret included."
+          },
+          "authorization_params": {
+            "type": "boolean",
+            "description": "Whether the extra authorization parameters changed."
+          },
+          "display_name": {
+            "type": "boolean",
+            "description": "Whether the display name changed."
+          },
+          "scopes": {
+            "type": "boolean",
+            "description": "Whether the scopes changed."
+          }
+        }
+      },
+      "OidcProviderCreatedDetails": {
+        "type": "object",
+        "description": "An identity provider was registered.",
+        "required": [
+          "kind"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "standard",
+              "google"
+            ]
+          }
+        }
+      },
       "OpenaiResponsesModelBody": {
         "type": "object",
         "required": [
@@ -14009,6 +16985,43 @@
           "desc"
         ]
       },
+      "OrgCreatedDetails": {
+        "type": "object",
+        "description": "The organization was created.",
+        "required": [
+          "metadata_keys"
+        ],
+        "properties": {
+          "metadata_keys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The catalog metadata it was created with, by key."
+          }
+        }
+      },
+      "OrgMemberAddedDetails": {
+        "type": "object",
+        "description": "An invited person joined at their first login.",
+        "required": [
+          "role",
+          "invitation_id"
+        ],
+        "properties": {
+          "invitation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "admin",
+              "member"
+            ]
+          }
+        }
+      },
       "OrgMemberBody": {
         "type": "object",
         "required": [
@@ -14044,6 +17057,127 @@
           }
         }
       },
+      "OrgMemberRemovedDetails": {
+        "type": "object",
+        "description": "A member was removed from the organization.",
+        "required": [
+          "workspace_memberships_removed",
+          "grants_revoked",
+          "pending_invitations_deleted",
+          "orphaned_api_keys"
+        ],
+        "properties": {
+          "grants_revoked": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The member's logins in the organization, revoked with the membership."
+          },
+          "orphaned_api_keys": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Live API keys the member created, which keep working."
+          },
+          "pending_invitations_deleted": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "workspace_memberships_removed": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "OrgMemberRenamedDetails": {
+        "type": "object",
+        "description": "A member changed their own display name.",
+        "required": [
+          "cleared"
+        ],
+        "properties": {
+          "cleared": {
+            "type": "boolean",
+            "description": "Whether the name was cleared rather than set."
+          }
+        }
+      },
+      "OrgMemberRoleSetDetails": {
+        "type": "object",
+        "description": "A member's role in the organization changed.",
+        "required": [
+          "role"
+        ],
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "admin",
+              "member"
+            ]
+          }
+        }
+      },
+      "OrgMetadataDeletedDetails": {
+        "type": "object",
+        "description": "A metadata entry was removed from the organization.",
+        "required": [
+          "key"
+        ],
+        "properties": {
+          "key": {
+            "type": "string"
+          }
+        }
+      },
+      "OrgMetadataSetDetails": {
+        "type": "object",
+        "description": "A metadata entry was set on the organization.",
+        "required": [
+          "key"
+        ],
+        "properties": {
+          "key": {
+            "type": "string"
+          }
+        }
+      },
+      "OrgOidcProviderSetDetails": {
+        "type": "object",
+        "description": "The organization's members now sign in through another identity provider.",
+        "required": [
+          "oidc_provider_id",
+          "member_count"
+        ],
+        "properties": {
+          "member_count": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Members whose sign-in the switch affects."
+          },
+          "oidc_provider_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "OrgPlanSetDetails": {
+        "type": "object",
+        "description": "The organization moved to another plan.",
+        "required": [
+          "plan"
+        ],
+        "properties": {
+          "plan": {
+            "type": "string"
+          }
+        }
+      },
+      "OrgRenamedDetails": {
+        "type": "object",
+        "description": "The organization was renamed."
+      },
       "OrgRoleBody": {
         "type": "string",
         "description": "What a member may do in the organization. An admin manages members,\ninvitations, and billing; a member does not.",
@@ -14051,6 +17185,29 @@
           "admin",
           "member"
         ]
+      },
+      "OrgStatusSetDetails": {
+        "type": "object",
+        "description": "Subako set the organization's status.",
+        "required": [
+          "status",
+          "runs_cancelled"
+        ],
+        "properties": {
+          "runs_cancelled": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Runs the change stopped."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "suspended",
+              "closed"
+            ]
+          }
+        }
       },
       "OrganizationBody": {
         "type": "object",
@@ -14219,6 +17376,38 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ApiKeyBody"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Pass back as `after` for the next page; `null` on the last page."
+          },
+          "prev_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Pass back as `before` for the previous page; `null` on the first page."
+          }
+        }
+      },
+      "PageOut_AuditLogEntryBody": {
+        "type": "object",
+        "required": [
+          "items",
+          "next_cursor",
+          "prev_cursor"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditLogEntryBody"
             }
           },
           "next_cursor": {
@@ -15246,6 +18435,19 @@
           }
         }
       },
+      "RefreshTokenReplayedDetails": {
+        "type": "object",
+        "description": "A refresh token was presented after it was spent, so the login it belongs to was revoked.",
+        "required": [
+          "presented_refresh_token_id"
+        ],
+        "properties": {
+          "presented_refresh_token_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
       "RegisterClientBody": {
         "type": "object",
         "required": [
@@ -15400,6 +18602,10 @@
           "tool_result"
         ]
       },
+      "RunCancelledDetails": {
+        "type": "object",
+        "description": "A session's run was cancelled."
+      },
       "RuntimeSummaryBody": {
         "type": "object",
         "description": "Run time by how it was priced. A class with none is absent.",
@@ -15432,6 +18638,19 @@
           },
           "url": {
             "type": "string"
+          }
+        }
+      },
+      "SandboxArchiveDeletedDetails": {
+        "type": "object",
+        "description": "A session's sandbox archive was deleted.",
+        "required": [
+          "bytes"
+        ],
+        "properties": {
+          "bytes": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },
@@ -15583,6 +18802,72 @@
           }
         }
       },
+      "SessionClientAddedDetails": {
+        "type": "object",
+        "description": "A client joined a session, offering its tools to the agent.",
+        "required": [
+          "session_id"
+        ],
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "SessionClientRemovedDetails": {
+        "type": "object",
+        "description": "A client left a session.",
+        "required": [
+          "session_id"
+        ],
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "SessionClientToolsSetDetails": {
+        "type": "object",
+        "description": "A client replaced the tools it offers.",
+        "required": [
+          "session_id"
+        ],
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "SessionCreatedDetails": {
+        "type": "object",
+        "description": "A session was created.",
+        "required": [
+          "agent_id",
+          "agent_version_id",
+          "vault_ids"
+        ],
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "agent_version_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "vault_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Vaults whose credentials the session's tools may use."
+          }
+        }
+      },
       "SessionCreatorBody": {
         "oneOf": [
           {
@@ -15631,6 +18916,10 @@
           }
         ],
         "description": "Who created the session: the header-surface user or the API key a\nbackend presented."
+      },
+      "SessionDeletedDetails": {
+        "type": "object",
+        "description": "A session was deleted, with the sessions under it."
       },
       "SessionDeltaBody": {
         "type": "object",
@@ -16282,6 +19571,10 @@
         ],
         "description": "One typed session event; `type` is the canonical kind spelling."
       },
+      "SessionRenamedDetails": {
+        "type": "object",
+        "description": "A session was renamed."
+      },
       "SessionSandboxBody": {
         "type": "object",
         "required": [
@@ -16458,6 +19751,24 @@
           }
         }
       },
+      "SessionTokenCreatedDetails": {
+        "type": "object",
+        "description": "A session token was created.",
+        "required": [
+          "session_id",
+          "expires_at"
+        ],
+        "properties": {
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "session_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
       "SessionTokenReceiptBody": {
         "type": "object",
         "required": [
@@ -16475,6 +19786,19 @@
             "format": "uuid"
           },
           "session_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "SessionVaultAddedDetails": {
+        "type": "object",
+        "description": "A vault was added to a session.",
+        "required": [
+          "vault_id"
+        ],
+        "properties": {
+          "vault_id": {
             "type": "string",
             "format": "uuid"
           }
@@ -16542,6 +19866,10 @@
           }
         }
       },
+      "SkillDeletedDetails": {
+        "type": "object",
+        "description": "A skill was deleted."
+      },
       "SkillGrantBody": {
         "type": "object",
         "description": "Grants read access to one versioned skill bundle.",
@@ -16566,6 +19894,28 @@
             "description": "Resolved when each session is created, including child sessions.\n`latest` selects the newest skill version then; later uploads affect\nnew sessions without republishing the agent. Existing sessions keep\ntheir resolved content across runs and retries."
           }
         }
+      },
+      "SkillPublishedDetails": {
+        "type": "object",
+        "description": "A skill's version was published; version 1 creates the skill.",
+        "required": [
+          "version",
+          "bundle_bytes"
+        ],
+        "properties": {
+          "bundle_bytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "SkillRenamedDetails": {
+        "type": "object",
+        "description": "A skill was renamed."
       },
       "SkillVersionBody": {
         "type": "object",
@@ -17512,6 +20862,127 @@
           }
         }
       },
+      "VaultCreatedDetails": {
+        "type": "object",
+        "description": "A vault was created."
+      },
+      "VaultCredentialCheckedDetails": {
+        "type": "object",
+        "description": "A credential was tried against its server, which may refresh it or mark it for reconnecting.",
+        "required": [
+          "vault_id",
+          "outcome"
+        ],
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "connected",
+              "rejected",
+              "reconnect_required"
+            ]
+          },
+          "vault_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "VaultCredentialCreatedDetails": {
+        "type": "object",
+        "description": "A credential was created in a vault.",
+        "required": [
+          "vault_id",
+          "via"
+        ],
+        "properties": {
+          "vault_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "via": {
+            "type": "string",
+            "enum": [
+              "direct",
+              "oauth"
+            ]
+          }
+        }
+      },
+      "VaultCredentialDeletedDetails": {
+        "type": "object",
+        "description": "A credential was deleted.",
+        "required": [
+          "vault_id"
+        ],
+        "properties": {
+          "vault_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "VaultCredentialReconnectedDetails": {
+        "type": "object",
+        "description": "A credential was reauthorized through OAuth.",
+        "required": [
+          "vault_id"
+        ],
+        "properties": {
+          "vault_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "VaultCredentialUsedDetails": {
+        "type": "object",
+        "description": "A run used a vault credential, the first time it did. The actor is whoever sent the message that started the run.",
+        "required": [
+          "session_id",
+          "used_for"
+        ],
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "used_for": {
+            "type": "string",
+            "enum": [
+              "mcp",
+              "http"
+            ]
+          }
+        }
+      },
+      "VaultDeletedDetails": {
+        "type": "object",
+        "description": "A vault was deleted, with its credentials."
+      },
+      "VaultUpdatedDetails": {
+        "type": "object",
+        "description": "A vault's settings changed.",
+        "required": [
+          "display_name",
+          "external_id",
+          "metadata"
+        ],
+        "properties": {
+          "display_name": {
+            "type": "boolean",
+            "description": "Whether the display name changed."
+          },
+          "external_id": {
+            "type": "boolean",
+            "description": "Whether the external id changed."
+          },
+          "metadata": {
+            "type": "boolean",
+            "description": "Whether the metadata changed."
+          }
+        }
+      },
       "VersionPinBody": {
         "oneOf": [
           {
@@ -17602,6 +21073,10 @@
         ],
         "description": "Whether the volume offers a persistent `/volume/data` root. `enabled`\nmounts it for the session tree's functions."
       },
+      "VolumeDeletedDetails": {
+        "type": "object",
+        "description": "A session's volume was deleted."
+      },
       "VolumeFileBody": {
         "type": "object",
         "required": [
@@ -17628,6 +21103,22 @@
             "format": "int64",
             "description": "Bytes for a file; 0 for a directory or a symlink.",
             "minimum": 0
+          }
+        }
+      },
+      "VolumeFileDeletedDetails": {
+        "type": "object",
+        "description": "A file was deleted from a session's volume.",
+        "required": [
+          "area"
+        ],
+        "properties": {
+          "area": {
+            "type": "string",
+            "enum": [
+              "data",
+              "tmp"
+            ]
           }
         }
       },
@@ -17681,6 +21172,27 @@
           "path": {
             "type": "string",
             "description": "The file's path in the area."
+          }
+        }
+      },
+      "VolumeFileWrittenDetails": {
+        "type": "object",
+        "description": "A file was written to a session's volume. Its path and content stay in the volume.",
+        "required": [
+          "area",
+          "bytes"
+        ],
+        "properties": {
+          "area": {
+            "type": "string",
+            "enum": [
+              "data",
+              "tmp"
+            ]
+          },
+          "bytes": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },
@@ -17850,6 +21362,30 @@
           }
         }
       },
+      "WorkspaceCreatedDetails": {
+        "type": "object",
+        "description": "A workspace was created."
+      },
+      "WorkspaceDeletedDetails": {
+        "type": "object",
+        "description": "A workspace was deleted, with everything in it."
+      },
+      "WorkspaceMemberAddedDetails": {
+        "type": "object",
+        "description": "A member was added to a workspace.",
+        "required": [
+          "role"
+        ],
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "admin",
+              "member"
+            ]
+          }
+        }
+      },
       "WorkspaceMemberBody": {
         "type": "object",
         "description": "One member of a workspace, with the role they hold in it.",
@@ -17885,6 +21421,43 @@
             "format": "uuid"
           }
         }
+      },
+      "WorkspaceMemberRemovedDetails": {
+        "type": "object",
+        "description": "A member was removed from a workspace.",
+        "required": [
+          "orphaned_api_keys"
+        ],
+        "properties": {
+          "orphaned_api_keys": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Live API keys the member created in the workspace, which keep working."
+          }
+        }
+      },
+      "WorkspaceMemberRoleSetDetails": {
+        "type": "object",
+        "description": "A member's role in a workspace changed.",
+        "required": [
+          "role"
+        ],
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "admin",
+              "member"
+            ]
+          }
+        }
+      },
+      "WorkspaceRenamedDetails": {
+        "type": "object",
+        "description": "A workspace was renamed."
       },
       "WorkspaceRoleBody": {
         "type": "string",

@@ -1,4 +1,5 @@
 export { type AgentVersionConfig, readAgentConfig } from "./agent-config.js";
+export { type AuditEntryEvent, auditEventOf } from "./audit.js";
 export { SubakoClient } from "./client.js";
 export type {
 	ClientOptions,
@@ -125,6 +126,7 @@ export type { Me } from "./resources/me.js";
 export type { ListModelProvidersParams, ModelProviders } from "./resources/model-providers.js";
 export type { ListOAuthClientsParams, OAuthClients } from "./resources/oauth-clients.js";
 export type {
+	ListAuditLogsParams,
 	ListInvitationsParams,
 	ListMembersParams,
 	ListUsageParams,
@@ -162,6 +164,12 @@ export type {
 	ApiKeyReceiptBody,
 	ApprovalDecisionForm,
 	AskUserGrantBody,
+	AuditActorBody,
+	AuditEvent,
+	AuditIssuerBody,
+	AuditLogEntryBody,
+	AuditNameBody,
+	AuditNamesBody,
 	AuthorizationParamBody,
 	AwsWorkloadIdentityBody,
 	BuiltinGrantsBody,
@@ -313,6 +321,8 @@ export type {
 export {
 	AnthropicEffortBody,
 	ApprovalDecisionBody,
+	AuditCategoryBody,
+	AuditResultBody,
 	BucketWidthParam,
 	ClientCallFailureBody,
 	ClientLeaveReasonBody,
@@ -327,6 +337,8 @@ export {
 	ImageMediaTypeBody,
 	InputSourceBody,
 	KeyPermissionSchema,
+	KnownAuditAction,
+	KnownAuditSubjectKind,
 	McpSchemeBody,
 	ModelProviderFormatBody,
 	ModelProviderOwnerBody,
