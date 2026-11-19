@@ -74,6 +74,7 @@ const said = (seq: number): SessionEventBody => ({
 	seq,
 	created_at: "2026-01-01T00:00:00Z",
 	type: "message_user",
+	attachments: [],
 	source: "client",
 	message: { role: "user", content: [{ type: "text", data: { text: `turn ${seq}` } }] },
 });
@@ -1010,6 +1011,111 @@ describe("the session connection, as a session", () => {
 		expect(await written[3]?.json()).toEqual({ decision: "deny", message: "not this one" });
 		expect(await written[4]?.json()).toEqual({ type: "declined", data: { message: "later" } });
 		expect(written.map((call) => call.headers.get("kikuvi-workspace"))).toEqual(["w2", "w2", "w2", "w2", "w2"]);
+
+		connection.close();
+	});
+
+	it("uploads a file and names it in the turn that carries it", async () => {
+		const stream = openSse([], { close: false });
+		const upload = { id: "u1", name: "a.txt", media_type: "text/plain", bytes: 2, expires_at: "2026-01-02T00:00:00Z" };
+		const http = stubFetch((request) => {
+			const { pathname } = new URL(request.url);
+			if (pathname.endsWith("/events/stream")) return stream.response;
+			return json(pathname.endsWith("/uploads") ? upload : { seq: 1 });
+		});
+		const client = testClient({ fetch: http.fetch });
+		const connection = client.sessions.connect("s1", { workspaceId: "w2" });
+		await connection.ready;
+
+		const { id } = await connection.upload(new Blob(["hi"]), { name: "a.txt" });
+		await connection.send("", { uploadIds: [id] });
+
+		const [uploaded, posted] = http.calls.slice(1);
+		expect(uploaded?.url).toBe("https://api.test/v1/sessions/s1/uploads?name=a.txt");
+		expect(uploaded?.headers.get("kikuvi-workspace")).toBe("w2");
+		expect(await posted?.json()).toEqual({ type: "input", text: "", upload_ids: ["u1"] });
+
+		connection.close();
+	});
+
+	it("uploads a turn's files once however often the turn is tried, and anew once Core no longer holds them", async () => {
+		const stream = openSse([], { close: false });
+		let uploads = 0;
+		const posts: ("fail" | "invalid" | "gone" | "take")[] = ["fail", "take", "invalid", "gone", "take"];
+		const http = stubFetch((request) => {
+			const { pathname } = new URL(request.url);
+			if (pathname.endsWith("/events/stream")) return stream.response;
+			if (pathname.endsWith("/uploads")) {
+				uploads += 1;
+				// The second file's first upload fails, and goes up again with the next try.
+				if (uploads === 2) return json({ error: { code: "internal", message: "boom" } }, 500);
+				return json({ id: `u${uploads}`, name: "a", media_type: "text/plain", bytes: 1, expires_at: "" });
+			}
+			const outcome = posts.shift();
+			if (outcome === "fail") return json({ error: { code: "internal", message: "boom" } }, 500);
+			if (outcome === "invalid") return json({ error: { code: "invalid_request", message: "malformed" } }, 400);
+			if (outcome === "gone") return json({ error: { code: "not_found", message: "no such upload" } }, 404);
+			return json({ seq: 1 });
+		});
+		const client = testClient({ fetch: http.fetch, maxRetries: 0 });
+		const connection = client.sessions.connect("s1");
+		await connection.ready;
+		const files = [new File(["a"], "a.txt"), new File(["b"], "b.txt")];
+
+		await expect(connection.send("these", { files })).rejects.toThrow();
+		expect(uploads).toBe(2);
+		await expect(connection.send("these", { files })).rejects.toThrow();
+		expect(uploads).toBe(3);
+		await connection.send("these", { files });
+		expect(uploads).toBe(3);
+		// Carried by that turn, the files go up anew with the next one.
+		await expect(connection.send("again", { files })).rejects.toThrow();
+		expect(uploads).toBe(5);
+		// A refusal that is not about the uploads leaves them named by the next try.
+		await expect(connection.send("again", { files })).rejects.toThrow();
+		expect(uploads).toBe(5);
+		// Core no longer holds the uploads it was named, so the next try does not name them again.
+		await connection.send("again", { files });
+		expect(uploads).toBe(7);
+
+		const posted = await Promise.all(
+			http.calls.filter((call) => new URL(call.url).pathname.endsWith("/events")).map((call) => call.json()),
+		);
+		// The first try posted nothing: an upload failed under it.
+		expect(posted.map((body) => body.upload_ids)).toEqual([
+			["u1", "u3"],
+			["u1", "u3"],
+			["u4", "u5"],
+			["u4", "u5"],
+			["u6", "u7"],
+		]);
+
+		connection.close();
+	});
+
+	it("uploads a file the turn names twice once, and names it once", async () => {
+		const stream = openSse([], { close: false });
+		let uploads = 0;
+		const http = stubFetch((request) => {
+			const { pathname } = new URL(request.url);
+			if (pathname.endsWith("/events/stream")) return stream.response;
+			if (pathname.endsWith("/uploads")) {
+				uploads += 1;
+				return json({ id: `u${uploads}`, name: "a", media_type: "text/plain", bytes: 1, expires_at: "" });
+			}
+			return json({ seq: 1 });
+		});
+		const client = testClient({ fetch: http.fetch });
+		const connection = client.sessions.connect("s1");
+		await connection.ready;
+		const a = new File(["a"], "a.txt");
+		const b = new File(["b"], "b.txt");
+
+		await connection.send("these", { files: [a, b, a] });
+
+		expect(uploads).toBe(2);
+		const posted = http.calls.find((call) => new URL(call.url).pathname.endsWith("/events"));
+		expect(await posted?.json()).toEqual({ type: "input", text: "these", upload_ids: ["u1", "u2"] });
 
 		connection.close();
 	});

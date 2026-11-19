@@ -3,16 +3,20 @@
 import type { ReasoningMessagePartProps, ToolCallMessagePartProps } from "@assistant-ui/react";
 import {
 	AssistantRuntimeProvider,
+	AttachmentPrimitive,
 	ComposerPrimitive,
 	MessagePartPrimitive,
 	MessagePrimitive,
 	ThreadPrimitive,
+	useAuiState,
 } from "@assistant-ui/react";
 import { MarkdownTextPrimitive } from "@assistant-ui/react-markdown";
 import { useSessionState } from "@subako-ai/react";
+import type { AttachmentBody } from "@subako-ai/sdk";
 import type { ComponentProps, ReactNode } from "react";
-import { createContext, useContext } from "react";
+import { createContext, useContext, useState } from "react";
 import remarkGfm from "remark-gfm";
+import type { SubakoMessageMetadata } from "./convert.js";
 import { SubakoInputForm, type WidgetRenderers } from "./input-form.js";
 import type { SubakoSession } from "./runtime.js";
 import { useSubakoRuntime } from "./runtime.js";
@@ -117,7 +121,19 @@ const STYLE = `
 	background: var(--subako-bg); color: var(--subako-fg); font: inherit; cursor: pointer; }
 .subako-input-actions button:disabled { opacity: 0.5; cursor: default; }
 .subako-input-error { color: var(--subako-error); font-size: 12px; }
-.subako-composer { display: flex; gap: 8px; padding: 8px; border-top: 1px solid var(--subako-border);
+.subako-files { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.subako-files:first-child { margin-top: 0; }
+.subako-file { display: inline-flex; align-items: baseline; gap: 6px; max-width: 100%; padding: 2px 8px;
+	border: 1px solid var(--subako-border); border-radius: 6px; background: var(--subako-bg);
+	color: var(--subako-fg); font: inherit; font-size: 12px; }
+button.subako-file { cursor: pointer; }
+.subako-file-size { color: var(--subako-muted); }
+.subako-file[data-error] .subako-file-size { color: var(--subako-error); }
+.subako-file button { padding: 0 2px; border: 0; background: none; color: var(--subako-muted); font: inherit;
+	cursor: pointer; }
+.subako-composer-files { display: flex; flex-wrap: wrap; gap: 4px; flex: 1 0 100%; }
+.subako-composer-files:empty { display: none; }
+.subako-composer { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px; border-top: 1px solid var(--subako-border);
 	background: var(--subako-bg); color: var(--subako-fg); }
 .subako-input { flex: 1 1 auto; resize: none; padding: 6px 8px; border: 1px solid var(--subako-border);
 	border-radius: 8px; background: var(--subako-bg); color: var(--subako-fg); font: inherit; }
@@ -147,6 +163,10 @@ div:where(.subako-chat) fieldset:where(.subako-input-question),
 div:where(.subako-chat) legend:where(.subako-input-prompt),
 div:where(.subako-chat) label:where(.subako-input-option),
 div:where(.subako-chat) :where(.subako-input-text):is(input, textarea),
+div:where(.subako-chat) div:where(.subako-files, .subako-composer-files, .subako-file),
+div:where(.subako-chat) button:where(.subako-file),
+div:where(.subako-chat) span:where(.subako-file-size),
+div:where(.subako-chat) :where(.subako-file) > button,
 div:where(.subako-chat) form:where(.subako-composer),
 div:where(.subako-chat) textarea:where(.subako-input),
 div:where(.subako-chat) textarea:where(.subako-input)::placeholder { all: revert-layer; }
@@ -302,10 +322,83 @@ function partsOf(theirs: PartComponents | undefined): PartComponents {
 	};
 }
 
+/** The session the chat draws, for the parts that call it. */
+const SessionContext = createContext<SubakoSession | null>(null);
+
+const UNITS = ["B", "KB", "MB", "GB"] as const;
+
+/** A length in the largest unit that keeps it at one or above. */
+function sizeOf(bytes: number): string {
+	const unit = Math.min(UNITS.length - 1, bytes < 1 ? 0 : Math.floor(Math.log(bytes) / Math.log(1024)));
+	const value = bytes / 1024 ** unit;
+	return `${unit === 0 ? value : value.toFixed(1)} ${UNITS[unit]}`;
+}
+
+/** Hands `blob` to the browser as a download named `name`. */
+function save(blob: Blob, name: string): void {
+	const url = URL.createObjectURL(blob);
+	const link = document.createElement("a");
+	link.href = url;
+	link.download = name;
+	link.click();
+	// Revoked once the click has handed the download to the browser.
+	setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+/** One file a message carries: its name and its size, downloaded on a click, and why not when it could not be. */
+function MessageFile({ file }: { readonly file: AttachmentBody }): ReactNode {
+	const session = useContext(SessionContext);
+	const [failed, setFailed] = useState(false);
+	return (
+		<button
+			type="button"
+			className="subako-file"
+			disabled={session === null}
+			data-error={failed ? "" : undefined}
+			onClick={() => {
+				setFailed(false);
+				session?.readAttachment(file.id).then(
+					(blob) => save(blob, file.name),
+					() => setFailed(true),
+				);
+			}}
+		>
+			{file.name}
+			<span className="subako-file-size">{failed ? "download failed" : sizeOf(file.bytes)}</span>
+		</button>
+	);
+}
+
+/** The files the message in scope carries, whoever wrote it. */
+function MessageFiles(): ReactNode {
+	const files = useAuiState((s) => (s.message.metadata.custom as SubakoMessageMetadata).attachments);
+	if (files === undefined) {
+		return null;
+	}
+	return (
+		<div className="subako-files">
+			{files.map((file) => (
+				<MessageFile key={file.id} file={file} />
+			))}
+		</div>
+	);
+}
+
+/** A file picked for the turn being written, with the button that takes it back. */
+function ComposerFile(): ReactNode {
+	return (
+		<AttachmentPrimitive.Root className="subako-file">
+			<AttachmentPrimitive.Name />
+			<AttachmentPrimitive.Remove aria-label="Remove">×</AttachmentPrimitive.Remove>
+		</AttachmentPrimitive.Root>
+	);
+}
+
 function UserMessage(): ReactNode {
 	return (
 		<MessagePrimitive.Root className="subako-message subako-user">
 			<MessagePrimitive.Parts />
+			<MessageFiles />
 		</MessagePrimitive.Root>
 	);
 }
@@ -316,6 +409,7 @@ function AssistantMessage(): ReactNode {
 		<MessagePrimitive.Root className="subako-message subako-assistant">
 			{/* A tool the app registered a UI for keeps it; everything else falls back to the row above. */}
 			<MessagePrimitive.Parts components={partsOf(theirs)} />
+			<MessageFiles />
 		</MessagePrimitive.Root>
 	);
 }
@@ -346,6 +440,12 @@ export interface SubakoChatProps {
 	 * person tell the agent the app cannot show it.
 	 */
 	readonly widgets?: WidgetRenderers;
+	/**
+	 * Lets the person attach files to a turn. Set it for a session whose agent
+	 * enables attachments; any other refuses the upload. The files a message
+	 * already carries are shown either way.
+	 */
+	readonly allowAttachments?: boolean;
 	/** Rendered inside the runtime, which is where a tool UI registers itself. */
 	readonly children?: ReactNode;
 }
@@ -358,37 +458,55 @@ export interface SubakoChatProps {
  * first ten minutes; an app that wants its own thread keeps `useSubakoRuntime`
  * and builds the rest from assistant-ui's primitives.
  */
-export function SubakoChat({ session, className, components, nonce, widgets, children }: SubakoChatProps): ReactNode {
-	const runtime = useSubakoRuntime(session);
+export function SubakoChat({
+	session,
+	className,
+	components,
+	nonce,
+	widgets,
+	allowAttachments,
+	children,
+}: SubakoChatProps): ReactNode {
+	const runtime = useSubakoRuntime(session, { allowAttachments });
 	const state = useSessionState(session);
 	return (
 		<AssistantRuntimeProvider runtime={runtime}>
 			<style nonce={nonce}>{STYLE}</style>
 			{children}
-			<PartsContext.Provider value={components}>
-				<ThreadPrimitive.Root className={className === undefined ? "subako-chat" : `subako-chat ${className}`}>
-					<ThreadPrimitive.Viewport className="subako-viewport">
-						<ThreadPrimitive.Messages components={{ UserMessage, AssistantMessage }} />
-					</ThreadPrimitive.Viewport>
-					{session === null || state === null || state.inputs.length === 0 ? null : (
-						<div className="subako-inputs">
-							{state.inputs.map((input) => (
-								<SubakoInputForm
-									key={`${input.call_id}:${input.seq}`}
-									input={input}
-									widgets={widgets}
-									onAnswer={(answer) => session.answerInput(input.call_id, answer)}
-								/>
-							))}
-						</div>
-					)}
-					<ComposerPrimitive.Root className="subako-composer">
-						<ComposerPrimitive.Input className="subako-input" rows={1} placeholder="Message the agent" />
-						<ComposerPrimitive.Send>Send</ComposerPrimitive.Send>
-						{state?.isRunning === true ? <ComposerPrimitive.Cancel>Stop</ComposerPrimitive.Cancel> : null}
-					</ComposerPrimitive.Root>
-				</ThreadPrimitive.Root>
-			</PartsContext.Provider>
+			<SessionContext.Provider value={session}>
+				<PartsContext.Provider value={components}>
+					<ThreadPrimitive.Root className={className === undefined ? "subako-chat" : `subako-chat ${className}`}>
+						<ThreadPrimitive.Viewport className="subako-viewport">
+							<ThreadPrimitive.Messages components={{ UserMessage, AssistantMessage }} />
+						</ThreadPrimitive.Viewport>
+						{session === null || state === null || state.inputs.length === 0 ? null : (
+							<div className="subako-inputs">
+								{state.inputs.map((input) => (
+									<SubakoInputForm
+										key={`${input.call_id}:${input.seq}`}
+										input={input}
+										widgets={widgets}
+										onAnswer={(answer) => session.answerInput(input.call_id, answer)}
+									/>
+								))}
+							</div>
+						)}
+						<ComposerPrimitive.Root className="subako-composer">
+							{allowAttachments === true ? (
+								<>
+									<div className="subako-composer-files">
+										<ComposerPrimitive.Attachments components={{ Attachment: ComposerFile }} />
+									</div>
+									<ComposerPrimitive.AddAttachment>Attach</ComposerPrimitive.AddAttachment>
+								</>
+							) : null}
+							<ComposerPrimitive.Input className="subako-input" rows={1} placeholder="Message the agent" />
+							<ComposerPrimitive.Send>Send</ComposerPrimitive.Send>
+							{state?.isRunning === true ? <ComposerPrimitive.Cancel>Stop</ComposerPrimitive.Cancel> : null}
+						</ComposerPrimitive.Root>
+					</ThreadPrimitive.Root>
+				</PartsContext.Provider>
+			</SessionContext.Provider>
 		</AssistantRuntimeProvider>
 	);
 }

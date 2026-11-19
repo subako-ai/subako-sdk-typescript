@@ -188,7 +188,7 @@ describe("transcript", () => {
 			toolCall("call-1", "read_file", { path: "/etc/hosts" }),
 		]);
 		const events: SessionEventBody[] = [
-			{ seq: 1, created_at: AT, type: "message_user", source: "client", message: asked },
+			{ seq: 1, created_at: AT, type: "message_user", attachments: [], source: "client", message: asked },
 			{ seq: 2, created_at: AT, type: "message_assistant", message: answered },
 			result(3, "call-1", "127.0.0.1 localhost"),
 		];
@@ -212,6 +212,63 @@ describe("transcript", () => {
 		]);
 	});
 
+	it("carries a user turn's files, and joins the files an agent's calls attached to the message making them", () => {
+		const asked = message("user", [text("Summarize this.")]);
+		const calling = message("assistant", [
+			text("Here they are."),
+			toolCall("call-1", "builtin__attachments__attach", { files: ["/volume/tmp/summary.md"] }),
+			toolCall("call-2", "builtin__attachments__attach", { files: ["/volume/tmp/notes.md"] }),
+		]);
+		const brief = { id: "a1", name: "brief.pdf", media_type: "application/pdf", bytes: 10 };
+		const summary = { id: "a2", name: "summary.md", media_type: "text/markdown", bytes: 4 };
+		const notes = { id: "a3", name: "notes.md", media_type: "text/markdown", bytes: 5 };
+		const events: SessionEventBody[] = [
+			{ seq: 1, created_at: AT, type: "message_user", attachments: [brief], source: "client", message: asked },
+			{ seq: 2, created_at: AT, type: "message_assistant", message: calling },
+			{ seq: 3, created_at: AT, type: "message_attachments_added", call_id: "call-2", attachments: [notes] },
+			{ seq: 4, created_at: AT, type: "message_attachments_added", call_id: "call-1", attachments: [summary] },
+		];
+
+		const [user, answer, ...rest] = transcript(events);
+
+		expect(rest).toEqual([]);
+		expect(user).toEqual({
+			seq: 1,
+			createdAt: AT,
+			role: "user",
+			message: asked,
+			source: "client",
+			attachments: [brief],
+		});
+		expect(answer).toMatchObject({ seq: 2, role: "assistant", message: calling, attachments: [summary, notes] });
+		expect(answer?.toolCalls?.map((call) => call.attachments)).toEqual([[summary], [notes]]);
+	});
+
+	it("keeps files attached ahead of the message making the call until that message arrives", () => {
+		const summary = { id: "a2", name: "summary.md", media_type: "text/markdown", bytes: 4 };
+		const calling = message("assistant", [toolCall("call-1", "builtin__attachments__attach", {})]);
+		const early = foldTranscript(EMPTY_TRANSCRIPT, [
+			{ seq: 1, created_at: AT, type: "message_attachments_added", call_id: "call-1", attachments: [summary] },
+		]);
+		expect(early.messages).toEqual([]);
+
+		const [answer] = foldTranscript(early, [
+			{ seq: 1, created_at: AT, type: "message_attachments_added", call_id: "call-1", attachments: [summary] },
+			{ seq: 2, created_at: AT, type: "message_assistant", message: calling },
+		]).messages;
+
+		expect(answer).toMatchObject({ attachments: [summary], toolCalls: [{ id: "call-1", attachments: [summary] }] });
+	});
+
+	it("lists no files for an assistant message whose calls attached none", () => {
+		const [answer] = transcript([
+			fromAssistant(1, [toolCall("call-1", "read_file", {})]),
+			result(2, "call-1", "hosts"),
+		]);
+
+		expect(answer).not.toHaveProperty("attachments");
+	});
+
 	it("leaves a message with no tool calls without the field", () => {
 		const [only] = transcript([fromAssistant(1, [text("Nothing to do.")])]);
 
@@ -222,7 +279,7 @@ describe("transcript", () => {
 	it("skips a result that joins nothing", () => {
 		const said = message("user", [text("Hi")]);
 		const events: SessionEventBody[] = [
-			{ seq: 1, created_at: AT, type: "message_user", source: "client", message: said },
+			{ seq: 1, created_at: AT, type: "message_user", attachments: [], source: "client", message: said },
 			result(2, "call-gone", "an answer nobody asked for"),
 		];
 
@@ -311,7 +368,7 @@ describe("transcript", () => {
 		const asked = message("user", [text("Hi")]);
 		const answered = message("assistant", [text("Hello.")]);
 		const events: SessionEventBody[] = [
-			{ seq: 1, created_at: AT, type: "message_user", source: "client", message: asked },
+			{ seq: 1, created_at: AT, type: "message_user", attachments: [], source: "client", message: asked },
 			{ seq: 2, created_at: AT, type: "message_assistant", message: answered },
 		];
 		const [user, assistant] = transcript(events);

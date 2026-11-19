@@ -23,6 +23,8 @@ export type TranscriptToolCall = Readonly<ToolCallBlock["data"]> & {
 	readonly result?: ToolCallResult;
 	/** Set only for a call an `approval_requested` named. */
 	readonly approval?: ApprovalState;
+	/** The files this call attached to its message, once the log carries them: set only for an `attach` of `builtin:attachments`. */
+	readonly attachments?: readonly api.AttachmentBody[];
 };
 
 /** One turn of the conversation: the message as it arrived, and the calls it made. */
@@ -33,6 +35,12 @@ export interface TranscriptMessage {
 	readonly role: "user" | "assistant";
 	/** The same object the event carries, never copied. */
 	readonly message: api.MessageBody;
+	/**
+	 * The files the message carries, each read with `readAttachment`: a user's,
+	 * sent with it; an assistant's, attached by its calls, in their order.
+	 * Unset for a message that carries none.
+	 */
+	readonly attachments?: readonly api.AttachmentBody[];
 	/** Where a user message came from; unset for an assistant one. */
 	readonly source?: api.InputSourceBody;
 	/** The assistant's `tool_call` blocks, in the order the message holds them. */
@@ -126,7 +134,13 @@ interface CallPlace {
 }
 
 /** What the log says came of one tool call, apart from the call itself. */
-type CallFacts = Pick<TranscriptToolCall, "result" | "approval">;
+type CallFacts = Pick<TranscriptToolCall, "result" | "approval" | "attachments">;
+
+/** The files `toolCalls` attached, in their order, as a message lists them: unset when none did. */
+function attachedBy(toolCalls: readonly TranscriptToolCall[]): Pick<TranscriptMessage, "attachments"> {
+	const attachments = toolCalls.flatMap((call) => call.attachments ?? []);
+	return attachments.length === 0 ? {} : { attachments };
+}
 
 /** A transcript in progress: what a fold made of the events it has read, and how far it read. */
 export interface TranscriptFold {
@@ -171,8 +185,9 @@ export function foldTranscript(previous: TranscriptFold, events: readonly api.Se
 	const early = new Map<string, CallFacts>(from === 0 ? undefined : previous.early);
 	const waiting = new Set<string>(from === 0 ? undefined : previous.waiting);
 	/**
-	 * Rebuilds the one message a result or an approval joins, leaving every other
-	 * message alone; for a call no message has made yet, keeps the facts for it.
+	 * Rebuilds the one message a result, an approval or attached files join,
+	 * leaving every other message alone; for a call no message has made yet,
+	 * keeps the facts for it.
 	 */
 	const join = (callId: string, facts: CallFacts): void => {
 		const place = places.get(callId);
@@ -184,7 +199,7 @@ export function foldTranscript(previous: TranscriptFold, events: readonly api.Se
 		}
 		const toolCalls = [...message.toolCalls];
 		toolCalls[place.position] = { ...call, ...facts };
-		messages[place.index] = { ...message, toolCalls };
+		messages[place.index] = { ...message, toolCalls, ...attachedBy(toolCalls) };
 	};
 	for (const event of events.slice(from)) {
 		switch (event.type) {
@@ -195,6 +210,7 @@ export function foldTranscript(previous: TranscriptFold, events: readonly api.Se
 					role: "user",
 					message: event.message,
 					source: event.source,
+					...(event.attachments.length === 0 ? {} : { attachments: event.attachments }),
 				});
 				break;
 			case "message_assistant": {
@@ -210,12 +226,15 @@ export function foldTranscript(previous: TranscriptFold, events: readonly api.Se
 					createdAt: event.created_at,
 					role: "assistant",
 					message: event.message,
-					...(toolCalls.length === 0 ? {} : { toolCalls }),
+					...(toolCalls.length === 0 ? {} : { toolCalls, ...attachedBy(toolCalls) }),
 				});
 				break;
 			}
 			case "tool_result":
 				join(event.call_id, { result: { content: event.content, is_error: event.is_error } });
+				break;
+			case "message_attachments_added":
+				join(event.call_id, { attachments: event.attachments });
 				break;
 			case "approval_requested":
 				waiting.add(event.call_id);

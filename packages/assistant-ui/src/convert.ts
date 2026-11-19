@@ -1,5 +1,6 @@
-import type { ThreadMessageLike } from "@assistant-ui/react";
+import type { CompleteAttachment, ThreadMessageLike } from "@assistant-ui/react";
 import {
+	type AttachmentBody,
 	type ContentBlockBody,
 	type LiveBlock,
 	type LiveMessage,
@@ -55,10 +56,44 @@ function toolCallPart(call: TranscriptCall): ContentPart {
 	};
 }
 
+/** A file of the log as assistant-ui lists it: already sent, and holding no content of its own to show. */
+const completeAttachment = (file: AttachmentBody): CompleteAttachment => ({
+	id: file.id,
+	type: file.media_type.startsWith("image/") ? "image" : "file",
+	name: file.name,
+	contentType: file.media_type,
+	status: { type: "complete" },
+	content: [],
+});
+
+/**
+ * What a message carries beside its parts, under `metadata.custom`: where a
+ * user turn came from, and the files it carries.
+ */
+export type SubakoMessageMetadata = {
+	readonly source?: TranscriptMessage["source"];
+	/**
+	 * The message's files as the log holds them, each read with the session's
+	 * `readAttachment`: a user's, sent with it; an assistant's, attached by its
+	 * calls.
+	 */
+	readonly attachments?: readonly AttachmentBody[];
+};
+
+function metadataOf(message: TranscriptMessage): SubakoMessageMetadata {
+	return {
+		...(message.source === undefined ? {} : { source: message.source }),
+		...(message.attachments === undefined ? {} : { attachments: message.attachments }),
+	};
+}
+
 /**
  * One message of the log as assistant-ui reads it: `text` becomes a text part,
  * `thinking` a reasoning part, and every `tool_call` the joined call, so its
  * result and its approval travel with it.
+ *
+ * A message's files are on `metadata.custom.attachments` whoever wrote it; a
+ * user's are on `attachments` too, the one role assistant-ui lists them for.
  *
  * The id is the event's `seq`, which the log never reuses. The conversion is
  * pure, and assistant-ui caches it on the identity of the message object rather
@@ -84,12 +119,15 @@ export function convertMessage(message: TranscriptMessage): ThreadMessageLike {
 				break;
 		}
 	}
+	const custom = metadataOf(message);
 	return {
 		role: message.role,
 		id: String(message.seq),
 		content,
-		// Where a user turn came from: the client, a steer, or something outside the browser.
-		...(message.source === undefined ? {} : { metadata: { custom: { source: message.source } } }),
+		...(message.role === "user" && message.attachments !== undefined
+			? { attachments: message.attachments.map(completeAttachment) }
+			: {}),
+		...(Object.keys(custom).length === 0 ? {} : { metadata: { custom } }),
 	};
 }
 

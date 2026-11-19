@@ -1,5 +1,5 @@
 import { type Core, isFinalRefusal, type RequestOptions, sleep } from "./core.js";
-import { SubakoConnectionError, SubakoError } from "./errors.js";
+import { NotFoundError, SubakoConnectionError, SubakoError } from "./errors.js";
 import {
 	EMPTY_LIVE,
 	EMPTY_TRANSCRIPT,
@@ -17,7 +17,7 @@ import {
 } from "./events.js";
 import * as api from "./generated/index.js";
 import type { InputAnswer, PendingInput } from "./input.js";
-import type { SessionApi } from "./resources/sessions.js";
+import type { CreateUploadParams, SessionApi, UploadContent } from "./resources/sessions.js";
 import { notify, Store } from "./store.js";
 import { LEAVE, REJOIN, ToolClient, type ToolClientOptions } from "./tool-client.js";
 
@@ -31,6 +31,15 @@ export type ApprovalDecision = "allow" | "deny";
  */
 export interface HistoryWindow {
 	readonly latest: number;
+}
+
+// CODESYNC(message-attachments-max)
+/** What a user turn carries besides its text: at most 20 files in all. */
+export interface SendOptions {
+	/** Files the turn uploads and carries, each under its own name; one named twice goes once. */
+	readonly files?: readonly File[];
+	/** The ids of uploads already made for the turn; an upload goes with one turn only. */
+	readonly uploadIds?: readonly string[];
 }
 
 /** Where a connection starts, and how it behaves when the stream drops. */
@@ -345,10 +354,62 @@ export class SessionConnection implements AsyncIterable<api.SessionEventBody> {
 		// The store holds the fields; what a subscriber hears is the snapshot, readings and all.
 		this.#store.subscribe(() => listener(this.state));
 
-	/** Posts a user turn, which queues a run or steers the active one. */
-	readonly send = async (text: string): Promise<void> => {
-		await this.#sessions.postEvent(this.sessionId, { type: "input", text }, this.#callOptions);
+	/**
+	 * The uploads a turn's `files` went up as, while the turn has not gone:
+	 * a turn tried again names them rather than uploading them twice.
+	 */
+	readonly #uploads = new WeakMap<Blob, Promise<string>>();
+
+	/** The id `file` went up as, uploading it first when it has not gone up, or when its last try failed. */
+	#uploadOnce(file: File): Promise<string> {
+		const known = this.#uploads.get(file);
+		if (known !== undefined) return known;
+		const uploading = this.upload(file, { name: file.name }).then((upload) => upload.id);
+		this.#uploads.set(file, uploading);
+		void uploading.catch(() => {
+			if (this.#uploads.get(file) === uploading) this.#uploads.delete(file);
+		});
+		return uploading;
+	}
+
+	/**
+	 * Posts a user turn, which queues a run or steers the active one. Text
+	 * may be empty when files alone carry the turn: `files` are uploaded
+	 * first, each once however often the turn is tried, and `uploadIds`
+	 * are ids `upload` already answered with.
+	 */
+	readonly send = async (text: string, options?: SendOptions): Promise<void> => {
+		// A file named twice goes up once and is named once: a message carries each attachment once.
+		const files = [...new Set(options?.files ?? [])];
+		const uploaded = await Promise.all(files.map((file) => this.#uploadOnce(file)));
+		const uploadIds = [...(options?.uploadIds ?? []), ...uploaded];
+		try {
+			await this.#sessions.postEvent(
+				this.sessionId,
+				{ type: "input", text, ...(uploadIds.length === 0 ? {} : { upload_ids: uploadIds }) },
+				this.#callOptions,
+			);
+		} catch (error) {
+			// Core answers an upload it no longer holds waiting -- expired, or carried by a message already -- as
+			// not found, so the next try uploads anew; any other refusal leaves the uploads for the next try to name.
+			if (error instanceof NotFoundError) this.#forget(files);
+			throw error;
+		}
+		this.#forget(files);
 	};
+
+	/** Drops the uploads of `files`: the turn carried them, or Core no longer holds them. */
+	#forget(files: readonly File[]): void {
+		for (const file of files) this.#uploads.delete(file);
+	}
+
+	/** Uploads a file for the next turn to carry; it lapses at `expires_at` if no turn does. */
+	readonly upload = (file: UploadContent, options: CreateUploadParams): Promise<api.SessionUploadBody> =>
+		this.#sessions.createUpload(this.sessionId, file, options, this.#callOptions);
+
+	/** Downloads a file a message of this session carries: an `attachments` entry's `id`. */
+	readonly readAttachment = (attachmentId: string): Promise<Blob> =>
+		this.#sessions.readAttachment(this.sessionId, attachmentId, this.#callOptions);
 
 	/** Cancels the active run, which stops at its next checkpoint. */
 	readonly cancel = async (): Promise<void> => {

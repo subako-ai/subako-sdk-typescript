@@ -119,7 +119,7 @@ export const frame = (seq: number, payload: Record<string, unknown>): string =>
 export const deltaFrame = (body: Record<string, unknown>): string => `event: delta\ndata: ${JSON.stringify(body)}\n\n`;
 
 export const userEvent = (seq: number): string =>
-	frame(seq, { type: "message_user", source: "client", message: { role: "user", content: [] } });
+	frame(seq, { type: "message_user", attachments: [], source: "client", message: { role: "user", content: [] } });
 
 export interface TestClientOptions {
 	readonly fetch: typeof fetch;

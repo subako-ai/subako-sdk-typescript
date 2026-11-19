@@ -41,7 +41,9 @@ export class ModelProviders {
 	 * Changes a BYOK provider's name, description, endpoint, or credential; an
 	 * absent field is left as it stands. A new `api_key` or `auth` replaces the
 	 * stored credential under the same id, so agents using the provider keep
-	 * resolving it; no response carries a key.
+	 * resolving it; no response carries a key. A `base_url` other than the
+	 * stored one is refused without one of the two, so a stored key never
+	 * reaches a new endpoint; the stored one sent again takes neither.
 	 */
 	update(modelProviderId: string, params: api.UpdateModelProviderBodyWritable, options?: RequestOptions) {
 		return this.core.call(

@@ -71,6 +71,21 @@ await subako.sessions.postEvent(sessionId, { type: "input", text: "book me a roo
 
 That queues a run, or steers the one already going. On a connection, `session.send(text)` is the same thing.
 
+## Files
+
+A session whose `attachments` is `enabled` -- its agent's version enables them, and no agent spawned it -- takes files with a turn, and its agent may send files back. A file goes up first, and the turn then names it; on a connection, `session.send(text, { files })` does both, uploading each file once however often the turn is tried:
+
+```ts
+const upload = await subako.sessions.createUpload(sessionId, file, { name: "floor-plan.pdf" });
+await subako.sessions.postEvent(sessionId, { type: "input", text: "this floor", upload_ids: [upload.id] });
+```
+
+An upload goes with one turn, and one no turn carries is removed at its `expires_at`, a day later. A turn naming an upload no longer waiting -- expired, or carried by a turn already -- is refused with a `NotFoundError`, and `send` uploads that turn's files anew when it is tried again. A `message_user` event lists the files its turn carried under `attachments`. The agent attaches files to its own message by calling `builtin:attachments`' `attach`, and a `message_attachments_added` event lists them with the `call_id` of that call; `transcript` joins them to the call and lists them under the `attachments` of the assistant message that made it. Either way an entry's `id` reads the file back:
+
+```ts
+const blob = await subako.sessions.readAttachment(sessionId, attachment.id);
+```
+
 ## Display name
 
 ```ts

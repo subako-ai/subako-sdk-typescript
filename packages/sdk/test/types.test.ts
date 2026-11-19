@@ -9,6 +9,7 @@ import type {
 	FunctionVersionBody,
 	Page,
 	PendingApproval,
+	SendOptions,
 	SessionConnection,
 	SessionEventBody,
 	ToolClient,
@@ -54,7 +55,7 @@ const connects: Equals<ReturnType<typeof client.sessions.connect>, SessionConnec
 // The connection carries the session's own writes, and the readings it derives from the log.
 const readsTranscript: Equals<SessionConnection["transcript"], readonly TranscriptMessage[]> = true;
 const readsApprovals: Equals<SessionConnection["approvals"], readonly PendingApproval[]> = true;
-const sendsText: Equals<Parameters<SessionConnection["send"]>, [string]> = true;
+const sendsText: Equals<Parameters<SessionConnection["send"]>, [string, (SendOptions | undefined)?]> = true;
 const decides: Equals<
 	Parameters<SessionConnection["resolveApproval"]>,
 	[string, ApprovalDecision, (string | undefined)?]

@@ -199,7 +199,7 @@ describe("the provider and useSession", () => {
 		const acquired = (): string | null => document.querySelector("[data-testid='acquired']")?.textContent ?? null;
 
 		await act(async () => {
-			back.push(1, { type: "message_user", source: "client", message: text("fill the form") });
+			back.push(1, { type: "message_user", attachments: [], source: "client", message: text("fill the form") });
 			await settle();
 		});
 
@@ -218,7 +218,7 @@ describe("the provider and useSession", () => {
 		expect(reading()).toBe("open/0/0/idle");
 
 		await act(async () => {
-			back.push(1, { type: "message_user", source: "client", message: text("fill the form") });
+			back.push(1, { type: "message_user", attachments: [], source: "client", message: text("fill the form") });
 			back.push(2, { type: "run_queued", run_id: "r1" });
 			await settle();
 		});
@@ -290,12 +290,12 @@ describe("the provider and useSession", () => {
 		});
 		const first = seen;
 		await act(async () => {
-			back.push(1, { type: "message_user", source: "client", message: text("one") });
+			back.push(1, { type: "message_user", attachments: [], source: "client", message: text("one") });
 			await settle();
 		});
 		const firstMessage = seen?.transcript[0]?.message;
 		await act(async () => {
-			back.push(2, { type: "message_user", source: "client", message: text("two") });
+			back.push(2, { type: "message_user", attachments: [], source: "client", message: text("two") });
 			await settle();
 		});
 		expect(seen).toBe(first);

@@ -6,5 +6,5 @@ export {
 	type WidgetRenderer,
 	type WidgetRenderers,
 } from "./input-form.js";
-export { convertLiveMessage, convertMessage } from "./convert.js";
-export { type SubakoSession, useSubakoRuntime } from "./runtime.js";
+export { convertLiveMessage, convertMessage, type SubakoMessageMetadata } from "./convert.js";
+export { type SubakoRuntimeOptions, type SubakoSession, useSubakoRuntime } from "./runtime.js";

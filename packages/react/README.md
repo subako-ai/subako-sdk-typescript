@@ -144,6 +144,12 @@ asked for. Read one session in several places by calling `useSession` once and
 passing the connection down, or through an app-level context of your own; each
 of those places subscribes for itself with `useSessionState`.
 
+A turn carries files on a session that takes them (its `attachments` is
+`enabled`): `session.send(text, { files })` uploads each file, once however
+often the turn is tried, and names it in the turn. A transcript message lists
+the files it carries under `attachments`, and `session.readAttachment(id)` reads
+one back.
+
 ## `useSessionState`
 
 ```tsx

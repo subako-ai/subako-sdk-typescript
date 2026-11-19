@@ -43,3 +43,4 @@ rates:
     write: "0.00000001"
   storage:
     volume: "0.00000001"
+    attachment: "0.00000001"

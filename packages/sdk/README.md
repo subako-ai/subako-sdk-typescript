@@ -315,6 +315,7 @@ else:
 
 ```ts
 await session.send("book me a room"); // posts a user turn
+await session.send("this floor", { files: [file] }); // uploads the file, once however often the turn is tried
 await session.cancel(); // stops the active run at its next checkpoint
 await session.resolveApproval(callId, "deny", "not this one"); // "allow" | "deny"
 

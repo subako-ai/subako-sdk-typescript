@@ -21,6 +21,7 @@ const CONFIG: AgentVersionConfig = {
 	builtin: { session_display_name: { when: "never" }, ask_user: null },
 	functions: [],
 	volume: { data: { type: "disabled" } },
+	attachments: { type: "disabled" },
 };
 
 describe("readAgentConfig", () => {

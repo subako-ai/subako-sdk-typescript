@@ -28,6 +28,17 @@ The key is sealed on arrival and never comes back. Replacing it keeps the provid
 await subako.modelProviders.update(providerId, { api_key: rotatedKey });
 ```
 
+A new `base_url` goes up with the credential it is called with. The stored key was given for the stored endpoint, so it never travels to a new one; an update naming a `base_url` other than the stored one with neither `api_key` nor `auth` is a `400`. The stored one sent again, however spelled, moves nothing and takes neither:
+
+```ts
+await subako.modelProviders.update(providerId, {
+	base_url: "https://gateway.example.com",
+	api_key: gatewayKey,
+});
+```
+
+A provider that authenticates as a role or a service account restates it the same way, as `auth`. It holds no secret, so `get` reads it back whole.
+
 ## As a role in your own AWS account
 
 A provider can reach Amazon Bedrock with no key at all. Subako is an OpenID Connect issuer, and each workspace has a subject of its own. Your AWS account trusts the issuer, and a role in it trusts the workspace's subject; Subako then assumes that role for each call and signs the call as the role. Nothing long-lived is handed over, and you can revoke access from your own account at any time.

@@ -93,6 +93,7 @@ export type {
 	ConnectionStatus,
 	ConnectOptions,
 	HistoryWindow,
+	SendOptions,
 	SessionConnection,
 	SessionState,
 } from "./session.js";
@@ -134,7 +135,14 @@ export type {
 } from "./resources/organization.js";
 // `SessionApi` is the half both clients bind: code that takes either a `SubakoClient`'s
 // `sessions` or a whole `SubakoSessionClient` names this.
-export type { ListSessionEventsParams, ListSessionsParams, SessionApi, Sessions } from "./resources/sessions.js";
+export type {
+	CreateUploadParams,
+	ListSessionEventsParams,
+	ListSessionsParams,
+	SessionApi,
+	Sessions,
+	UploadContent,
+} from "./resources/sessions.js";
 export type { ListSkillsParams, ListSkillVersionsParams, Skills } from "./resources/skills.js";
 export type { ListCredentialsParams, ListVaultsParams, Vaults } from "./resources/vaults.js";
 export type {
@@ -164,6 +172,8 @@ export type {
 	ApiKeyReceiptBody,
 	ApprovalDecisionForm,
 	AskUserGrantBody,
+	AttachmentBody,
+	AttachmentsConfigBody,
 	AuditActorBody,
 	AuditEvent,
 	AuditIssuerBody,
@@ -279,6 +289,7 @@ export type {
 	SessionSandboxListBody,
 	SessionTokenBody,
 	SessionTokenReceiptBody,
+	SessionUploadBody,
 	SkillBody,
 	SkillGrantBody,
 	SkillVersionBody,

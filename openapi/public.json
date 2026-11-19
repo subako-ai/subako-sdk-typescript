@@ -2634,7 +2634,7 @@
           "model-providers"
         ],
         "summary": "Update a model provider",
-        "description": "Changes a BYOK provider in place. An omitted field is left as it stands, including its credential: send `api_key` or `auth` only to replace it. A key is write-only -- it is sealed on arrival and no response carries it -- and replacing the credential keeps the provider's id, so agent versions already published against it go on resolving.",
+        "description": "Changes a BYOK provider in place. An omitted field is left as it stands, including its credential: send `api_key` or `auth` only to replace it -- or with a `base_url` other than the stored one, which is refused without one, so a stored key never reaches an endpoint it was not given for. A key is write-only -- it is sealed on arrival and no response carries it -- and replacing the credential keeps the provider's id, so agent versions already published against it go on resolving.",
         "operationId": "update_model_provider",
         "parameters": [
           {
@@ -2670,7 +2670,7 @@
             }
           },
           "400": {
-            "description": "Malformed body, path parameter, a field outside its bound, a base URL the network policy or the provider's auth refuses, or a role that does not trust this workspace alone.",
+            "description": "Malformed body, path parameter, a field outside its bound, a base URL other than the stored one sent with no `api_key` or `auth`, a base URL the network policy or the provider's auth refuses, or a role that does not trust this workspace alone.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4982,6 +4982,96 @@
         }
       }
     },
+    "/v1/sessions/{session_id}/attachments/{attachment_id}": {
+      "get": {
+        "tags": [
+          "sessions"
+        ],
+        "summary": "Download a session attachment",
+        "description": "The bytes of a file a message in the session's events carries, under the `id` the message names it by, typed as the message's `media_type`. It is served as a download whatever it holds. A file never changes under its id, so a client may keep it for as long as it likes.",
+        "operationId": "get_session_attachment",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "description": "Session id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "attachment_id",
+            "in": "path",
+            "description": "The attachment's id, as a message's `attachments` names it.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The file's bytes.",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed path parameter.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, malformed, or invalid bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "A workspace credential lacking session.read. A session token carries no permissions and never lands here.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such session or attachment, or the caller cannot see it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/v1/sessions/{session_id}/cancel": {
       "post": {
         "tags": [
@@ -5968,7 +6058,7 @@
             }
           },
           "400": {
-            "description": "Malformed body or path parameter.",
+            "description": "Malformed body or path parameter, more than 20 `upload_ids`, or one named twice.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5998,7 +6088,7 @@
             }
           },
           "404": {
-            "description": "No such session, the caller cannot see it, or a session token presented against any session but its own.",
+            "description": "No such session, the caller cannot see it, a session token presented against any session but its own, or an id in `upload_ids` that names no upload of this session still waiting to be sent: unknown, expired, or already carried by a message. Upload such a file again.",
             "content": {
               "application/json": {
                 "schema": {
@@ -6739,6 +6829,142 @@
         "x-audit": {
           "records": [
             "session_token_created"
+          ]
+        }
+      }
+    },
+    "/v1/sessions/{session_id}/uploads": {
+      "post": {
+        "tags": [
+          "sessions"
+        ],
+        "summary": "Upload a file for a message",
+        "description": "Stores a file ahead of the message it goes with. Send the message as an `input` whose `upload_ids` names the upload's `id`; the file is then an attachment of that message under the same id. An upload no message carries is removed 24 hours after it was made. Only a session whose agent enables attachments takes one. A retry under one `Idempotency-Key` is recognized by the session, the name and the declared length, and answers the first upload.",
+        "operationId": "create_session_upload",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Retry the same operation with this key to return its saved receipt. Scoped by the operation's authenticated caller or resource. A different input under the same key returns 409. Receipts are retained for at least 7 days after completion, then removed by an hourly sweep. After removal the key can execute again. Fresh-only secrets are never included in a replay.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 255,
+              "minLength": 1
+            }
+          },
+          {
+            "name": "session_id",
+            "in": "path",
+            "description": "Session id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "name",
+            "in": "query",
+            "description": "The file's name: one path segment of 1 to 200 bytes, such as\n`report.pdf`. Its extension decides the media type the file is served\nas.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 200,
+              "minLength": 1
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "The file's bytes, at most 1 GiB.",
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The file as stored.",
+            "headers": {
+              "Idempotency-Replayed": {
+                "schema": {
+                  "type": "boolean"
+                },
+                "description": "True when returning a saved receipt."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionUploadBody"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed path parameter, a name that is not one path segment of 1 to 200 bytes, or a body over 1 GiB.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, malformed, or invalid bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "A workspace credential lacking session.manage, or an organization suspended or out of credit. A session token may act only on its own session and never lands here.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such session, or the caller cannot see it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The session's agent does not enable attachments, the session's attachments and uploads already hold 10 GiB or more (a file taken short of that may run past it), or Idempotency-Key was already used for a different request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-audit": {
+          "records": [
+            "attachment_uploaded"
           ]
         }
       }
@@ -10984,6 +11210,10 @@
           "model"
         ],
         "properties": {
+          "attachments": {
+            "$ref": "#/components/schemas/AttachmentsConfigBody",
+            "description": "Whether the agent's sessions carry files on their messages. `enabled`\nlets a person upload files for a message to carry, and serves the\nagent `builtin:attachments`, through which it reads a file a message\ncarries and, when the version grants functions, copies one into the\nsession's volume or attaches files from the volume to its own\nmessage. `disabled` when left out. A child session's messages never\ncarry files, whatever its version says."
+          },
           "builtin": {
             "$ref": "#/components/schemas/BuiltinGrantsBody",
             "description": "The servers the platform serves itself, one setting per server under\nits fixed name. A setting left out takes its default."
@@ -11615,6 +11845,82 @@
             "minItems": 1
           }
         }
+      },
+      "AttachmentBody": {
+        "type": "object",
+        "description": "A file a message carries. It never changes under its `id`.",
+        "required": [
+          "id",
+          "name",
+          "media_type",
+          "bytes"
+        ],
+        "properties": {
+          "bytes": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The file's length in bytes.",
+            "minimum": 0
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "media_type": {
+            "type": "string",
+            "description": "What the file holds, as a media type such as `application/pdf`."
+          },
+          "name": {
+            "type": "string",
+            "description": "The file's name, without the directory it was sent from."
+          }
+        }
+      },
+      "AttachmentUploadedDetails": {
+        "type": "object",
+        "description": "A file was uploaded to a session, to go with a message. Its name and content stay with the session.",
+        "required": [
+          "bytes"
+        ],
+        "properties": {
+          "bytes": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "AttachmentsConfigBody": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "disabled"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "enabled"
+                ]
+              }
+            }
+          }
+        ],
+        "description": "Whether messages carry files."
       },
       "AuditActorBody": {
         "oneOf": [
@@ -13003,6 +13309,25 @@
               },
               "details": {
                 "$ref": "#/components/schemas/VolumeFileWrittenDetails"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "title": "AttachmentUploadedDetails",
+            "required": [
+              "action",
+              "details"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "attachment_uploaded"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/AttachmentUploadedDetails"
               }
             }
           },
@@ -15689,6 +16014,7 @@
           "session_client_tools_set",
           "session_client_removed",
           "volume_file_written",
+          "attachment_uploaded",
           "volume_file_deleted",
           "volume_deleted",
           "vault_credential_used",
@@ -16545,6 +16871,17 @@
               "openai_workload_identity"
             ]
           },
+          "base_url": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Where its calls are sent."
+          },
           "format": {
             "type": "string",
             "enum": [
@@ -16655,6 +16992,17 @@
           "display_name": {
             "type": "boolean",
             "description": "Whether the display name changed."
+          },
+          "new_base_url": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Where its calls are sent from now on, when that changed."
           }
         }
       },
@@ -18022,13 +18370,22 @@
             "properties": {
               "text": {
                 "type": "string",
-                "description": "The user turn, as plain text."
+                "description": "The user turn, as plain text. May be empty when files alone carry\nit."
               },
               "type": {
                 "type": "string",
                 "enum": [
                   "input"
                 ]
+              },
+              "upload_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "description": "The files the turn carries: the `id` of each upload made to this\nsession for it. An upload goes with one message only, and keeps\nits `id` as an attachment of that message.",
+                "maxItems": 20
               }
             }
           }
@@ -18754,7 +19111,8 @@
           "status",
           "created_by",
           "created_at",
-          "metadata"
+          "metadata",
+          "attachments"
         ],
         "properties": {
           "agent_id": {
@@ -18764,6 +19122,10 @@
           "agent_version_id": {
             "type": "string",
             "format": "uuid"
+          },
+          "attachments": {
+            "$ref": "#/components/schemas/AttachmentsConfigBody",
+            "description": "Whether the session's messages carry files: `enabled` takes uploads\nfor a person's messages, and serves the agent the attachment servers.\nIts version's `attachments`, and `disabled` for a session an agent\nspawned, whatever its version says."
           },
           "created_at": {
             "type": "string",
@@ -19038,9 +19400,17 @@
             "required": [
               "message",
               "source",
+              "attachments",
               "type"
             ],
             "properties": {
+              "attachments": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/AttachmentBody"
+                },
+                "description": "The files the message carries, each read back from the session's\nattachments by `id`. Empty for a message that carries none."
+              },
               "message": {
                 "$ref": "#/components/schemas/MessageBody"
               },
@@ -19069,6 +19439,33 @@
                 "type": "string",
                 "enum": [
                   "message_assistant"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Files the agent attached to its message through\n`builtin:attachments`' `attach`, as the tool call `call_id`. They\nbelong to the `message_assistant` that makes that call. It is\nconversation the person reads, not a turn the model is shown again.",
+            "required": [
+              "call_id",
+              "attachments",
+              "type"
+            ],
+            "properties": {
+              "attachments": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/AttachmentBody"
+                },
+                "description": "The files attached, each read back from the session's\nattachments by `id`."
+              },
+              "call_id": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "message_attachments_added"
                 ]
               }
             }
@@ -19791,6 +20188,42 @@
           }
         }
       },
+      "SessionUploadBody": {
+        "type": "object",
+        "description": "A file stored for a message not sent yet.",
+        "required": [
+          "id",
+          "name",
+          "media_type",
+          "bytes",
+          "expires_at"
+        ],
+        "properties": {
+          "bytes": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The file's length in bytes.",
+            "minimum": 0
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the file is removed if no message has carried it."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "What an input's `upload_ids` names the file by, and the id it keeps\nas an attachment once a message carries it."
+          },
+          "media_type": {
+            "type": "string",
+            "description": "What the file is taken to hold, by its name's extension."
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
       "SessionVaultAddedDetails": {
         "type": "object",
         "description": "A vault was added to a session.",
@@ -20060,7 +20493,8 @@
         "description": "What a storage event held.",
         "enum": [
           "archive",
-          "volume"
+          "volume",
+          "attachment"
         ]
       },
       "StorageSummaryBody": {
@@ -20249,7 +20683,7 @@
       },
       "UpdateModelProviderBody": {
         "type": "object",
-        "description": "An absent field leaves that part of the provider as it stands, so a\nrename need not restate the endpoint -- nor the credential.",
+        "description": "An absent field leaves that part of the provider as it stands, so a\nrename need not restate the endpoint -- nor the credential. A new endpoint\nis the one exception: it comes with a new credential. The stored endpoint\nsent again is not a new one.",
         "properties": {
           "api_key": {
             "type": [
@@ -20277,6 +20711,7 @@
               "string",
               "null"
             ],
+            "description": "The upstream base URL. One other than the stored one takes `api_key`\nor `auth` with it: the stored credential was given for the stored\nendpoint, so it never travels to a new one. A federated provider\nrestates its identity, which `GET` reads back. The stored one, in any\nspelling of it, takes neither.",
             "maxLength": 2048
           },
           "description": {

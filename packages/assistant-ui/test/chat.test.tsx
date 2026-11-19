@@ -104,6 +104,7 @@ describe("SubakoChat", () => {
 				1,
 				{
 					type: "message_user",
+					attachments: [],
 					source: "client",
 					message: { role: "user", content: [{ type: "text", data: { text: "find it" } }] },
 				},
@@ -296,6 +297,7 @@ describe("SubakoChat", () => {
 				1,
 				{
 					type: "message_user",
+					attachments: [],
 					source: "client",
 					message: { role: "user", content: [{ type: "text", data: { text: "**not bold**" } }] },
 				},
@@ -422,6 +424,132 @@ describe("SubakoChat", () => {
 		const posted = back.sent("POST", "/events");
 		expect(posted).toHaveLength(1);
 		await expect(posted[0]?.clone().json()).resolves.toEqual({ type: "input", text: "hello" });
+	});
+
+	it("offers no way to attach a file unless the app asks for one", async () => {
+		const back = backend();
+		await mount(back);
+
+		expect(screen.queryByText("Attach")).toBeNull();
+	});
+
+	it("uploads the files picked when the turn is sent, and names them in it", async () => {
+		const upload = {
+			id: "u1",
+			name: "notes.txt",
+			media_type: "text/plain",
+			bytes: 2,
+			expires_at: "2026-01-02T00:00:00Z",
+		};
+		const back = backend({ "/uploads": () => Response.json(upload) });
+		render(
+			<SubakoProvider client={back.client}>
+				<Chat allowAttachments />
+			</SubakoProvider>,
+		);
+		await act(async () => {
+			await settle();
+		});
+
+		// The button opens a file input of its own on the body, which is where the pick lands.
+		fireEvent.click(screen.getByText("Attach"));
+		const picker = document.body.querySelector<HTMLInputElement>('input[type="file"]');
+		const file = new File(["hi"], "notes.txt", { type: "text/plain" });
+		await act(async () => {
+			fireEvent.change(picker as HTMLInputElement, { target: { files: [file] } });
+			await settle();
+		});
+		expect(screen.getByText("notes.txt")).toBeDefined();
+		expect(back.sent("POST", "/uploads")).toHaveLength(0);
+
+		fireEvent.click(screen.getByText("Send"));
+		await act(async () => {
+			await settle();
+		});
+
+		const uploaded = back.sent("POST", "/uploads");
+		expect(uploaded).toHaveLength(1);
+		expect(new URL(uploaded[0]?.url ?? "").searchParams.get("name")).toBe("notes.txt");
+		const posted = back.sent("POST", "/events");
+		await expect(posted[0]?.clone().json()).resolves.toEqual({ type: "input", text: "", upload_ids: ["u1"] });
+	});
+
+	it("lists the files a message carries, and downloads one on a click", async () => {
+		const back = backend({ "/attachments/a2": () => new Response("# Summary") });
+		await mount(back);
+		await push(back, [
+			[
+				1,
+				{
+					type: "message_user",
+					source: "client",
+					message: { role: "user", content: [{ type: "text", data: { text: "Summarize this." } }] },
+					attachments: [{ id: "a1", name: "brief.pdf", media_type: "application/pdf", bytes: 2048 }],
+				},
+			],
+			[
+				2,
+				{
+					type: "message_assistant",
+					message: {
+						role: "assistant",
+						content: [
+							{ type: "text", data: { text: "Here it is." } },
+							{ type: "tool_call", data: { id: "c9", name: "builtin__attachments__attach", arguments: {} } },
+						],
+					},
+				},
+			],
+			[
+				3,
+				{
+					type: "message_attachments_added",
+					call_id: "c9",
+					attachments: [{ id: "a2", name: "summary.md", media_type: "text/markdown", bytes: 9 }],
+				},
+			],
+		]);
+
+		expect(screen.getByText("brief.pdf").textContent).toBe("brief.pdf2.0 KB");
+		expect(screen.getByText("Here it is.")).toBeDefined();
+		fireEvent.click(screen.getByText("summary.md"));
+		await act(async () => {
+			await settle();
+		});
+
+		expect(back.sent("GET", "/attachments/a2")).toHaveLength(1);
+	});
+
+	it("says a file could not be downloaded", async () => {
+		const back = backend({ "/attachments/a1": () => Response.json({ error: { code: "not_found" } }, { status: 404 }) });
+		await mount(back);
+		await push(back, [
+			[
+				1,
+				{
+					type: "message_assistant",
+					message: {
+						role: "assistant",
+						content: [{ type: "tool_call", data: { id: "c9", name: "builtin__attachments__attach", arguments: {} } }],
+					},
+				},
+			],
+			[
+				2,
+				{
+					type: "message_attachments_added",
+					call_id: "c9",
+					attachments: [{ id: "a1", name: "gone.md", media_type: "text/markdown", bytes: 9 }],
+				},
+			],
+		]);
+
+		fireEvent.click(screen.getByText("gone.md"));
+		await act(async () => {
+			await settle();
+		});
+
+		expect(screen.getByText("gone.md").textContent).toBe("gone.mddownload failed");
 	});
 
 	it("shows the approval prompt while the server waits, and answers it with allow", async () => {

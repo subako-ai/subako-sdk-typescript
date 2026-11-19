@@ -1,6 +1,6 @@
 "use client";
 
-import type { AppendMessage, AssistantRuntime } from "@assistant-ui/react";
+import type { AppendMessage, AssistantRuntime, AttachmentAdapter } from "@assistant-ui/react";
 import { useExternalStoreRuntime } from "@assistant-ui/react";
 import { useSessionState } from "@subako-ai/react";
 import type { InputAnswer, LiveMessage, SessionState, TranscriptMessage } from "@subako-ai/sdk";
@@ -18,7 +18,11 @@ export interface SubakoSession {
 	/** Calls `listener` with the state after every change; returns an unsubscribe. */
 	readonly subscribe: (listener: (state: SessionState) => void) => () => void;
 	/** Posts a user turn, which queues a run or steers the active one. */
-	send(text: string): Promise<void>;
+	send(text: string, options?: { readonly uploadIds?: readonly string[] }): Promise<void>;
+	/** Uploads a file for the next turn to carry, and answers with the id that turn names it by. */
+	upload(file: Blob, options: { readonly name: string }): Promise<{ readonly id: string }>;
+	/** Downloads a file a message carries. */
+	readAttachment(attachmentId: string): Promise<Blob>;
 	/** Cancels the active run. */
 	cancel(): Promise<void>;
 	resolveApproval(callId: string, decision: "allow" | "deny", message?: string): Promise<void>;
@@ -46,16 +50,51 @@ function appendedText(message: AppendMessage): string {
 }
 
 /**
+ * The composer's files, uploaded when the turn is sent rather than when they
+ * are picked, so a file taken back leaves nothing behind. A sent attachment's
+ * id is its upload's, which is what the turn names.
+ */
+function attachmentAdapter(session: SubakoSession): AttachmentAdapter {
+	return {
+		accept: "*",
+		async add({ file }) {
+			return {
+				id: crypto.randomUUID(),
+				type: file.type.startsWith("image/") ? "image" : "file",
+				name: file.name,
+				contentType: file.type,
+				file,
+				status: { type: "requires-action", reason: "composer-send" },
+			};
+		},
+		async send(attachment) {
+			const { id } = await session.upload(attachment.file, { name: attachment.name });
+			return { ...attachment, id, status: { type: "complete" }, content: [] };
+		},
+		async remove() {},
+	};
+}
+
+export interface SubakoRuntimeOptions {
+	/**
+	 * Lets the composer attach files. Set it for a session whose agent enables
+	 * attachments; any other refuses the upload.
+	 */
+	readonly allowAttachments?: boolean;
+}
+
+/**
  * An assistant-ui runtime over one Subako session: the log is the store, and
  * every action the thread offers is a call on the session.
  *
- * | assistant-ui              | Subako                                        |
- * | ------------------------- | --------------------------------------------- |
- * | `messages`                | `state.transcript`, then `state.live`         |
- * | `isRunning`               | `state.isRunning`                             |
- * | `onNew`                   | `send(text)`                                  |
- * | `onCancel`                | `cancel()`                                    |
- * | `onRespondToToolApproval` | `resolveApproval(callId, decision, reason)`   |
+ * | assistant-ui              | Subako                                            |
+ * | ------------------------- | ------------------------------------------------- |
+ * | `messages`                | `state.transcript`, then `state.live`             |
+ * | `isRunning`               | `state.isRunning`                                 |
+ * | `onNew`                   | `send(text, { uploadIds })`                       |
+ * | `adapters.attachments`    | `upload(file, { name })`, with `allowAttachments` |
+ * | `onCancel`                | `cancel()`                                        |
+ * | `onRespondToToolApproval` | `resolveApproval(callId, decision, reason)`       |
  *
  * The runtime keeps no messages of its own: what the server put on the log is
  * what the thread shows, and a send that fails leaves the log as it was. A
@@ -70,7 +109,12 @@ function appendedText(message: AppendMessage): string {
  * writes it: each of `state.live` follows the log as a running assistant
  * message, which the logged message replaces once it lands.
  */
-export function useSubakoRuntime(session: SubakoSession | null): AssistantRuntime {
+export function useSubakoRuntime(session: SubakoSession | null, options?: SubakoRuntimeOptions): AssistantRuntime {
+	const attaches = options?.allowAttachments === true;
+	const attachments = useMemo(
+		() => (session === null || !attaches ? undefined : attachmentAdapter(session)),
+		[session, attaches],
+	);
 	// The snapshot this render was woken for, which is what the thread is built from.
 	const state = useSessionState(session);
 	const transcript = state?.transcript;
@@ -91,8 +135,11 @@ export function useSubakoRuntime(session: SubakoSession | null): AssistantRuntim
 		isDisabled: session === null,
 		convertMessage: convertEntry,
 		onNew: async (message) => {
-			await session?.send(appendedText(message));
+			await session?.send(appendedText(message), {
+				uploadIds: (message.attachments ?? []).map((attachment) => attachment.id),
+			});
 		},
+		...(attachments === undefined ? {} : { adapters: { attachments } }),
 		onCancel: async () => {
 			await session?.cancel();
 		},

@@ -167,12 +167,30 @@ appear.
 | ------------------------- | -------------------------------------------------------------- |
 | `messages`                | `state.transcript`, through `convertMessage`                   |
 | `isRunning`               | `state.isRunning`                                              |
-| `onNew`                   | `send(text)`, over the text parts of the appended message      |
+| `onNew`                   | `send(text, { uploadIds })`, over the text parts and the ids   |
+| `adapters.attachments`    | `upload(file, { name })`, when `allowAttachments` is set       |
 | `onCancel`                | `cancel()`                                                     |
 | `onRespondToToolApproval` | `resolveApproval(callId, approved ? "allow" : "deny", reason)` |
 
 The argument is anything carrying those members, or `null`, which is what
 `useSession` hands back.
+
+### Files
+
+```tsx
+const runtime = useSubakoRuntime(session, { allowAttachments: true });
+// or
+<SubakoChat session={session} allowAttachments />;
+```
+
+With `allowAttachments`, the composer takes files: each is uploaded when the turn is
+sent, not when it is picked, and the turn names the uploads it carries. Set it
+for a session whose agent enables attachments; any other refuses the upload.
+
+The files a message carries are shown either way, and `<SubakoChat>` downloads
+one on a click. The files the agent attaches through `builtin:attachments`'
+`attach` are shown under the assistant message that made the call, which keeps
+the call's row.
 
 ### `convertMessage`
 
@@ -190,8 +208,13 @@ The pure half, exported so an app can convert a transcript without a runtime:
 The conversion is cached on the identity of the message object, not on the id,
 and the connection's `transcript` folds a new event into the messages it already
 made — replacing only the ones that event touched — so every other message is
-converted once and stays converted. A user message carries where it came from as
-`metadata.custom.source`.
+converted once and stays converted.
+
+`metadata.custom` is a `SubakoMessageMetadata`: `source`, where a user message
+came from, and `attachments`, the message's files as the log holds them -- a
+user's, sent with it, or an assistant's, attached by its calls to
+`builtin:attachments`' `attach`. A user message lists its files as
+assistant-ui's own `attachments` too, the one role it keeps them for.
 
 ## Your own thread
 
@@ -294,6 +317,6 @@ function Terse(props: ToolCallMessagePartProps) {
 
 ## What it does not do
 
-No thread list, no branching, no editing, no attachments, no speech: the
+No thread list, no branching, no editing, no speech: the
 session is one conversation, its log is append-only, and the runtime declares
 only what the session can actually do.

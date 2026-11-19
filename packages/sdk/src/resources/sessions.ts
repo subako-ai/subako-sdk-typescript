@@ -17,6 +17,12 @@ const volumeRoute = (sessionId: string, { area, path }: VolumePath) => ({ sessio
 const volumeBytes = (content: VolumeFileContent): Blob | Uint8Array =>
 	content instanceof Blob || content instanceof Uint8Array ? content : new Blob([content]);
 
+/** The bytes of a file a message is to carry. */
+export type UploadContent = Blob | Uint8Array | ReadableStream<Uint8Array>;
+
+/** `name` is one path segment such as `report.pdf`; its extension decides the media type the file is served with. */
+export type CreateUploadParams = api.CreateSessionUploadData["query"];
+
 export type ListSessionEventsParams = NonNullable<api.ListSessionEventsData["query"]>;
 
 /** The routes a session token reaches, which `SubakoClient.sessions` and `SubakoSessionClient` both bind. */
@@ -54,6 +60,14 @@ export class SessionApi {
 	/** Posts input, which queues a run or steers the active one. */
 	postEvent(sessionId: string, params: api.PostSessionEventBody, options?: RequestOptions) {
 		return this.core.call(api.postSessionEvent, { path: { session_id: sessionId }, body: params }, options);
+	}
+
+	/**
+	 * Uploads a file for a message to carry. The `id` it answers with goes in an
+	 * input's `upload_ids`; a file no message carries is removed at `expires_at`.
+	 */
+	createUpload(sessionId: string, file: UploadContent, params: CreateUploadParams, options?: RequestOptions) {
+		return this.core.upload(api.createSessionUpload, { path: { session_id: sessionId }, query: params }, file, options);
 	}
 
 	/** Cancels the active run, which stops at its next checkpoint. */
@@ -101,6 +115,15 @@ export class SessionApi {
 	/** Downloads an image the session's events name: an `image` content block's `sha256`. Its bytes never change, so a caller may keep them. */
 	readImage(sessionId: string, sha256: string, options?: RequestOptions) {
 		return this.core.download(api.getSessionImage, { path: { session_id: sessionId, sha256 } }, options);
+	}
+
+	/** Downloads a file a message in the session's events carries: an `attachments` entry's `id`. Its bytes never change, so a caller may keep them. */
+	readAttachment(sessionId: string, attachmentId: string, options?: RequestOptions) {
+		return this.core.download(
+			api.getSessionAttachment,
+			{ path: { session_id: sessionId, attachment_id: attachmentId } },
+			options,
+		);
 	}
 
 	/**

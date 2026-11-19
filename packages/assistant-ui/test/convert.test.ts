@@ -19,6 +19,7 @@ const userTurn = (seq: number, text: string): SessionEventBody => ({
 	seq,
 	created_at: AT,
 	type: "message_user",
+	attachments: [],
 	source: "client",
 	message: { role: "user", content: [{ type: "text", data: { text } }] },
 });
@@ -74,6 +75,42 @@ describe("convertMessage", () => {
 		expect(converted.id).toBe("1");
 		expect(parts(message)).toEqual([{ type: "text", text: "hello" }]);
 		expect(converted.metadata?.custom).toEqual({ source: "client" });
+	});
+
+	it("lists a user turn's files as sent attachments, and carries them as the log holds them", () => {
+		const brief = { id: "a1", name: "brief.png", media_type: "image/png", bytes: 10 };
+		const turn = { ...userTurn(1, "look"), attachments: [brief] } as SessionEventBody;
+		const converted = convertMessage(only([turn]));
+
+		expect(converted.attachments).toEqual([
+			{
+				id: "a1",
+				type: "image",
+				name: "brief.png",
+				contentType: "image/png",
+				status: { type: "complete" },
+				content: [],
+			},
+		]);
+		expect(converted.metadata?.custom).toEqual({ source: "client", attachments: [brief] });
+	});
+
+	it("keeps the files an assistant turn's calls attached beside its parts", () => {
+		const summary = { id: "a2", name: "summary.md", media_type: "text/markdown", bytes: 4 };
+		const added: SessionEventBody = {
+			seq: 3,
+			created_at: AT,
+			type: "message_attachments_added",
+			call_id: "c1",
+			attachments: [summary],
+		};
+		const message = only([assistantTurn(2, "Here it is.", "c1"), added]);
+		const converted = convertMessage(message);
+
+		expect(converted.role).toBe("assistant");
+		// assistant-ui lists attachments for a user message only, and refuses them on any other.
+		expect(converted.attachments).toBeUndefined();
+		expect(converted.metadata?.custom).toEqual({ attachments: [summary] });
 	});
 
 	it("maps an assistant turn to a text part and a tool call with no result yet", () => {

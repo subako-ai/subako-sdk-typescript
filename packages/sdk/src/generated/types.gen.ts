@@ -66,6 +66,16 @@ export type AgentBody = {
  */
 export type AgentConfigBody = {
   /**
+   * Whether the agent's sessions carry files on their messages. `enabled`
+   * lets a person upload files for a message to carry, and serves the
+   * agent `builtin:attachments`, through which it reads a file a message
+   * carries and, when the version grants functions, copies one into the
+   * session's volume or attaches files from the volume to its own
+   * message. `disabled` when left out. A child session's messages never
+   * carry files, whatever its version says.
+   */
+  attachments?: AttachmentsConfigBody;
+  /**
    * The servers the platform serves itself, one setting per server under
    * its fixed name. A setting left out takes its default.
    */
@@ -339,6 +349,41 @@ export type AskUserGrantBody = {
 };
 
 /**
+ * A file a message carries. It never changes under its `id`.
+ */
+export type AttachmentBody = {
+  /**
+   * The file's length in bytes.
+   */
+  bytes: number;
+  id: string;
+  /**
+   * What the file holds, as a media type such as `application/pdf`.
+   */
+  media_type: string;
+  /**
+   * The file's name, without the directory it was sent from.
+   */
+  name: string;
+};
+
+/**
+ * A file was uploaded to a session, to go with a message. Its name and content stay with the session.
+ */
+export type AttachmentUploadedDetails = {
+  bytes: number;
+};
+
+/**
+ * Whether messages carry files.
+ */
+export type AttachmentsConfigBody = {
+  type: 'disabled';
+} | {
+  type: 'enabled';
+};
+
+/**
  * The credential an action came in on.
  * Stable vocabulary for v1: adding a value requires a new API version.
  */
@@ -580,6 +625,9 @@ export type AuditEvent = {
 } | {
   action: 'volume_file_written';
   details: VolumeFileWrittenDetails;
+} | {
+  action: 'attachment_uploaded';
+  details: AttachmentUploadedDetails;
 } | {
   action: 'volume_file_deleted';
   details: VolumeFileDeletedDetails;
@@ -1861,6 +1909,7 @@ export const KnownAuditAction = {
   SESSION_CLIENT_TOOLS_SET: 'session_client_tools_set',
   SESSION_CLIENT_REMOVED: 'session_client_removed',
   VOLUME_FILE_WRITTEN: 'volume_file_written',
+  ATTACHMENT_UPLOADED: 'attachment_uploaded',
   VOLUME_FILE_DELETED: 'volume_file_deleted',
   VOLUME_DELETED: 'volume_deleted',
   VAULT_CREDENTIAL_USED: 'vault_credential_used',
@@ -2238,6 +2287,10 @@ export type ModelProviderBody = (ModelProviderDetailsBody & {
  */
 export type ModelProviderCreatedDetails = {
   auth: 'api_key' | 'aws_web_identity' | 'anthropic_workload_identity' | 'openai_workload_identity';
+  /**
+   * Where its calls are sent.
+   */
+  base_url?: string | null;
   format: 'anthropic' | 'openai_responses';
 };
 
@@ -2319,6 +2372,10 @@ export type ModelProviderUpdatedDetails = {
    * Whether the display name changed.
    */
   display_name: boolean;
+  /**
+   * Where its calls are sent from now on, when that changed.
+   */
+  new_base_url?: string | null;
 };
 
 export type ModelUsageBody = {
@@ -2924,10 +2981,17 @@ export type PolicyActionBody = typeof PolicyActionBody[keyof typeof PolicyAction
  */
 export type PostSessionEventBody = {
   /**
-   * The user turn, as plain text.
+   * The user turn, as plain text. May be empty when files alone carry
+   * it.
    */
   text: string;
   type: 'input';
+  /**
+   * The files the turn carries: the `id` of each upload made to this
+   * session for it. An upload goes with one message only, and keeps
+   * its `id` as an attachment of that message.
+   */
+  upload_ids?: Array<string>;
 };
 
 /**
@@ -3310,6 +3374,13 @@ export type SelectOptionBody = {
 export type SessionBody = {
   agent_id: string;
   agent_version_id: string;
+  /**
+   * Whether the session's messages carry files: `enabled` takes uploads
+   * for a person's messages, and serves the agent the attachment servers.
+   * Its version's `attachments`, and `disabled` for a session an agent
+   * spawned, whatever its version says.
+   */
+  attachments: AttachmentsConfigBody;
   created_at: string;
   created_by: SessionCreatorBody;
   display_name: string;
@@ -3437,12 +3508,25 @@ export type SessionEventPayloadBody = {
   agent_version_id: string;
   type: 'session_created';
 } | {
+  /**
+   * The files the message carries, each read back from the session's
+   * attachments by `id`. Empty for a message that carries none.
+   */
+  attachments: Array<AttachmentBody>;
   message: MessageBody;
   source: InputSourceBody;
   type: 'message_user';
 } | {
   message: MessageBody;
   type: 'message_assistant';
+} | {
+  /**
+   * The files attached, each read back from the session's
+   * attachments by `id`.
+   */
+  attachments: Array<AttachmentBody>;
+  call_id: string;
+  type: 'message_attachments_added';
 } | {
   arguments: {
     [key: string]: unknown;
@@ -3705,6 +3789,30 @@ export type SessionTokenReceiptBody = {
 };
 
 /**
+ * A file stored for a message not sent yet.
+ */
+export type SessionUploadBody = {
+  /**
+   * The file's length in bytes.
+   */
+  bytes: number;
+  /**
+   * When the file is removed if no message has carried it.
+   */
+  expires_at: string;
+  /**
+   * What an input's `upload_ids` names the file by, and the id it keeps
+   * as an attachment once a message carries it.
+   */
+  id: string;
+  /**
+   * What the file is taken to hold, by its name's extension.
+   */
+  media_type: string;
+  name: string;
+};
+
+/**
  * A vault was added to a session.
  */
 export type SessionVaultAddedDetails = {
@@ -3847,7 +3955,11 @@ export type StorageBody = {
 /**
  * What a storage event held.
  */
-export const StorageSubjectBody = { ARCHIVE: 'archive', VOLUME: 'volume' } as const;
+export const StorageSubjectBody = {
+  ARCHIVE: 'archive',
+  VOLUME: 'volume',
+  ATTACHMENT: 'attachment'
+} as const;
 
 /**
  * What a storage event held.
@@ -3956,10 +4068,19 @@ export type UpdateClientToolsBody = {
 
 /**
  * An absent field leaves that part of the provider as it stands, so a
- * rename need not restate the endpoint -- nor the credential.
+ * rename need not restate the endpoint -- nor the credential. A new endpoint
+ * is the one exception: it comes with a new credential. The stored endpoint
+ * sent again is not a new one.
  */
 export type UpdateModelProviderBody = {
   auth?: null | ModelProviderAuthInput;
+  /**
+   * The upstream base URL. One other than the stored one takes `api_key`
+   * or `auth` with it: the stored credential was given for the stored
+   * endpoint, so it never travels to a new one. A federated provider
+   * restates its identity, which `GET` reads back. The stored one, in any
+   * spelling of it, takes neither.
+   */
   base_url?: string | null;
   description?: string | null;
   display_name?: string | null;
@@ -4677,7 +4798,9 @@ export type TokenEndpointAuthBodyWritable = {
 
 /**
  * An absent field leaves that part of the provider as it stands, so a
- * rename need not restate the endpoint -- nor the credential.
+ * rename need not restate the endpoint -- nor the credential. A new endpoint
+ * is the one exception: it comes with a new credential. The stored endpoint
+ * sent again is not a new one.
  */
 export type UpdateModelProviderBodyWritable = {
   /**
@@ -4687,6 +4810,13 @@ export type UpdateModelProviderBodyWritable = {
    */
   api_key?: string | null;
   auth?: null | ModelProviderAuthInputWritable;
+  /**
+   * The upstream base URL. One other than the stored one takes `api_key`
+   * or `auth` with it: the stored credential was given for the stored
+   * endpoint, so it never travels to a new one. A federated provider
+   * restates its identity, which `GET` reads back. The stored one, in any
+   * spelling of it, takes neither.
+   */
   base_url?: string | null;
   description?: string | null;
   display_name?: string | null;
@@ -5987,7 +6117,7 @@ export type UpdateModelProviderData = {
 
 export type UpdateModelProviderErrors = {
   /**
-   * Malformed body, path parameter, a field outside its bound, a base URL the network policy or the provider's auth refuses, or a role that does not trust this workspace alone.
+   * Malformed body, path parameter, a field outside its bound, a base URL other than the stored one sent with no `api_key` or `auth`, a base URL the network policy or the provider's auth refuses, or a role that does not trust this workspace alone.
    */
   400: ErrorBody;
   /**
@@ -7112,6 +7242,52 @@ export type ResolveApprovalResponses = {
 
 export type ResolveApprovalResponse = ResolveApprovalResponses[keyof ResolveApprovalResponses];
 
+export type GetSessionAttachmentData = {
+  body?: never;
+  path: {
+    /**
+     * Session id
+     */
+    session_id: string;
+    /**
+     * The attachment's id, as a message's `attachments` names it.
+     */
+    attachment_id: string;
+  };
+  query?: never;
+  url: '/v1/sessions/{session_id}/attachments/{attachment_id}';
+};
+
+export type GetSessionAttachmentErrors = {
+  /**
+   * Malformed path parameter.
+   */
+  400: ErrorBody;
+  /**
+   * Missing, malformed, or invalid bearer token.
+   */
+  401: ErrorBody;
+  /**
+   * A workspace credential lacking session.read. A session token carries no permissions and never lands here.
+   */
+  403: ErrorBody;
+  /**
+   * No such session or attachment, or the caller cannot see it.
+   */
+  404: ErrorBody;
+};
+
+export type GetSessionAttachmentError = GetSessionAttachmentErrors[keyof GetSessionAttachmentErrors];
+
+export type GetSessionAttachmentResponses = {
+  /**
+   * The file's bytes.
+   */
+  200: Blob | File;
+};
+
+export type GetSessionAttachmentResponse = GetSessionAttachmentResponses[keyof GetSessionAttachmentResponses];
+
 export type CancelSessionRunData = {
   body?: never;
   headers?: {
@@ -7560,7 +7736,7 @@ export type PostSessionEventData = {
 
 export type PostSessionEventErrors = {
   /**
-   * Malformed body or path parameter.
+   * Malformed body or path parameter, more than 20 `upload_ids`, or one named twice.
    */
   400: ErrorBody;
   /**
@@ -7572,7 +7748,7 @@ export type PostSessionEventErrors = {
    */
   403: ErrorBody;
   /**
-   * No such session, the caller cannot see it, or a session token presented against any session but its own.
+   * No such session, the caller cannot see it, a session token presented against any session but its own, or an id in `upload_ids` that names no upload of this session still waiting to be sent: unknown, expired, or already carried by a message. Upload such a file again.
    */
   404: ErrorBody;
   /**
@@ -7946,6 +8122,68 @@ export type MintSessionTokenResponses = {
 };
 
 export type MintSessionTokenResponse = MintSessionTokenResponses[keyof MintSessionTokenResponses];
+
+export type CreateSessionUploadData = {
+  /**
+   * The file's bytes, at most 1 GiB.
+   */
+  body: Blob | File;
+  headers?: {
+    /**
+     * Retry the same operation with this key to return its saved receipt. Scoped by the operation's authenticated caller or resource. A different input under the same key returns 409. Receipts are retained for at least 7 days after completion, then removed by an hourly sweep. After removal the key can execute again. Fresh-only secrets are never included in a replay.
+     */
+    'Idempotency-Key'?: string;
+  };
+  path: {
+    /**
+     * Session id
+     */
+    session_id: string;
+  };
+  query: {
+    /**
+     * The file's name: one path segment of 1 to 200 bytes, such as
+     * `report.pdf`. Its extension decides the media type the file is served
+     * as.
+     */
+    name: string;
+  };
+  url: '/v1/sessions/{session_id}/uploads';
+};
+
+export type CreateSessionUploadErrors = {
+  /**
+   * Malformed path parameter, a name that is not one path segment of 1 to 200 bytes, or a body over 1 GiB.
+   */
+  400: ErrorBody;
+  /**
+   * Missing, malformed, or invalid bearer token.
+   */
+  401: ErrorBody;
+  /**
+   * A workspace credential lacking session.manage, or an organization suspended or out of credit. A session token may act only on its own session and never lands here.
+   */
+  403: ErrorBody;
+  /**
+   * No such session, or the caller cannot see it.
+   */
+  404: ErrorBody;
+  /**
+   * The session's agent does not enable attachments, the session's attachments and uploads already hold 10 GiB or more (a file taken short of that may run past it), or Idempotency-Key was already used for a different request.
+   */
+  409: ErrorBody;
+};
+
+export type CreateSessionUploadError = CreateSessionUploadErrors[keyof CreateSessionUploadErrors];
+
+export type CreateSessionUploadResponses = {
+  /**
+   * The file as stored.
+   */
+  200: SessionUploadBody;
+};
+
+export type CreateSessionUploadResponse = CreateSessionUploadResponses[keyof CreateSessionUploadResponses];
 
 export type DeleteVolumeData = {
   body?: never;

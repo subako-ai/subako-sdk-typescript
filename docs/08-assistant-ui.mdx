@@ -137,10 +137,13 @@ The runtime subscribes to the session itself, so the thread follows the log wher
 | ------------ | ------ |
 | `messages` | `state.transcript`, through `convertMessage`, then `state.live`, through `convertLiveMessage` |
 | `isRunning` | `state.isRunning` |
-| `onNew` | `send(text)`, over the text parts of the appended message |
+| `onNew` | `send(text, { uploadIds })`, over the text parts of the appended message and the ids of its uploads |
+| `adapters.attachments` | `upload(file, { name })`, when `allowAttachments` is set |
 | `onCancel` | `cancel()` |
 | `onRespondToToolApproval` | `resolveApproval(callId, approved ? "allow" : "deny", reason)` |
 
 The argument is anything carrying those members, or `null`.
+
+`useSubakoRuntime(session, { allowAttachments: true })`, or `<SubakoChat allowAttachments>`, lets the composer take files. Each is uploaded when the turn is sent, and the turn names the uploads it carries. Set it for a session whose agent enables attachments; any other refuses the upload. The files a message carries are shown either way.
 
 `convertMessage` and `convertLiveMessage` are the pure half, exported so an app can convert a transcript without a runtime. A live message converts to a running assistant message whose tool calls carry `argsText` while their arguments are still arriving.
